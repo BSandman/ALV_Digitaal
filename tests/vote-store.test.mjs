@@ -70,3 +70,21 @@ test('ongeldige stemkeuze wordt vóór databasegebruik afgewezen', async () => {
   );
   assert.equal(usedDatabase, false);
 });
+
+test('idempotent sluiten accepteert MariaDB JSON als tekst én als reeds geparseerd object', async () => {
+  for (const stored of ['{"count":1}', { count: 1 }]) {
+    const conn = {
+      async execute(sql) {
+        if (/JOIN motion/.test(sql)) return [[{
+          id: 5, status: 'closed', meeting_id: 1,
+          quorum_numerator: 1, quorum_denominator: 2,
+          majority_numerator: 2, majority_denominator: 3,
+        }]];
+        if (/SELECT snapshot/.test(sql)) return [[{ snapshot: stored }]];
+        throw new Error(`Onverwachte query: ${sql}`);
+      },
+    };
+    const store = createVoteStoreMariaDB({ withTransaction: (fn) => fn(conn) });
+    assert.deepEqual(await store.closeRoundAtomically(5), { roundId: 5, snapshot: { count: 1 } });
+  }
+});

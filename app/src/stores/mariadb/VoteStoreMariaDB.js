@@ -152,7 +152,7 @@ export function createVoteStoreMariaDB({
             'SELECT snapshot FROM round_result WHERE round_id = ?',
             [roundId]
           );
-          return { roundId, snapshot: existing ? JSON.parse(existing.snapshot) : null };
+          return { roundId, snapshot: existing ? parseSnapshot(existing.snapshot) : null };
         }
 
         await conn.execute("UPDATE round SET status = 'closing' WHERE id = ?", [roundId]);
@@ -213,6 +213,7 @@ function mapRound(r) {
   };
 }
 function toIso(v) { return v ? new Date(v).toISOString() : null; }
+function parseSnapshot(value) { return typeof value === 'string' ? JSON.parse(value) : value; }
 
 function assertDuration(value) {
   if (!Number.isSafeInteger(value) || value < 1 || value > 86400) {
