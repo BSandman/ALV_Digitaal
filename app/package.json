@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test ../tests/architecture-gate.test.mjs ../tests/auth-store.test.mjs ../tests/hardening-contracts.test.mjs ../tests/pii-scan.test.mjs ../tests/security.test.mjs ../tests/seed-preparer.test.mjs ../tests/vote-result.test.mjs ../tests/vote-store.test.mjs",
+    "test": "node --test ../tests/architecture-gate.test.mjs ../tests/auth-store.test.mjs ../tests/hardening-contracts.test.mjs ../tests/pii-scan.test.mjs ../tests/security.test.mjs ../tests/seed-preparer.test.mjs ../tests/transaction-retry.test.mjs ../tests/vote-result.test.mjs ../tests/vote-store.test.mjs",
     "gate:architecture": "node ../scripts/architecture-gate.mjs",
     "build:release": "node ../scripts/build-release.mjs"
   },

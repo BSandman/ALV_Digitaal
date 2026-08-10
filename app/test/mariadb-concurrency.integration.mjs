@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { closePool, withConnection } from '../src/db/pool.js';
 import { createRequestHandler } from '../src/server.js';
+import { createAuthStoreMariaDB } from '../src/stores/mariadb/AuthStoreMariaDB.js';
 import { createVoteStoreMariaDB } from '../src/stores/mariadb/VoteStoreMariaDB.js';
 
 const votes = createVoteStoreMariaDB();
+const pepper = process.env.AUTH_PEPPER;
+if (!pepper) throw new Error('AUTH_PEPPER ontbreekt voor integratietest.');
 const ids = await seedScenario();
 const round = await votes.openRound(ids.motionId, 60);
 const authStore = {
@@ -69,12 +72,55 @@ try {
   });
   assert.equal(resultCount, 1);
 
+  // Eigenaarlogin en stemmen op hetzelfde gemachtigde recht mogen nooit een
+  // onafgehandelde deadlock of dubbele representatie opleveren.
+  const powerRace = await seedPowerRace();
+  const auth = createAuthStoreMariaDB({ pepper });
+  const { code } = await auth.provisionCredential({
+    participantId: powerRace.participantId,
+    meetingId: powerRace.meetingId,
+    inviteVersion: 1,
+    visiblePrefix: `RACE${powerRace.meetingId}`,
+  });
+  const powerRound = await votes.openRound(powerRace.motionId, 60);
+  const [loginOutcome, voteOutcome] = await Promise.allSettled([
+    auth.authenticate({
+      code,
+      deviceBinding: 'integration-device-binding-power-race',
+      clientIp: '203.0.113.23',
+    }),
+    votes.recordVote(powerRound.id, powerRace.participantId, {
+      entitlementId: powerRace.entitlementId,
+      choice: 'voor',
+    }),
+  ]);
+  assert.equal(loginOutcome.status, 'fulfilled');
+  if (voteOutcome.status === 'rejected') {
+    assert.equal(voteOutcome.reason.code, 'ENTITLEMENT_FORBIDDEN');
+  }
+  const powerEvidence = await withConnection(async (conn) => {
+    const [[power]] = await conn.execute(
+      'SELECT status FROM power_of_attorney WHERE entitlement_id = ?',
+      [powerRace.entitlementId]
+    );
+    const [[audit]] = await conn.execute(
+      `SELECT COUNT(*) AS amount FROM audit_event
+        WHERE action = 'power_of_attorney_invalidated_owner_login'
+          AND JSON_VALUE(context, '$.entitlementId') = ?`,
+      [powerRace.entitlementId]
+    );
+    return { power, audit };
+  });
+  assert.equal(powerEvidence.power.status, 'invalidated_owner_login');
+  assert.equal(Number(powerEvidence.audit.amount), 1);
+
   console.log(JSON.stringify({
     concurrentHttpVotes: statuses.length,
     acceptedBeforeClose: 1 + statuses.filter((status) => status === 201).length,
     rejectedAfterClose: statuses.filter((status) => status === 409).length,
     acceptedAfterClose: 0,
     duplicateCloseResults: 1,
+    loginPowerRace: voteOutcome.status === 'fulfilled' ? 'vote-before-or-after-invalidation' : 'safely-rejected',
   }));
 } finally {
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
@@ -113,6 +159,36 @@ async function seedScenario() {
           majority_numerator, majority_denominator)
        VALUES (?, 'Synthetische race-test', NULL, 1, 2, 2, 3)`,
       [meeting.insertId]
+    );
+    return {
+      meetingId: meeting.insertId,
+      participantId: participant.insertId,
+      entitlementId: entitlement.insertId,
+      motionId: motion.insertId,
+    };
+  });
+}
+
+async function seedPowerRace() {
+  return withConnection(async (conn) => {
+    const [meeting] = await conn.execute(
+      "INSERT INTO meeting (vve_code, meeting_date, status, invite_version) VALUES ('VVE-TEST-POWER-RACE', '2026-09-01', 'open', 1)"
+    );
+    const [participant] = await conn.execute(
+      "INSERT INTO participant (meeting_id, display_name, object_label) VALUES (?, 'Testgroep Machtiging', 'Testobject Machtiging')",
+      [meeting.insertId]
+    );
+    const [entitlement] = await conn.execute(
+      "INSERT INTO entitlement (participant_id, splitsing_code, weight) VALUES (?, 'PG', 1.0000)",
+      [participant.insertId]
+    );
+    const [motion] = await conn.execute(
+      "INSERT INTO motion (meeting_id, title, splitsingen) VALUES (?, 'Synthetische machtigingsrace', NULL)",
+      [meeting.insertId]
+    );
+    await conn.execute(
+      'INSERT INTO power_of_attorney (meeting_id, entitlement_id) VALUES (?, ?)',
+      [meeting.insertId, entitlement.insertId]
     );
     return {
       meetingId: meeting.insertId,

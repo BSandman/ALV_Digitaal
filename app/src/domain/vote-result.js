@@ -50,7 +50,7 @@ export function calculateVoteResult(rows, {
     quorum: {
       numerator: quorum.numerator,
       denominator: quorum.denominator,
-      met: present * quorum.denominatorBig >= eligible * quorum.numeratorBig,
+      met: eligible > 0n && present * quorum.denominatorBig >= eligible * quorum.numeratorBig,
     },
     majority: {
       numerator: majority.numerator,

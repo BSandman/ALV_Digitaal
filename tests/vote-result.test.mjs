@@ -44,3 +44,29 @@ test('één tienduizendste onder een drempel blijft exact rood', () => {
   assert.equal(result.quorum.met, false);
   assert.equal(result.majority.met, false);
 });
+
+test('nul kiesgerechtigd gewicht behaalt nooit automatisch quorum', () => {
+  const result = calculateVoteResult([], {
+    eligibleWeight: '0.0000',
+    quorumNumerator: 1,
+    quorumDenominator: 2,
+    majorityNumerator: 2,
+    majorityDenominator: 3,
+  });
+  assert.equal(result.quorum.met, false);
+  assert.equal(result.majority.met, false);
+});
+
+test('ongeldige of negatieve gewichten en onmogelijke ratio’s worden geweigerd', () => {
+  for (const invalid of ['10.12345', '-1.0000', 'abc', null, undefined]) {
+    assert.throws(() => parseWeight(invalid), TypeError);
+  }
+  assert.throws(() => formatWeight(-1n), TypeError);
+  assert.throws(() => calculateVoteResult([], {
+    eligibleWeight: '10.0000',
+    quorumNumerator: 3,
+    quorumDenominator: 2,
+    majorityNumerator: 2,
+    majorityDenominator: 3,
+  }), RangeError);
+});

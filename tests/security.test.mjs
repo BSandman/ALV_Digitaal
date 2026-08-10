@@ -42,4 +42,8 @@ test('proxy-IP wordt alleen als één door Caddy overschreven hop geaccepteerd',
     () => getVerifiedClientIp({ ...request, headers: { 'x-forwarded-for': '203.0.113.8, 10.0.0.1' } }, { trustProxy: true }),
     { code: 'UNVERIFIED_CLIENT_IP' }
   );
+  assert.throws(
+    () => getVerifiedClientIp({ ...request, headers: { 'x-forwarded-for': ['203.0.113.8', '10.0.0.1'] } }, { trustProxy: true }),
+    { code: 'UNVERIFIED_CLIENT_IP' }
+  );
 });

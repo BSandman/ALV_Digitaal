@@ -49,7 +49,7 @@ test('server-relatieve rondestatus bevat resterende seconden maar geen absolute 
   const conn = {
     async query(sql) {
       assert.match(sql, /TIMESTAMPDIFF\(MICROSECOND, UTC_TIMESTAMP\(3\), closes_at\)/);
-      return [[{ id: 5, status: 'open', round_version: 2, remaining_seconds: 17 }]];
+      return [[{ id: 5, effective_status: 'open', round_version: 2, remaining_seconds: 17 }]];
     },
     async execute(sql, params) { return this.query(sql, params); },
   };
@@ -57,6 +57,18 @@ test('server-relatieve rondestatus bevat resterende seconden maar geen absolute 
   const status = await store.getRoundStatus(5);
   assert.deepEqual(status, { roundId: 5, status: 'open', roundVersion: 2, remainingSeconds: 17 });
   assert.equal('closesAt' in status, false);
+});
+
+test('een verstreken serverdeadline wordt als closing met nul seconden gepubliceerd', async () => {
+  const conn = {
+    async execute() {
+      return [[{ id: 5, effective_status: 'closing', round_version: 2, remaining_seconds: 0 }]];
+    },
+  };
+  const store = createVoteStoreMariaDB({ withConnection: (fn) => fn(conn) });
+  assert.deepEqual(await store.getRoundStatus(5), {
+    roundId: 5, status: 'closing', roundVersion: 2, remainingSeconds: 0,
+  });
 });
 
 test('ongeldige stemkeuze wordt vóór databasegebruik afgewezen', async () => {

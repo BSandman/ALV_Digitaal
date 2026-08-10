@@ -115,7 +115,12 @@ export function createVoteStoreMariaDB({
     async getRoundStatus(roundId) {
       return withConnection(async (conn) => {
         const [[row]] = await conn.execute(
-          `SELECT id, status, round_version,
+          `SELECT id,
+                  CASE
+                    WHEN status = 'open' AND closes_at <= UTC_TIMESTAMP(3) THEN 'closing'
+                    ELSE status
+                  END AS effective_status,
+                  round_version,
                   GREATEST(0, CEIL(TIMESTAMPDIFF(MICROSECOND, UTC_TIMESTAMP(3), closes_at) / 1000000)) AS remaining_seconds
              FROM round WHERE id = ?`,
           [roundId]
@@ -123,9 +128,9 @@ export function createVoteStoreMariaDB({
         if (!row) return null;
         return {
           roundId: row.id,
-          status: row.status,
+          status: row.effective_status,
           roundVersion: row.round_version,
-          remainingSeconds: row.status === 'open' ? Number(row.remaining_seconds) : 0,
+          remainingSeconds: row.effective_status === 'open' ? Number(row.remaining_seconds) : 0,
         };
       });
     },

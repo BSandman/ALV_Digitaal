@@ -57,7 +57,13 @@ export async function withConnection(fn) {
 /** Voer fn uit binnen één transactie (BEGIN/COMMIT/ROLLBACK). Gebruikt voor het
  *  atomair sluiten van een ronde (ADR-0002, regel 3). */
 export async function withTransaction(fn) {
-  return withConnection(async (conn) => {
+  return withConnection((conn) => runTransactionWithRetry(conn, fn));
+}
+
+/** Herhaal een volledig teruggedraaide transactie maximaal tweemaal bij een
+ *  door InnoDB gekozen deadlock-slachtoffer. Andere fouten gaan direct omhoog. */
+export async function runTransactionWithRetry(conn, fn, { maxRetries = 2 } = {}) {
+  for (let attempt = 0; ; attempt += 1) {
     await conn.beginTransaction();
     try {
       const result = await fn(conn);
@@ -65,7 +71,17 @@ export async function withTransaction(fn) {
       return result;
     } catch (err) {
       await conn.rollback();
+      if (isDeadlock(err) && attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, 10 * (attempt + 1)));
+        continue;
+      }
       throw err;
     }
-  });
+  }
+}
+
+function isDeadlock(error) {
+  return error?.code === 'ER_LOCK_DEADLOCK'
+    || error?.errno === 1213
+    || error?.sqlState === '40001';
 }
