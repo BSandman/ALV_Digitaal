@@ -1,0 +1,29 @@
+# Reverse proxy voor de dev/test-omgeving.
+# Bootst de shared-hosting-proxy (LiteSpeed/DirectAdmin) na: TLS-terminatie +
+# X-Forwarded-For, zodat rate limiting en apparaatbinding representatief testen.
+# Lokaal zelfondertekend certificaat (tls internal).
+
+{
+	# Lokale interne CA; geen publieke ACME in dev.
+	auto_https disable_redirects
+}
+
+https://alv-proxy, https://localhost {
+	tls internal
+
+	# Geef het echte client-IP door; de app vertrouwt alleen deze proxy (TRUST_PROXY=1).
+	reverse_proxy alv-app:3000 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Real-IP {remote_host}
+	}
+
+	# Basale securityheaders (Fase 4 verfijnt CSP e.d.).
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+}

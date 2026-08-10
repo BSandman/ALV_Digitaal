@@ -1,0 +1,29 @@
+# Geheimen en omgeving — NOOIT in Git (AVG, voorstel §2.2)
+.env
+*.env
+!infra/.env.example
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Productie-eigenaarsdata mag NOOIT in de repo komen
+data/
+exports/
+*.dump
+*.sql.gz
+!infra/mysql/init/*.sql
+
+# Mistral Lokaal — echte/pseudonieme data en gegenereerde uitvoer blijven lokaal
+mistral-lokaal/secure/
+mistral-lokaal/out/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Docker/loadtest-output
+loadtest-results/
+*.log
