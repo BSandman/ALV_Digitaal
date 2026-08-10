@@ -32,7 +32,7 @@ jobs:
       - name: Stuur Diff naar Gemini API
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: gemini-2.0-flash   # wijzig naar gemini-1.5-flash als dit model niet beschikbaar is op jouw key
+          GEMINI_MODEL: gemini-3.6-flash   # actueel model (aug 2026); bij 404 toont het log de beschikbare modellen voor jouw key
         run: |
           DIFF_CONTENT=$(jq -sR . pr_diff.txt)
           PROMPT="Je bent de Lead Tester in een softwareontwikkelingsteam voor een VvE-stem/presentie-app (server-side stemverwerking in MariaDB, atomair sluiten, quorum en gekwalificeerde meerderheden). Analyseer onderstaande code-diff. Schrijf concrete suggesties voor unit-tests, randgevallen (edge cases) en risico's, met bijzondere aandacht voor race-condities bij gelijktijdig stemmen en voor server-side autorisatie per eigenaarsgroep:\n\n$DIFF_CONTENT"
@@ -62,7 +62,12 @@ jobs:
           echo "---------------------------------------"
 
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::Gemini API eindigde op HTTP $HTTP_CODE. Aanhoudend 429 op free tier = quota nog niet actief: koppel een billing-account (blijft gratis binnen de free-limieten) of kies een ander model via GEMINI_MODEL. 403=key/permissies, 404=modelnaam, 400=payload. Zie respons hierboven."
+            if [ "$HTTP_CODE" = "404" ]; then
+              echo "Model '${GEMINI_MODEL}' niet gevonden. Beschikbare modellen voor deze key die generateContent ondersteunen:"
+              curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}" \
+                | jq -r '.models[]? | select(.supportedGenerationMethods[]? == "generateContent") | .name' || true
+            fi
+            echo "::error::Gemini API eindigde op HTTP $HTTP_CODE. 404=modelnaam onbekend (zie lijst hierboven, zet die in GEMINI_MODEL), 429=quota (billing koppelen of backoff), 403=key/permissies, 400=payload. Zie respons hierboven."
             exit 1
           fi
 
