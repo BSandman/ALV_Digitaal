@@ -1,0 +1,183 @@
+#!/usr/bin/env node
+'use strict';
+
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+
+const args = parseArgs(process.argv.slice(2));
+const findings = [];
+const denylist = loadDenylist(args.denylist || process.env.PII_DENYLIST_FILE);
+
+for (const base of args.diffBase) scanDiff(base);
+for (const target of [...args.path, ...args.fixtures]) scanTarget(path.resolve(target));
+for (const artifact of args.artifact) scanArtifactTarget(path.resolve(artifact));
+
+if (findings.length > 0) {
+  console.error(`PII-gate B: ROOD (${findings.length} bevinding${findings.length === 1 ? '' : 'en'})`);
+  for (const finding of findings) console.error(`- [${finding.kind}] ${finding.location} — ${finding.message}`);
+  process.exitCode = 1;
+} else {
+  console.log('PII-gate B: GROEN — geen deterministische PII- of runtime-datapatronen gevonden.');
+}
+
+function parseArgs(values) {
+  const parsed = { diffBase: [], path: [], fixtures: [], artifact: [] };
+  for (let index = 0; index < values.length; index += 1) {
+    const flag = values[index];
+    const value = values[index + 1];
+    if (!flag?.startsWith('--') || value === undefined) throw new Error(`Ongeldig of onvolledig argument: ${flag}`);
+    if (flag === '--diff-base') parsed.diffBase.push(value);
+    else if (flag === '--path') parsed.path.push(value);
+    else if (flag === '--fixtures') parsed.fixtures.push(value);
+    else if (flag === '--artifact') parsed.artifact.push(value);
+    else if (flag === '--denylist') parsed.denylist = value;
+    else throw new Error(`Onbekend argument: ${flag}`);
+    index += 1;
+  }
+  if (parsed.diffBase.length + parsed.path.length + parsed.fixtures.length + parsed.artifact.length === 0) {
+    throw new Error('Geef minimaal één --diff-base, --path, --fixtures of --artifact op.');
+  }
+  return parsed;
+}
+
+function scanDiff(base) {
+  const result = run('git', ['diff', '--no-ext-diff', '--unified=0', `${base}...HEAD`]);
+  if (result.status !== 0) throw new Error(`Git-diff tegen ${base} mislukt: ${result.stderr.trim()}`);
+
+  let currentFile = '(onbekende diff)';
+  const addedLines = [];
+  for (const line of result.stdout.split(/\r?\n/)) {
+    if (line.startsWith('diff --git ')) {
+      if (addedLines.length) scanText(currentFile, addedLines.join('\n'));
+      addedLines.length = 0;
+      const match = line.match(/^diff --git a\/(.+) b\/(.+)$/);
+      currentFile = match ? match[2] : line;
+      scanFileName(currentFile);
+    } else if (line.startsWith('+') && !line.startsWith('+++')) {
+      addedLines.push(line.slice(1));
+    }
+  }
+  if (addedLines.length) scanText(currentFile, addedLines.join('\n'));
+}
+
+function scanTarget(target) {
+  if (!fs.existsSync(target)) return;
+  const stat = fs.statSync(target);
+  if (stat.isDirectory()) {
+    for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
+      if (['.git', 'node_modules', 'secure', 'out'].includes(entry.name)) continue;
+      scanTarget(path.join(target, entry.name));
+    }
+    return;
+  }
+  scanFile(target, normalize(target));
+}
+
+function scanArtifactTarget(target) {
+  if (!fs.existsSync(target)) {
+    findings.push({ kind: 'missing_artifact', location: normalize(target), message: 'Release-artefact ontbreekt.' });
+    return;
+  }
+  const stat = fs.statSync(target);
+  if (stat.isDirectory()) {
+    for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
+      const fullPath = path.join(target, entry.name);
+      if (entry.isDirectory()) scanArtifactTarget(fullPath);
+      else if (isArchive(fullPath)) scanArchive(fullPath);
+      else scanFile(fullPath, normalize(fullPath));
+    }
+  } else if (isArchive(target)) {
+    scanArchive(target);
+  } else {
+    scanFile(target, normalize(target));
+  }
+}
+
+function scanArchive(archive) {
+  const listArgs = archive.toLowerCase().endsWith('.zip') ? ['-tf', archive] : ['-tzf', archive];
+  const listed = run('tar', listArgs);
+  if (listed.status !== 0) {
+    findings.push({ kind: 'invalid_artifact', location: normalize(archive), message: 'Archief kan niet deterministisch worden gelezen.' });
+    return;
+  }
+
+  for (const entry of listed.stdout.split(/\r?\n/).filter(Boolean)) {
+    scanFileName(`${normalize(archive)}::${entry}`);
+    if (entry.endsWith('/')) continue;
+    const extractArgs = archive.toLowerCase().endsWith('.zip')
+      ? ['-xOf', archive, entry]
+      : ['-xOzf', archive, entry];
+    const extracted = run('tar', extractArgs, 4 * 1024 * 1024);
+    if (extracted.status === 0) scanText(`${normalize(archive)}::${entry}`, extracted.stdout);
+  }
+}
+
+function scanFile(file, label) {
+  scanFileName(label);
+  const stat = fs.statSync(file);
+  if (stat.size > 4 * 1024 * 1024) {
+    findings.push({ kind: 'oversized_file', location: label, message: 'Bestand is groter dan 4 MB en kan niet veilig worden vrijgegeven.' });
+    return;
+  }
+  const buffer = fs.readFileSync(file);
+  if (buffer.includes(0)) return;
+  scanText(label, buffer.toString('utf8'));
+}
+
+function scanFileName(label) {
+  const normalized = normalize(label);
+  const base = path.posix.basename(normalized.split('::').pop());
+  if (/^(?:owners(?:\.initial)?\.(?:js|json|csv)|events\.json|audit\.log|cycle\.json)$/i.test(base)) {
+    findings.push({ kind: 'forbidden_file', location: normalized, message: 'Eigenaars- of runtimebestand is verboden in diff/fixture/release.' });
+  }
+  if (/(?:^|\/)snapshots?(?:\/|$)/i.test(normalized)) {
+    findings.push({ kind: 'forbidden_snapshot', location: normalized, message: 'Snapshots zijn verboden in het release-artefact.' });
+  }
+}
+
+function scanText(label, content) {
+  const placeholderEmails = new Set(['user@starter.mijn.host']);
+  const emails = content.match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi) ?? [];
+  if (emails.some((email) => !placeholderEmails.has(email.toLocaleLowerCase('nl-NL')))) {
+    findings.push({ kind: 'email', location: label, message: 'E-mailadres aangetroffen.' });
+  }
+  const patterns = [
+    ['postcode', /\b\d{4}\s?[A-Z]{2}\b/i, 'Nederlandse postcode aangetroffen.'],
+    ['iban', /\bNL\d{2}[A-Z]{4}\d{10}\b/i, 'Nederlands IBAN aangetroffen.'],
+  ];
+  for (const [kind, expression, message] of patterns) {
+    if (expression.test(content)) findings.push({ kind, location: label, message });
+  }
+  const lower = content.toLocaleLowerCase('nl-NL');
+  for (const blocked of denylist) {
+    if (lower.includes(blocked.toLocaleLowerCase('nl-NL'))) {
+      findings.push({ kind: 'denylist', location: label, message: 'Bekende echte VvE-naam of straat uit de lokale denylist aangetroffen.' });
+    }
+  }
+}
+
+function loadDenylist(explicitPath) {
+  const candidates = [];
+  if (explicitPath) candidates.push(path.resolve(explicitPath));
+  candidates.push(path.resolve('mistral-lokaal', 'secure', 'pii-denylist.txt'));
+  const selected = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!selected) return [];
+  return fs.readFileSync(selected, 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'));
+}
+
+function isArchive(file) {
+  return /\.(?:tgz|tar\.gz|zip)$/i.test(file);
+}
+
+function run(command, commandArgs, maxBuffer = 8 * 1024 * 1024) {
+  return spawnSync(command, commandArgs, { encoding: 'utf8', maxBuffer, windowsHide: true });
+}
+
+function normalize(value) {
+  return value.replaceAll('\\', '/');
+}

@@ -26,4 +26,6 @@ Thumbs.db
 
 # Docker/loadtest-output
 loadtest-results/
+dist/
+coverage/
 *.log

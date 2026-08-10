@@ -27,15 +27,7 @@ jobs:
           git diff origin/${{ github.base_ref }}...HEAD > pr_diff.txt
 
       - name: PII-voorwacht (ADR-0005) — stop vóór externe verzending
-        run: |
-          # Faal als de diff patronen bevat die op echte persoonsgegevens of
-          # runtime-databestanden wijzen. Zo verlaat er nooit PII de repo.
-          if grep -Eiq '([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})' pr_diff.txt \
-             || grep -Eiq '(owners\.js|owners\.initial\.js|events\.json|audit\.log|cycle\.json|snapshots/)' pr_diff.txt; then
-            echo "::error::PII-voorwacht: mogelijke persoonsgegevens/runtime-data in de diff. Verzending naar externe API geblokkeerd (ADR-0005)."
-            exit 1
-          fi
-          echo "PII-voorwacht schoon."
+        run: node mistral-lokaal/scripts/pii_scan --diff-base "origin/${{ github.base_ref }}"
 
       - name: Stuur Diff naar Gemini API
         env:

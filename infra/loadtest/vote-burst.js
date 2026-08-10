@@ -43,6 +43,9 @@ export function vote() {
   const res = http.post(`${TARGET}/deelnemen/api/vote`, payload, {
     headers: { 'Content-Type': 'application/json' },
     tags: { name: 'vote' },
+    // Productfunctionaliteit valt buiten Sprint 1: de placeholder mag 4xx geven.
+    // Netwerkfouten en 5xx blijven wél http_req_failed en blokkeren de T-gate.
+    responseCallback: http.expectedStatuses({ min: 200, max: 499 }),
   });
   check(res, { 'vote afgehandeld': (r) => r.status < 500 });
 }
