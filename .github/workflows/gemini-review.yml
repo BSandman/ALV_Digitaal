@@ -32,14 +32,36 @@ jobs:
       - name: Stuur Diff naar Gemini API
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-2.0-flash   # wijzig naar gemini-1.5-flash als dit model niet beschikbaar is op jouw key
         run: |
           DIFF_CONTENT=$(jq -sR . pr_diff.txt)
           PROMPT="Je bent de Lead Tester in een softwareontwikkelingsteam voor een VvE-stem/presentie-app (server-side stemverwerking in MariaDB, atomair sluiten, quorum en gekwalificeerde meerderheden). Analyseer onderstaande code-diff. Schrijf concrete suggesties voor unit-tests, randgevallen (edge cases) en risico's, met bijzondere aandacht voor race-condities bij gelijktijdig stemmen en voor server-side autorisatie per eigenaarsgroep:\n\n$DIFF_CONTENT"
           PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{ contents: [{ parts: [{ text: $prompt }] }] }')
-          curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}" \
+
+          # Vang de HTTP-status apart, zodat we bij een fout de échte oorzaak zien
+          # (de respons-body bevat de API-key NIET; Actions-logs zijn privé voor collaborators).
+          HTTP_CODE=$(curl -s -w "%{http_code}" -o response.json \
+            -X POST "https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD" > response.json
-          jq -r '.candidates[0].content.parts[0].text // "‼️ Geen bruikbaar antwoord van de Gemini API (controleer GEMINI_API_KEY en quota)."' response.json > review_output.txt
+            -d "$PAYLOAD")
+
+          echo "Gemini API HTTP-status: $HTTP_CODE  (model: ${GEMINI_MODEL})"
+          echo "----- Ruwe API-respons (diagnose) -----"
+          cat response.json
+          echo ""
+          echo "---------------------------------------"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Gemini API gaf HTTP $HTTP_CODE. 429=quota/rate-limit, 403=key/permissies of API niet ingeschakeld, 404=modelnaam onbekend, 400=payload. Zie ruwe respons hierboven."
+            exit 1
+          fi
+
+          REVIEW=$(jq -r '.candidates[0].content.parts[0].text // empty' response.json)
+          if [ -z "$REVIEW" ]; then
+            echo "::error::HTTP 200 maar geen review-tekst (mogelijk safety-block of leeg antwoord). Zie ruwe respons hierboven."
+            exit 1
+          fi
+          printf '%s' "$REVIEW" > review_output.txt
 
       - name: Plaats Feedback als PR Comment
         uses: actions/github-script@v7
