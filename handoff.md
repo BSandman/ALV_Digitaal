@@ -1,12 +1,12 @@
 ---
-sprint: 1
-state: READY_FOR_DEV
+sprint: 2
+state: DEV_IN_PROGRESS
 owner: codex
-since: 2026-08-10T14:30:00Z
-next: gemini
+since: 2026-08-10T22:24:02Z
+next: claude
 action_required_by: none
 blocked: false
-note: "Git opgelost (ADR-0007): repo = ALV_Digitaal zelf, privé GitHub-repo als origin. Codex: init + push (zie Huidige beurt), daarna taak 10.2. Bas regelt Gemini's connector-toegang vóór TEST."
+note: "Sprint 2 hardening A1-A6 in uitvoering; PR #1 wordt eerst naar main gemerged."
 ---
 
 # handoff.md — de estafettestok
@@ -15,29 +15,16 @@ note: "Git opgelost (ADR-0007): repo = ALV_Digitaal zelf, privé GitHub-repo als
 
 ## Huidige beurt
 
-**Handmatige bootstrap (geen watchers).** Git-blokkade opgelost, zie ADR-0007: de repo is `Platform/ALV_Digitaal` zelf (niet VvE_Werk). Codex, doe als Git-steward eerst de repo-init, dan taak 10.2:
+**Sprint 2, blok 1 — Codex (dev).** Start je watcher (`python scripts/watch_handoff.py --role codex`). Volgorde:
 
-```powershell
-# 1. Ruim het lege, misleidende .git-omhulsel op
-Remove-Item -Recurse -Force "D:\Bas_en_AIs\VvE_Werk\.git"
-# 2. Init de repo IN ALV_Digitaal (dit is de repo-root)
-cd "D:\Bas_en_AIs\VvE_Werk\Platform\ALV_Digitaal"
-git init -b main
-# 3. Controleer .gitignore: geen mistral-lokaal/secure, out, .env, data, node_modules
-git add -A ; git status
-# 4. Eerste commit
-git commit -m "chore: init ALV_Digitaal repo (fase 2) - architectuur, OTAP, ADR-0001..0007, pijplijn"
-# 5. Privé GitHub-repo aanmaken + pushen (gh gebruikt het account dat ook HAOS-Werk beheert)
-gh repo create ALV_Digitaal --private --source=. --remote=origin --push
-#    Fallback zonder gh:
-#    git remote add origin git@github.com:<account>/ALV_Digitaal.git ; git push -u origin main
-```
+1. Merge **PR #1** → `main` (steward).
+2. Branch `feat/sprint-2-hardening`.
+3. Bouw **A1–A6** uit `sprint.md` (row-level autorisatie, `NO_BACKSLASH_ESCAPES`, exacte rekenkunde, auth-hardening, machtiging-vervalt-bij-login, server-relatieve sluit-timer). Toets tegen ADR-0002/0006/0008.
+4. Open een PR (gates + Gemini-review draaien automatisch) en zet daarna `state: READY_FOR_VALIDATION`, `owner: claude`.
 
-Verifieer bij stap 3 dat `git status` géén `mistral-lokaal/secure/`, `mistral-lokaal/out/`, `.env` of `data/` toont (PII-discipline, ADR-0005). De commit bevat nu ook `.github/workflows/gemini-review.yml` (Gemini als PR-Action, ADR-0007). Daarna: `DEV_IN_PROGRESS` + taak 10.2, en werk als steward via **feature-branch → PR** (DEV→TEST loopt via een PR). **Bas** zet de repo-secret `GEMINI_API_KEY` (Settings → Secrets → Actions) vóór de eerste PR.
+Bij een blokker: `state: BLOCKED`, `action_required_by: bas`. Window leeg? Baton blijft staan; volgend blok verder.
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
-- 2026-08-10 — Claude: architectuur, OTAP, ADR-0001..0006, AGENTS/bijbel/sprint + agent-instructies opgezet. → READY_FOR_DEV.
-- 2026-08-10 — Codex: BLOCKED — VvE_Werk/.git leeg, geen commits mogelijk.
-- 2026-08-10 — Claude: gediagnosticeerd + ADR-0007 (repo = ALV_Digitaal). Git-init-commando's aangeleverd. → READY_FOR_DEV.
-- 2026-08-10 — Codex aan zet: repo-init, daarna taak 10.2 (T-run + CI-gates).
+- 2026-08-10 — Sprint 1 afgerond (Fundament), gevalideerd groen. → SPRINT_DONE.
+- 2026-08-10 — Claude: Sprint 2 (Hardening) opgezet in blok-cadans; 10.3 A-domein → Sprint 3. → READY_FOR_DEV (blok 1 Codex).

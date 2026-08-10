@@ -69,6 +69,22 @@ Regels: werk op feature-branches; `handoff.md` wordt alleen door de huidige eige
 
 Elke AI draait lokaal een watcher die het protocol hierboven uitvoert. Referentie-implementatie: `scripts/watch_handoff.py` (pollt Git, leest de frontmatter, past de 60s-guard toe, en roept de rol-specifieke "act"-stap aan). Elke agent vult zijn eigen "act" in met zijn eigen runner; de coördinatielogica is identiek. Poll-interval: 30–60 s.
 
+## Cadans en watchers (operating model)
+
+Twee misverstanden om af te pellen:
+
+- **Watchen kost geen LLM-tokens.** `watch_handoff.py` is een kale Git-poll + bestand-lezen; zolang het niet jouw beurt is, gebeurt er niets duurs. Alleen een **echte beurt** (het `act`-werk) kost tokens. Houd de poller dus gescheiden van het model: de watcher wekt de agent pas als de state zijn `READY_FOR_*` is.
+- **Draai niet 24/7.** Werk in **blokken** (bv. 4×30 min per sprint). Aan het begin van een blok start je de watcher(s) van de agent(s) die dán aan zet zijn (zie `handoff.md`); aan het eind stop je ze. Tussen blokken draait er niets → geen tokens, geen window-verbruik.
+
+Regels om te voorkomen dat je op een koud window wacht:
+
+1. **Lijn blokken uit op de beurten.** Een blok heeft idealiter maar één of twee venstergebonden agents nodig. Volgorde per sprint: **dev-blok** (Codex) → op de PR draaien gates + Gemini-review **automatisch** → **validatie-blok** (Claude) → **integratie/deploy-blok** (Mistral).
+2. **Gemini is serverless.** Zijn review draait als GitHub Action op de PR — geen usage-window, dus Gemini is nooit de bottleneck en hoeft niet "wakker" te zijn.
+3. **Window uitgeput bij jouw beurt?** Geen live keten die vastloopt: de baton blijft gewoon op jouw `READY_FOR_*` staan, het blok pauzeert, en je pakt 'm op zodra je window weer open is. Zet alleen een `note` als er iets bijzonders is.
+4. **Alleen de venstergebonden hop telt.** Omdat blokken kort en gescheiden zijn, blokkeert een uitgeput window van één agent alleen zijn eigen blok — niet een doorlopende keten.
+
+Activeren = per agent-omgeving `python scripts/watch_handoff.py --role <rol>` starten aan het begin van diens blok (Gemini niet — die is de Action). Begin semi-handmatig/gescheduled; zet continue watchers pas aan als een paar volledige cycli bewezen zijn.
+
 ## Eigenaarschap van de waarheid
 
 `README.md` (de ingang) en `bijbel.md` (de waarheid) worden **uitsluitend door Claude (Architect)** gewijzigd. Zo is er één schrijver op de gedeelde werkelijkheid en ontstaat geen drift. Elke andere rol — nu Codex/Gemini/Mistral, later bv. DeepSeek — die een wijziging in README of bijbel nodig heeft, meldt dat via de `handoff.md`-`note` (of `state: BLOCKED`); Claude verwerkt het. Elke nieuwe agent leest de README minimaal één keer als nulpunt.

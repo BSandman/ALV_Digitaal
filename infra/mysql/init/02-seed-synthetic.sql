@@ -4,9 +4,11 @@
 INSERT INTO meeting (vve_code, meeting_date, status, invite_version)
 VALUES ('VVE-TEST-001', '2026-09-01', 'draft', 1);
 
+SET @meeting_id = LAST_INSERT_ID();
+
 -- 120 fictieve deelnemers + één stemrecht elk, voor de belastingstest van Gemini.
 INSERT INTO participant (meeting_id, display_name, object_label)
-SELECT 1,
+SELECT @meeting_id,
        CONCAT('Test Eigenaar ', LPAD(seq, 3, '0')),
        CONCAT('Appartement ', LPAD(seq, 3, '0'))
 FROM (
@@ -21,4 +23,5 @@ WHERE seq <= 120;
 
 INSERT INTO entitlement (participant_id, splitsing_code, weight)
 SELECT id, CONCAT('A-', LPAD(id, 3, '0')), 1.0000
-FROM participant;
+FROM participant
+WHERE meeting_id = @meeting_id;

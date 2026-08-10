@@ -53,12 +53,13 @@ ALV_Digitaal/
     Architectuur_en_infravoorstel_v0.2.0.md   hoofdvoorstel (beoordeling + infra)
     OTAP_opzet_v1.0.0.md                        vier-traps OTAP + promotiepoorten + repo-advies
     Mistral_Lokaal_setup_runbook_v1.0.0.md      parallelle setup voor Bas (model, data, PII-gate)
-    ADR/                                        besluitregister (ADR-0001..0006, template)
+    ADR/                                        besluitregister (ADR-0001..0008, template)
     gates/handoff-template.md                   verplicht handoff-formaat tussen de 4 AI's
     gates/Codex-instructie.md                   rol-charter + Sprint 1 (dev + git-steward)
     gates/Gemini-instructie.md                  rol-charter + Sprint 1 (test)
     gates/Mistral-instructie.md                 rol-charter + fase C (3 scripts) + deploy
     gates/Codex-taak-10.2_T-run-en-CI-gates.md  Sprint 1: T-run + CI-gates
+    gates/Claude-validatie-sprint1.md           validatie PR#1 + Sprint 2-acties
     gates/Codex-Mistral-taak-10.3_A-domein.md   Sprint 2: acceptatie.honigfabriek.nl
   infra/
     docker-compose.yml                          dev/test/CI-omgeving (profielen: dev, loadtest)
@@ -72,7 +73,7 @@ ALV_Digitaal/
   scripts/deploy.sh                             productie-deploy naar .starter (GEEN Docker)
 ```
 
-## Snel starten (dev/test)
+## Snel starten (dev)
 
 Vereist: Docker Desktop.
 
@@ -89,11 +90,22 @@ DB-inspectie (Adminer):
 docker compose --profile dev up -d alv-adminer   # http://localhost:8081
 ```
 
-Belastingstest (120 clients + stemburst):
+## Snel starten (test — de volledige T-omgeving)
+
+De T-trap uit de OTAP-opzet: basisrun + de profielen `dev` en `loadtest`, met synthetische data.
+
+```bash
+cd infra
+docker compose --profile dev --profile loadtest up   # T-omgeving compleet
+```
+
+Losse belastingstest (120 clients + stemburst):
 
 ```bash
 docker compose --profile loadtest run --rm alv-loadtest
 ```
+
+CI-gates draaien automatisch op elke PR (`.github/workflows/ci.yml`): regressietests, Gate A (ADR-0002), code-only release-build en Gate B (PII-scan). De Gemini-review draait als aparte Action (`gemini-review.yml`).
 
 ## Rolverdeling en coördinatie
 

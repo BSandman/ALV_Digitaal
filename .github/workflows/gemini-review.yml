@@ -27,27 +27,56 @@ jobs:
           git diff origin/${{ github.base_ref }}...HEAD > pr_diff.txt
 
       - name: PII-voorwacht (ADR-0005) — stop vóór externe verzending
-        run: |
-          # Faal als de diff patronen bevat die op echte persoonsgegevens of
-          # runtime-databestanden wijzen. Zo verlaat er nooit PII de repo.
-          if grep -Eiq '([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})' pr_diff.txt \
-             || grep -Eiq '(owners\.js|owners\.initial\.js|events\.json|audit\.log|cycle\.json|snapshots/)' pr_diff.txt; then
-            echo "::error::PII-voorwacht: mogelijke persoonsgegevens/runtime-data in de diff. Verzending naar externe API geblokkeerd (ADR-0005)."
-            exit 1
-          fi
-          echo "PII-voorwacht schoon."
+        run: node mistral-lokaal/scripts/pii_scan --diff-base "origin/${{ github.base_ref }}"
 
       - name: Stuur Diff naar Gemini API
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.6-flash   # actueel model (aug 2026); bij 404 toont het log de beschikbare modellen voor jouw key
         run: |
           DIFF_CONTENT=$(jq -sR . pr_diff.txt)
           PROMPT="Je bent de Lead Tester in een softwareontwikkelingsteam voor een VvE-stem/presentie-app (server-side stemverwerking in MariaDB, atomair sluiten, quorum en gekwalificeerde meerderheden). Analyseer onderstaande code-diff. Schrijf concrete suggesties voor unit-tests, randgevallen (edge cases) en risico's, met bijzondere aandacht voor race-condities bij gelijktijdig stemmen en voor server-side autorisatie per eigenaarsgroep:\n\n$DIFF_CONTENT"
           PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{ contents: [{ parts: [{ text: $prompt }] }] }')
-          curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" > response.json
-          jq -r '.candidates[0].content.parts[0].text // "‼️ Geen bruikbaar antwoord van de Gemini API (controleer GEMINI_API_KEY en quota)."' response.json > review_output.txt
+
+          # Roep de API aan met retry + exponentiële backoff op 429 (rate-limit).
+          # De respons-body bevat de API-key NIET; Actions-logs zijn privé voor collaborators.
+          URL="https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}"
+          HTTP_CODE=""
+          for attempt in 1 2 3 4 5; do
+            HTTP_CODE=$(curl -s -w "%{http_code}" -o response.json -X POST "$URL" \
+              -H "Content-Type: application/json" -d "$PAYLOAD")
+            echo "Poging $attempt — HTTP $HTTP_CODE (model: ${GEMINI_MODEL})"
+            if [ "$HTTP_CODE" = "200" ]; then break; fi
+            if [ "$HTTP_CODE" = "429" ]; then
+              WAIT=$((attempt * 20))
+              echo "429 rate-limit — wacht ${WAIT}s en probeer opnieuw..."
+              sleep "$WAIT"
+              continue
+            fi
+            break   # andere fout (403/404/400): niet blijven proberen
+          done
+
+          echo "----- Ruwe API-respons (diagnose) -----"
+          cat response.json
+          echo ""
+          echo "---------------------------------------"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            if [ "$HTTP_CODE" = "404" ]; then
+              echo "Model '${GEMINI_MODEL}' niet gevonden. Beschikbare modellen voor deze key die generateContent ondersteunen:"
+              curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}" \
+                | jq -r '.models[]? | select(.supportedGenerationMethods[]? == "generateContent") | .name' || true
+            fi
+            echo "::error::Gemini API eindigde op HTTP $HTTP_CODE. 404=modelnaam onbekend (zie lijst hierboven, zet die in GEMINI_MODEL), 429=quota (billing koppelen of backoff), 403=key/permissies, 400=payload. Zie respons hierboven."
+            exit 1
+          fi
+
+          REVIEW=$(jq -r '.candidates[0].content.parts[0].text // empty' response.json)
+          if [ -z "$REVIEW" ]; then
+            echo "::error::HTTP 200 maar geen review-tekst (mogelijk safety-block of leeg antwoord). Zie ruwe respons hierboven."
+            exit 1
+          fi
+          printf '%s' "$REVIEW" > review_output.txt
 
       - name: Plaats Feedback als PR Comment
         uses: actions/github-script@v7

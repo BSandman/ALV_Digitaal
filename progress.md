@@ -2,9 +2,19 @@
 
 Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel. Waarheid in `bijbel.md`; regels in `AGENTS.md`.
 
-## Sprint 1 — Fundament (loopt)
+## Sprint 2 — Hardening (loopt)
 
-**Doel:** T-omgeving draait, CI-gates groen. Zie `sprint.md`.
+**Doel:** skeleton → correcte, veilige stemverwerking (A1–A6 + G1–G5 + M1 + B1). Vier-blok-cadans; 10.3 A-domein → Sprint 3. Zie `sprint.md`.
+
+- 2026-08-10 · Claude · Sprint 2 opgezet in blok-ritme (dev → auto gates/review → validatie → integratie). Baton → READY_FOR_DEV (blok 1 Codex). Codex start met PR #1 mergen, dan `feat/sprint-2-hardening`.
+
+## Sprint 1 — Fundament (afgerond, gevalideerd)
+
+**Doel:** T-omgeving draait, CI-gates groen. Zie `sprint.md`. **Uitkomst:** groen op alle poorten; gevalideerd.
+
+- 2026-08-10 · Codex · Taak 10.2 opgeleverd (commits t/m fe56766): reproduceerbare T-run, veldgelijke synthetische seed, CI-gate A (ADR-0002), gate B (`pii_scan` op diff/fixtures/artefact), code-only release-artefact, skeleton MariaDB-stores (append-only + atomair sluiten). Bewijs: 7/7 tests; k6 1.783 requests, 0,00% fouten, vote-p95 17,15 ms; negatieftest PII-gate faalt correct.
+- 2026-08-10 · Gemini (PR-Action) · Review groen op PR #1 via `gemini-3.6-flash`, HTTP 200 poging 1.
+- 2026-08-10 · Claude · Architectuurvalidatie **groen** tegen de zes ADR-0002-regels (state in DB, FOR UPDATE atomair, append-only, UTC, sql_mode, row-level=TODO correct gemarkeerd). Reviewpunten (Gemini + Bas) geconsolideerd in `docs/gates/Claude-validatie-sprint1.md`; blijvende domeinregels in ADR-0008 (multi-VvE PG+TF/NB, machtiging vervalt bij login, exacte rekenkunde). Klok-sync-vraag beantwoord: servertijd volstaat, alleen "relatieve deadline i.p.v. absolute" toevoegen. → SPRINT_DONE; follow-ups naar Sprint 2.
 
 **Verslag:**
 - 2026-08-10 · Claude · Architectuur- en besturingslaag opgezet: `OTAP_opzet_v1.0.0.md`, ADR-0004/0005/0006, Mistral-runbook, Codex-taak-10.2, en de pijplijnbestanden `AGENTS.md` / `bijbel.md` / `sprint.md` / `handoff.md` / `progress.md` + referentie-watcher `scripts/watch_handoff.py`. Fase-1 `stem.honigfabriek.nl` → onderhoudspagina.
@@ -13,6 +23,10 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 - 2026-08-10 · Codex · BLOCKED: `D:\Bas_en_AIs\VvE_Werk\.git` leeg (geen HEAD/config) — geen git-operaties mogelijk. Protocol correct gevolgd, geen productcode gewijzigd.
 - 2026-08-10 · Claude · Diagnose: VvE_Werk was nooit een repo; agent-topologie gemengd (Codex/Claude/Mistral lokaal, Gemini cloud). Besluit ADR-0007: repo = `ALV_Digitaal` zelf, lokaal trio deelt map. Remote = **privé GitHub-repo `ALV_Digitaal`** (net als HAOS-Werk); Gemini krijgt directe toegang via zijn GitHub-connector. Git-init + `gh repo create`-commando's aan Codex geleverd; `handoff.md` → `READY_FOR_DEV`.
 - 2026-08-10 · Claude · Gemini heeft geen connector → opgenomen als **GitHub Action op PR** (`.github/workflows/gemini-review.yml`, met PII-voorwacht vóór externe API-verzending). DEV→TEST loopt nu via een Pull Request. ADR-0007 + bijbel + AGENTS + Gemini-charter bijgewerkt. Actie Bas: repo-secret `GEMINI_API_KEY` instellen vóór de eerste PR.
+- 2026-08-10 · Codex/Bas · Eerste PR-run: Gemini gaf een fout (key/quota-melding) maar de workflow slikte de echte oorzaak in. Chat-Pro ≠ API-quota (los systeem). Claude · workflow gehard: toont nu HTTP-status + ruwe API-respons in het log en faalt hard, zodat de volgende run de echte oorzaak toont (429/403/404/400). `GEMINI_MODEL` als env-var.
+- 2026-08-10 · Bas · Oorzaak vastgesteld via AI Studio Usage: **429 TooManyRequests** (plain free-tier key, project ALV-Digitaal, geen billing gekoppeld). Claude · workflow uitgebreid met retry + exponentiële backoff op 429.
+- 2026-08-10 · Codex (commit 5efebe3) · Re-run: 429 weg (backoff werkt), nu **HTTP 404** — `gemini-2.0-flash` bestaat niet meer (verouderd model). Claude · model → `gemini-3.6-flash` (actueel per Google-docs, doc-check Codex); workflow toont bij 404 nu de beschikbare modellen voor de key (ListModels), zodat modelnamen niet meer geraden worden. Vervolg: Codex pusht + één re-run.
+- 2026-08-10 · Codex · Taak 10.2 op `feat/sprint-1-t-run-ci-gates` (`af14f3a`): T-run met MariaDB 11.8.8, 120 synthetische deelnemers, strict SQL-mode/UTC, 2 GB/2 CPU en één Node-proces; 7/7 tests, gates A+B en code-only artefact groen; k6 1.783 requests, 0,00% fouten, status-p95 3,56 ms, vote-p95 17,15 ms. → READY_FOR_TEST via PR.
 
 ## Sprint 0 — Architectuur (afgerond, samengevat)
 
