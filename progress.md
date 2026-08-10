@@ -7,6 +7,7 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 **Doel:** skeleton → correcte, veilige stemverwerking (A1–A6 + G1–G5 + M1 + B1). Vier-blok-cadans; 10.3 A-domein → Sprint 3. Zie `sprint.md`.
 
 - 2026-08-10 · Claude · Sprint 2 opgezet in blok-ritme (dev → auto gates/review → validatie → integratie). Baton → READY_FOR_DEV (blok 1 Codex). Codex start met PR #1 mergen, dan `feat/sprint-2-hardening`.
+- 2026-08-10 · Codex · PR #1 gemerged; A1–A6 op PR #2 (`feat/sprint-2-hardening`, t/m `5ddd8b3`): row-level autorisatie, prepared SQL + `NO_BACKSLASH_ESCAPES`, exacte DECIMAL/BigInt-rekenkern, DB-rate-limits/lockout/één apparaatsessie, onherstelbare geauditeerde machtigingsinvalidation en relatieve sluit-timer. Bewijs: 30/30 unit-/contracttests; Node 20 + MariaDB 11.8 integratie groen; concurrency 50 HTTP-stemmen, 0 na sluiting, dubbele sluiting één resultaat, login/machtigingsrace consistent; k6 1.784 requests, 0% fouten, status-p95 7,62 ms, vote-p95 38,2 ms; gates A/B, release en Gemini groen. Validatiepunt Claude: quorumgrondslag = uitgebrachte stemmen of juridische `attendance`. → READY_FOR_VALIDATION.
 
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 
