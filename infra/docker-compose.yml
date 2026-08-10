@@ -50,7 +50,7 @@ services:
       - --collation-server=utf8mb4_unicode_ci
       # LET OP: productie-sql_mode is NIET strict. We forceren hier GEEN afwijkende
       # serverstand; de app zet per verbinding zelf een vaste strict sql_mode
-      # (STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION) zodat dev == prod, ongeacht default.
+      # (incl. NO_BACKSLASH_ESCAPES) zodat dev == prod, ongeacht de serverdefault.
       - --innodb-flush-log-at-trx-commit=1
     volumes:
       - alv-db-data:/var/lib/mysql
@@ -87,8 +87,10 @@ services:
       DB_NAME: ${DB_NAME:-alv}
       DB_USER: ${DB_USER:-alv}
       DB_PASSWORD: ${DB_PASSWORD:-alv_dev_pw}
-      # App zet per verbinding: SET SESSION sql_mode='STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION'
-      DB_SESSION_SQL_MODE: "STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION"
+      # App zet per verbinding een vaste, productie-onafhankelijke strict mode.
+      DB_SESSION_SQL_MODE: "STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION,NO_BACKSLASH_ESCAPES"
+      # Uitsluitend fictieve O/T-pepper; A/P krijgt een geheim buiten de release.
+      AUTH_PEPPER: "synthetic-dev-pepper-change-before-acceptance"
       # App draait als EEN proces (geen cluster/PM2-fork) — spiegelt shared hosting/Passenger.
       APP_SINGLE_PROCESS: "true"
       # Vertrouw alleen de proxyheader van alv-proxy (geverifieerd client-IP).

@@ -6,7 +6,7 @@
 import mysql from 'mysql2/promise';
 
 const SESSION_SQL_MODE =
-  process.env.DB_SESSION_SQL_MODE || 'STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION';
+  process.env.DB_SESSION_SQL_MODE || 'STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION,NO_BACKSLASH_ESCAPES';
 
 let pool;
 
@@ -32,6 +32,14 @@ export function getPool() {
   // mysql2 heeft geen 'per-connection init hook' in de pool-API; daarom zetten we
   // sql_mode expliciet bij het lenen van een verbinding via withConnection().
   return pool;
+}
+
+/** Sluit de pool gecontroleerd voor tests en proces-shutdown. */
+export async function closePool() {
+  if (!pool) return;
+  const activePool = pool;
+  pool = undefined;
+  await activePool.end();
 }
 
 /** Leen een verbinding, zet de vaste sql_mode, en geef 'm terug na gebruik. */

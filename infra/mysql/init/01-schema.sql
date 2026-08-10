@@ -50,10 +50,15 @@ CREATE TABLE credential (
   participant_id BIGINT UNSIGNED NOT NULL,
   meeting_id     BIGINT UNSIGNED NOT NULL,
   invite_version INT UNSIGNED    NOT NULL,
-  code_hash      VARBINARY(255)  NOT NULL,   -- Argon2id/bcrypt van >=128-bit random token
+  code_lookup_hash BINARY(32)    NOT NULL,   -- HMAC-SHA-256 voor lookup; pepper blijft buiten DB
+  code_hash      VARBINARY(255)  NOT NULL,   -- memory-hard scrypt/Argon2id-hash van >=128-bit token
+  failed_attempts INT UNSIGNED   NOT NULL DEFAULT 0,
+  locked_until   DATETIME(3)     NULL,
+  last_authenticated_at DATETIME(3) NULL,
   revoked_at     DATETIME(3)     NULL,
   created_at     DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
+  UNIQUE KEY uq_credential_lookup (code_lookup_hash),
   KEY idx_credential_participant (participant_id),
   CONSTRAINT fk_credential_participant FOREIGN KEY (participant_id) REFERENCES participant(id),
   CONSTRAINT fk_credential_meeting FOREIGN KEY (meeting_id) REFERENCES meeting(id)
@@ -63,15 +68,32 @@ CREATE TABLE credential (
 CREATE TABLE session (
   id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   credential_id BIGINT UNSIGNED NOT NULL,
-  device_token  VARBINARY(255)  NOT NULL,
+  session_token_hash BINARY(32) NOT NULL,
+  device_binding_hash BINARY(32) NOT NULL,
   role          ENUM('owner','admin') NOT NULL,
   last_seen_at  DATETIME(3)     NULL,       -- technische indicator, geen presentie
   expires_at    DATETIME(3)     NOT NULL,
   revoked_at    DATETIME(3)     NULL,
   created_at    DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
+  UNIQUE KEY uq_session_token (session_token_hash),
   KEY idx_session_credential (credential_id),
   CONSTRAINT fk_session_credential FOREIGN KEY (credential_id) REFERENCES credential(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Append-only authenticatiespoor voor begrenzing per IP én per credential.
+-- IP en ingevoerde code worden uitsluitend als keyed hash opgeslagen.
+CREATE TABLE authentication_attempt (
+  id                     BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  credential_id          BIGINT UNSIGNED NULL,
+  credential_lookup_hash BINARY(32)      NOT NULL,
+  client_ip_hash         BINARY(32)      NOT NULL,
+  succeeded              TINYINT(1)      NOT NULL,
+  attempted_at           DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY idx_auth_attempt_ip_time (client_ip_hash, attempted_at),
+  KEY idx_auth_attempt_credential_time (credential_lookup_hash, attempted_at),
+  CONSTRAINT fk_auth_attempt_credential FOREIGN KEY (credential_id) REFERENCES credential(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Presentie ('Present' = juridische registratie, niet automatisch verwijderen).
@@ -93,6 +115,10 @@ CREATE TABLE motion (
   meeting_id  BIGINT UNSIGNED NOT NULL,
   title       VARCHAR(500)    NOT NULL,
   splitsingen JSON            NULL,
+  quorum_numerator SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+  quorum_denominator SMALLINT UNSIGNED NOT NULL DEFAULT 2,
+  majority_numerator SMALLINT UNSIGNED NOT NULL DEFAULT 2,
+  majority_denominator SMALLINT UNSIGNED NOT NULL DEFAULT 3,
   created_at  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
   KEY idx_motion_meeting (meeting_id),
@@ -106,11 +132,38 @@ CREATE TABLE round (
   round_version INT UNSIGNED  NOT NULL DEFAULT 1,
   status      ENUM('waiting','open','closing','closed') NOT NULL DEFAULT 'waiting',
   opened_at   DATETIME(3)     NULL,
+  closes_at   DATETIME(3)     NULL,
   closed_at   DATETIME(3)     NULL,
   PRIMARY KEY (id),
   KEY idx_round_motion (motion_id),
   CONSTRAINT fk_round_motion FOREIGN KEY (motion_id) REFERENCES motion(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Registratie van een papieren machtiging per appartementsrecht. Een status
+-- invalidated_owner_login is eindtoestand en kan niet worden teruggedraaid.
+CREATE TABLE power_of_attorney (
+  id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  meeting_id     BIGINT UNSIGNED NOT NULL,
+  entitlement_id BIGINT UNSIGNED NOT NULL,
+  status         ENUM('active','invalidated_owner_login') NOT NULL DEFAULT 'active',
+  invalidated_at DATETIME(3) NULL,
+  created_at     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_power_of_attorney (meeting_id, entitlement_id),
+  CONSTRAINT fk_power_meeting FOREIGN KEY (meeting_id) REFERENCES meeting(id),
+  CONSTRAINT fk_power_entitlement FOREIGN KEY (entitlement_id) REFERENCES entitlement(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DELIMITER //
+CREATE TRIGGER trg_power_of_attorney_irreversible
+BEFORE UPDATE ON power_of_attorney
+FOR EACH ROW
+BEGIN
+  IF OLD.status = 'invalidated_owner_login' AND NEW.status <> OLD.status THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'power_of_attorney_invalidation_is_irreversible';
+  END IF;
+END//
+DELIMITER ;
 
 -- Append-only reeks stemwijzigingen. Per (round, entitlement) telt de LAATSTE
 -- door de server geaccepteerde revisie vóór het sluitmoment. NOOIT updaten/deleten.

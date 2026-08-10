@@ -1,6 +1,6 @@
 {
   "name": "alv-digitaal-app",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Digitaal ALV-eigenaarportaal — beheer + mobiele eigenaarstoegang (single-process, MySQL/MariaDB state).",
   "type": "module",
@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test ../tests/architecture-gate.test.mjs ../tests/seed-preparer.test.mjs ../tests/pii-scan.test.mjs",
+    "test": "node --test ../tests/architecture-gate.test.mjs ../tests/auth-store.test.mjs ../tests/hardening-contracts.test.mjs ../tests/pii-scan.test.mjs ../tests/security.test.mjs ../tests/seed-preparer.test.mjs ../tests/vote-result.test.mjs ../tests/vote-store.test.mjs",
     "gate:architecture": "node ../scripts/architecture-gate.mjs",
     "build:release": "node ../scripts/build-release.mjs"
   },
