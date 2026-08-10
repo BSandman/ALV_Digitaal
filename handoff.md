@@ -1,12 +1,12 @@
 ---
 sprint: 1
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-10T13:14:20Z
-next: gemini
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-10T13:52:02Z
+next: claude
 action_required_by: none
 blocked: false
-note: "Codex voert taak 10.2 uit op feat/sprint-1-t-run-ci-gates; private origin en GEMINI_API_KEY zijn vereist vóór READY_FOR_TEST."
+note: "Taak 10.2 groen op feat/sprint-1-t-run-ci-gates; Gemini reviewt via PR, Claude voegt wegens documenteigenaarschap het T-commando aan README toe."
 ---
 
 # handoff.md — de estafettestok
@@ -15,29 +15,33 @@ note: "Codex voert taak 10.2 uit op feat/sprint-1-t-run-ci-gates; private origin
 
 ## Huidige beurt
 
-**Handmatige bootstrap (geen watchers).** Git-blokkade opgelost, zie ADR-0007: de repo is `Platform/ALV_Digitaal` zelf (niet VvE_Werk). Codex, doe als Git-steward eerst de repo-init, dan taak 10.2:
+### 1. Doel
 
-```powershell
-# 1. Ruim het lege, misleidende .git-omhulsel op
-Remove-Item -Recurse -Force "D:\Bas_en_AIs\VvE_Werk\.git"
-# 2. Init de repo IN ALV_Digitaal (dit is de repo-root)
-cd "D:\Bas_en_AIs\VvE_Werk\Platform\ALV_Digitaal"
-git init -b main
-# 3. Controleer .gitignore: geen mistral-lokaal/secure, out, .env, data, node_modules
-git add -A ; git status
-# 4. Eerste commit
-git commit -m "chore: init ALV_Digitaal repo (fase 2) - architectuur, OTAP, ADR-0001..0007, pijplijn"
-# 5. Privé GitHub-repo aanmaken + pushen (gh gebruikt het account dat ook HAOS-Werk beheert)
-gh repo create ALV_Digitaal --private --source=. --remote=origin --push
-#    Fallback zonder gh:
-#    git remote add origin git@github.com:<account>/ALV_Digitaal.git ; git push -u origin main
-```
+Taak 10.2 levert een reproduceerbare T-run, een veldgelijke synthetische seedroute, CI-gate A (ADR-0002), CI-gate B (ADR-0005) en een code-only release-artefact.
 
-Verifieer bij stap 3 dat `git status` géén `mistral-lokaal/secure/`, `mistral-lokaal/out/`, `.env` of `data/` toont (PII-discipline, ADR-0005). De commit bevat nu ook `.github/workflows/gemini-review.yml` (Gemini als PR-Action, ADR-0007). Daarna: `DEV_IN_PROGRESS` + taak 10.2, en werk als steward via **feature-branch → PR** (DEV→TEST loopt via een PR). **Bas** zet de repo-secret `GEMINI_API_KEY` (Settings → Secrets → Actions) vóór de eerste PR.
+### 2. Gewijzigde bestanden
+
+Featurebranch `feat/sprint-1-t-run-ci-gates`, commit `af14f3a`; wijzigingen in `.github/workflows/`, `app/`, `infra/`, `mistral-lokaal/scripts/pii_scan`, `scripts/` en `tests/`.
+
+### 3. Testbewijs
+
+Groen: 7/7 Node-tests; gate A; gate B op diff+fixtures+artefact; Compose-config; MariaDB 11.8.8 met 120 deelnemers/rechten; strict SQL-mode + UTC; app 2 GB/2 CPU en één Node-proces. k6: 1.783 requests, 0,00% fouten, status-p95 3,56 ms, vote-p95 17,15 ms, 120/120 stemburst.
+
+### 4. Privacyclassificatie
+
+Schoon: deterministische scan van branchdiff, fixtures en `alv-digitaal-app-v0.1.0.tgz` (11 code-/manifestpaden). Negatietest met dynamisch aangemaakt `owners.initial.js`-artefact faalt aantoonbaar. `secure/`, `out/`, `.env`, data en runtimebestanden zijn uitgesloten.
+
+### 5. Open risico's
+
+Mistral moet de lokale denylist met bekende echte VvE-/straatnamen beheren. README-update “Snel starten (test)” blijft voor Claude, omdat alleen Claude README/bijbel mag wijzigen. Productfunctionaliteit en echte stemverwerking blijven conform sprintscope buiten deze taak.
+
+### 6. Rollback
+
+Revert commit `af14f3a`; verwijder desgewenst alleen de Docker-resources met projectnaam `alv-digitaal`. De initialisatiecommit en ADR-/besturingshistorie blijven behouden.
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
 - 2026-08-10 — Claude: architectuur, OTAP, ADR-0001..0006, AGENTS/bijbel/sprint + agent-instructies opgezet. → READY_FOR_DEV.
 - 2026-08-10 — Codex: BLOCKED — VvE_Werk/.git leeg, geen commits mogelijk.
 - 2026-08-10 — Claude: gediagnosticeerd + ADR-0007 (repo = ALV_Digitaal). Git-init-commando's aangeleverd. → READY_FOR_DEV.
-- 2026-08-10 — Codex aan zet: repo-init, daarna taak 10.2 (T-run + CI-gates).
+- 2026-08-10 — Codex: repo/init/origin hersteld; taak 10.2 lokaal groen met rood+groen bewijs. → READY_FOR_TEST.
