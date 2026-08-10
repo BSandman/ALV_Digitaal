@@ -1,12 +1,12 @@
 ---
 sprint: 1
-state: READY_FOR_DEV
+state: DEV_IN_PROGRESS
 owner: codex
-since: 2026-08-10T14:30:00Z
+since: 2026-08-10T13:14:20Z
 next: gemini
 action_required_by: none
 blocked: false
-note: "Git opgelost (ADR-0007): repo = ALV_Digitaal zelf, privé GitHub-repo als origin. Codex: init + push (zie Huidige beurt), daarna taak 10.2. Bas regelt Gemini's connector-toegang vóór TEST."
+note: "Codex voert taak 10.2 uit op feat/sprint-1-t-run-ci-gates; private origin en GEMINI_API_KEY zijn vereist vóór READY_FOR_TEST."
 ---
 
 # handoff.md — de estafettestok
