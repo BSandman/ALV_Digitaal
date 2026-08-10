@@ -1,38 +1,42 @@
-# sprint.md — Sprint 1: Fundament
+# sprint.md — Sprint 2: Hardening (stemlogica correct & veilig)
 
-**Doel:** de T-omgeving draait reproduceerbaar en de CI-gates zijn groen. Geen productfunctionaliteit; dit is het fundament waar alle latere sprints op leunen (v0.2.0 Fase 0.5). Kan starten zonder Mistral: T valt terug op een ingecheckte fictieve mini-seed.
+**Doel:** de skeleton-stores worden echte, correcte en veilige stemverwerking. De validatie-acties uit `docs/gates/Claude-validatie-sprint1.md` + de domeinregels uit ADR-0008 worden gebouwd, getest en gevalideerd. **10.3 (A-domein) volgt in Sprint 3** — Acceptatie pas ná gevalideerde hardening.
 
-**Sprintversie:** app `v0.1.0` (eerste code). Achtergrond in `bijbel.md`; detailopdracht in `docs/gates/Codex-taak-10.2_T-run-en-CI-gates.md`.
+**Sprintversie:** app `v0.2.0` (nieuwe functionaliteit op v0.1.0). Achtergrond in `bijbel.md`; besluiten in ADR-0002/0006/0008.
+
+## Cadans — vier blokken (operating model in `AGENTS.md`)
+
+| Blok | Rol | Watcher | Inhoud |
+|---|---|---|---|
+| 1 | **Codex** (dev) | `--role codex` | Merge PR #1 → `main`; branch `feat/sprint-2-hardening`; A1–A6; open PR |
+| 2 | *auto* | — (serverless) | CI-gates + Gemini-review draaien op de PR |
+| 3 | **Claude** (validatie) | `--role claude` | Toets A1–A6 tegen ADR-0002/0006/0008; verwerk Gemini-punten |
+| 4 | **Mistral** (integratie) | `--role mistral` | M1: datasets met multi-VvE + machtiging; PII-gate schoon |
+
+Bas (parallel, elk moment): **B1** — machtiging-vervalt-bij-login opnemen in de voorwaarden/instructie-tekst.
 
 ## Scope per rol
 
-**Codex (dev):**
-- `docker compose --profile dev --profile loadtest up` → werkende T (app single-process, MariaDB 11.8.8, proxy met `X-Forwarded-For`, k6).
-- Seedroute: synthetisch uit Mistral indien aanwezig, anders fictieve mini-seed. Nooit echte data.
-- CI-gate A (arch-regels ADR-0002) en gate B (PII-scan ADR-0005, deterministische kern in `mistral-lokaal/scripts/pii_scan`).
-- Release-artefact = alleen code; versie via `package.json` + git-tag.
+**Codex (dev) — A1 t/m A6:**
+- **A1** Row-level autorisatie: een recht mag alleen gestemd/gelezen door de ingelogde eigenaarsgroep, server-side (vervangt de TODO in `recordVote`/`getCurrentVote`).
+- **A2** `NO_BACKSLASH_ESCAPES` toevoegen aan `DB_SESSION_SQL_MODE`.
+- **A3** Exacte rekenkunde: vervang `computeResultPlaceholder`'s `Number()`-sommatie door exacte decimal-/SQL-aggregatie (`SUM(weight)`); ronden alleen voor weergave; drempels tegen exacte totalen (ADR-0008 §3). Roep hier de geïsoleerde, met regressietests vastgepinde VvE-rekenkern aan.
+- **A4** Auth-hardening: rate limiting per IP én credential, lockout/backoff, apparaatbinding (één actieve sessie), entropie + serverzijdige hash op het codedeel.
+- **A5** Machtiging vervalt onherstelbaar bij login van de eigenaar, geauditeerd (servertijd-UTC) — ADR-0008 §2.
+- **A6** Sluiting met server-relatieve aftelling (resterende seconden, geen absolute eindtijd). De sluiting blijft één servermoment voor iedereen.
 
-**Gemini (test):**
-- k6 120-clients-burst draait tegen T met bewijs (aantallen, latency, foutratio).
-- Regressieharnas dat de bestaande ALV-rekenregels vastpint (quorum, PG-blok, meerderheden) — rood/groen bewijs.
-- Negatieftest: een artefact met `owners.initial.js` erin **moet** gate B laten falen.
+**Gemini (test) — G1 t/m G5:** multi-VvE `{PG,TF}`/`{PG,NB}` (niet samenvoegen); machtiging-conflict (login doet machtiging vervallen, dubbel stemmen onmogelijk); load met gespreide aankomst; quorum/2⁄3 exact op de grens; brute-force op de toegangscode.
 
-**Claude (validatie):**
-- Toets dat gate A de zes regels echt afdwingt (geprepareerde overtreding faalt aantoonbaar).
-- Domeinvalidatie op de acceptatiecriteria; noteer gaps als ADR/gate.
+**Mistral (integratie) — M1:** synthetische (T) en gepseudonimiseerde (A) datasets bevatten de multi-VvE-combinaties en machtiging-scenario's; lokale denylist bijhouden; PII-gate schoon. Geen deploy deze sprint.
 
-**Mistral (integratie):**
-- PII-scan-gate scherp zetten en aan `scripts/deploy.sh`-voorbereiding hangen (nog geen deploy).
-- Bevestig: geen echte PII in repo/CI/fixtures.
+## Definition of done
 
-## Definition of done (sprint)
-
-- T start met één commando en synthetische/mini-seed-data.
-- Gate A en B draaien in CI en falen aantoonbaar op een geprepareerde overtreding (regressie op het fase-1-`owners.js`-lek is groen = faalt correct).
-- Gemini's burst + regressie groen met vastgelegd bewijs.
-- Handoff-keten één keer volledig doorlopen O→T→validatie→integratie zonder `BLOCKED`.
-- `progress.md` bijgewerkt; app getagd `v0.1.0`.
+- A1–A6 geïmplementeerd en door Claude **groen** gevalideerd tegen ADR-0002/0006/0008.
+- Gemini-review op de PR verwerkt; G1–G5-tests groen met bewijs.
+- Exacte-rekenkunde-tests op quorum/2⁄3-drempels groen; machtiging-vervalt-test groen.
+- Datasets met multi-VvE klaar (M1); PII-gate groen.
+- App getagd `v0.2.0`; `handoff.md` op `SPRINT_DONE`.
 
 ## Buiten scope
 
-A-domein op mijn.host (Sprint 2, na Mistral-setup) · productcode/domeinfunctionaliteit · pseudonimisering voor A.
+10.3 A-domein (Sprint 3) · echte productie-deploy · digitaal machtigingsbeheer (blijft buiten, v0.1.0).

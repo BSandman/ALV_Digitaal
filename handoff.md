@@ -1,12 +1,12 @@
 ---
-sprint: 1
-state: READY_FOR_TEST
-owner: gemini
-since: 2026-08-10T13:52:02Z
+sprint: 2
+state: DEV_IN_PROGRESS
+owner: codex
+since: 2026-08-10T22:24:02Z
 next: claude
 action_required_by: none
 blocked: false
-note: "Taak 10.2 groen op feat/sprint-1-t-run-ci-gates; Gemini reviewt via PR, Claude voegt wegens documenteigenaarschap het T-commando aan README toe."
+note: "Sprint 2 hardening A1-A6 in uitvoering; PR #1 wordt eerst naar main gemerged."
 ---
 
 # handoff.md — de estafettestok
@@ -15,33 +15,16 @@ note: "Taak 10.2 groen op feat/sprint-1-t-run-ci-gates; Gemini reviewt via PR, C
 
 ## Huidige beurt
 
-### 1. Doel
+**Sprint 2, blok 1 — Codex (dev).** Start je watcher (`python scripts/watch_handoff.py --role codex`). Volgorde:
 
-Taak 10.2 levert een reproduceerbare T-run, een veldgelijke synthetische seedroute, CI-gate A (ADR-0002), CI-gate B (ADR-0005) en een code-only release-artefact.
+1. Merge **PR #1** → `main` (steward).
+2. Branch `feat/sprint-2-hardening`.
+3. Bouw **A1–A6** uit `sprint.md` (row-level autorisatie, `NO_BACKSLASH_ESCAPES`, exacte rekenkunde, auth-hardening, machtiging-vervalt-bij-login, server-relatieve sluit-timer). Toets tegen ADR-0002/0006/0008.
+4. Open een PR (gates + Gemini-review draaien automatisch) en zet daarna `state: READY_FOR_VALIDATION`, `owner: claude`.
 
-### 2. Gewijzigde bestanden
-
-Featurebranch `feat/sprint-1-t-run-ci-gates`, commit `af14f3a`; wijzigingen in `.github/workflows/`, `app/`, `infra/`, `mistral-lokaal/scripts/pii_scan`, `scripts/` en `tests/`.
-
-### 3. Testbewijs
-
-Groen: 7/7 Node-tests; gate A; gate B op diff+fixtures+artefact; Compose-config; MariaDB 11.8.8 met 120 deelnemers/rechten; strict SQL-mode + UTC; app 2 GB/2 CPU en één Node-proces. k6: 1.783 requests, 0,00% fouten, status-p95 3,56 ms, vote-p95 17,15 ms, 120/120 stemburst.
-
-### 4. Privacyclassificatie
-
-Schoon: deterministische scan van branchdiff, fixtures en `alv-digitaal-app-v0.1.0.tgz` (11 code-/manifestpaden). Negatietest met dynamisch aangemaakt `owners.initial.js`-artefact faalt aantoonbaar. `secure/`, `out/`, `.env`, data en runtimebestanden zijn uitgesloten.
-
-### 5. Open risico's
-
-Mistral moet de lokale denylist met bekende echte VvE-/straatnamen beheren. README-update “Snel starten (test)” blijft voor Claude, omdat alleen Claude README/bijbel mag wijzigen. Productfunctionaliteit en echte stemverwerking blijven conform sprintscope buiten deze taak.
-
-### 6. Rollback
-
-Revert commit `af14f3a`; verwijder desgewenst alleen de Docker-resources met projectnaam `alv-digitaal`. De initialisatiecommit en ADR-/besturingshistorie blijven behouden.
+Bij een blokker: `state: BLOCKED`, `action_required_by: bas`. Window leeg? Baton blijft staan; volgend blok verder.
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
-- 2026-08-10 — Claude: architectuur, OTAP, ADR-0001..0006, AGENTS/bijbel/sprint + agent-instructies opgezet. → READY_FOR_DEV.
-- 2026-08-10 — Codex: BLOCKED — VvE_Werk/.git leeg, geen commits mogelijk.
-- 2026-08-10 — Claude: gediagnosticeerd + ADR-0007 (repo = ALV_Digitaal). Git-init-commando's aangeleverd. → READY_FOR_DEV.
-- 2026-08-10 — Codex: repo/init/origin hersteld; taak 10.2 lokaal groen met rood+groen bewijs. → READY_FOR_TEST.
+- 2026-08-10 — Sprint 1 afgerond (Fundament), gevalideerd groen. → SPRINT_DONE.
+- 2026-08-10 — Claude: Sprint 2 (Hardening) opgezet in blok-cadans; 10.3 A-domein → Sprint 3. → READY_FOR_DEV (blok 1 Codex).
