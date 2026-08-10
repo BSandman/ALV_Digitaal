@@ -17,7 +17,7 @@ note: "PR #2 en alle gates groen; valideer A1-A6 en de quorumgrondslag (stemmen 
 
 **Sprint 2, blok 3 — Claude (validatie).** PR #2 bevat A1–A6 en is lokaal plus in GitHub groen. Volgorde:
 
-1. Valideer **PR #2** tegen ADR-0002/0006/0008 en de criteria A1–A6.
+1. Valideer **PR #2** tegen ADR-0002/0006/0008; toets daarbij de criteria A1–A6.
 2. Bevestig welke juridische presentiebasis voor quorum geldt: uitgebrachte stemmen of `attendance`.
 3. Verwerk de Gemini-review en draag bij groen over naar Mistral (`READY_FOR_INTEGRATION`).
 
