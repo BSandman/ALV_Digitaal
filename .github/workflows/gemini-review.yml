@@ -38,21 +38,31 @@ jobs:
           PROMPT="Je bent de Lead Tester in een softwareontwikkelingsteam voor een VvE-stem/presentie-app (server-side stemverwerking in MariaDB, atomair sluiten, quorum en gekwalificeerde meerderheden). Analyseer onderstaande code-diff. Schrijf concrete suggesties voor unit-tests, randgevallen (edge cases) en risico's, met bijzondere aandacht voor race-condities bij gelijktijdig stemmen en voor server-side autorisatie per eigenaarsgroep:\n\n$DIFF_CONTENT"
           PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{ contents: [{ parts: [{ text: $prompt }] }] }')
 
-          # Vang de HTTP-status apart, zodat we bij een fout de échte oorzaak zien
-          # (de respons-body bevat de API-key NIET; Actions-logs zijn privé voor collaborators).
-          HTTP_CODE=$(curl -s -w "%{http_code}" -o response.json \
-            -X POST "https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD")
+          # Roep de API aan met retry + exponentiële backoff op 429 (rate-limit).
+          # De respons-body bevat de API-key NIET; Actions-logs zijn privé voor collaborators.
+          URL="https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}"
+          HTTP_CODE=""
+          for attempt in 1 2 3 4 5; do
+            HTTP_CODE=$(curl -s -w "%{http_code}" -o response.json -X POST "$URL" \
+              -H "Content-Type: application/json" -d "$PAYLOAD")
+            echo "Poging $attempt — HTTP $HTTP_CODE (model: ${GEMINI_MODEL})"
+            if [ "$HTTP_CODE" = "200" ]; then break; fi
+            if [ "$HTTP_CODE" = "429" ]; then
+              WAIT=$((attempt * 20))
+              echo "429 rate-limit — wacht ${WAIT}s en probeer opnieuw..."
+              sleep "$WAIT"
+              continue
+            fi
+            break   # andere fout (403/404/400): niet blijven proberen
+          done
 
-          echo "Gemini API HTTP-status: $HTTP_CODE  (model: ${GEMINI_MODEL})"
           echo "----- Ruwe API-respons (diagnose) -----"
           cat response.json
           echo ""
           echo "---------------------------------------"
 
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::Gemini API gaf HTTP $HTTP_CODE. 429=quota/rate-limit, 403=key/permissies of API niet ingeschakeld, 404=modelnaam onbekend, 400=payload. Zie ruwe respons hierboven."
+            echo "::error::Gemini API eindigde op HTTP $HTTP_CODE. Aanhoudend 429 op free tier = quota nog niet actief: koppel een billing-account (blijft gratis binnen de free-limieten) of kies een ander model via GEMINI_MODEL. 403=key/permissies, 404=modelnaam, 400=payload. Zie respons hierboven."
             exit 1
           fi
 
