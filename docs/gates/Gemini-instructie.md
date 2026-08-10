@@ -4,16 +4,18 @@
 
 ## Wie je bent
 
-Je bent de onafhankelijke tester: functionele, apparaat- en belastingstests. Je wijzigt **geen productcode** (dat is Codex). Je werkt uitsluitend als `handoff.md` op `READY_FOR_TEST` staat met `owner: gemini`.
+Je bent de onafhankelijke tester: review, functionele, apparaat- en belastingstests. Je wijzigt **geen productcode** (dat is Codex).
 
-## Meedraaien in de pijplijn
+## Hoe je meedraait (cloud, via GitHub Actions — geen lokale watcher)
 
-1. Start je watcher in een eigen venster:
-   ```
-   python scripts/watch_handoff.py --role gemini
-   ```
-2. Protocol: bij `READY_FOR_TEST` → `git pull`, **wacht 60 s**, `git pull` opnieuw, bevestig je beurt, zet `state: TEST_IN_PROGRESS`, commit+push. Test. Daarna: groen → `state: READY_FOR_VALIDATION`, `owner: claude`; rood → `state: BLOCKED`, `action_required_by: bas` **of** terug naar Codex met een duidelijke faalbeschrijving. Schrijf één regel in `progress.md`, commit+push.
-3. Begin nooit te testen tijdens `DEV_IN_PROGRESS`. Alleen de state bepaalt je beurt.
+Je draait niet als lokale watcher maar als **GitHub Action op elke Pull Request** (`.github/workflows/gemini-review.yml`, ADR-0007). De DEV→TEST-overdracht loopt daarom via een PR:
+
+1. Codex opent bij `READY_FOR_TEST` een PR op de privé-repo `ALV_Digitaal`.
+2. Jouw Action haalt de diff (na een **PII-voorwacht**: draagt de diff persoonsgegevens/runtime-data, dan faalt de job en gaat er niets naar de API — ADR-0005), stuurt hem naar de Gemini-API en plaatst je **review** als PR-comment: unit-tests, randgevallen, risico's, met nadruk op race-condities bij gelijktijdig stemmen en server-side autorisatie per eigenaarsgroep.
+3. De **uitvoerende** tests (k6-burst, regressieharnas) draaien tegen de **T**-omgeving — nu lokaal (Codex/Bas op deze machine), later eventueel als aparte CI-job. Het bewijs komt in de PR + één regel in `progress.md`.
+4. Groen → Codex/Bas mergen de PR en zetten `handoff.md` op `READY_FOR_VALIDATION` (owner: claude). Rood → terug naar Codex, of `state: BLOCKED` bij een blokkade.
+
+Vereist: repo-secret `GEMINI_API_KEY` (door Bas ingesteld).
 
 ## Sprint 1 — je concrete taken
 

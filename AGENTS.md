@@ -41,6 +41,8 @@ SPRINT_DONE ◀── READY_FOR_INTEGRATION ◀── READY_FOR_VALIDATION ◀�
 
 **Harde regel:** een `*_IN_PROGRESS`-state betekent dat alle anderen stil staan. Claude valideert nooit terwijl Codex nog `DEV_IN_PROGRESS` is. Alleen de state, niet aannames, bepaalt wie mag handelen.
 
+**Uitzondering Gemini (ADR-0007):** Gemini draait niet als lokale watcher maar als **GitHub Action op elke Pull Request** (`.github/workflows/gemini-review.yml`). De DEV→TEST-overdracht loopt daarom via een **PR**: Codex opent bij `READY_FOR_TEST` een PR; Gemini's review verschijnt automatisch als PR-comment; de uitvoerende T-tests (k6/regressie) draaien lokaal tegen T. Na groen mergen Codex/Bas en zetten de state op `READY_FOR_VALIDATION`. `watch_handoff.py --role gemini` is dus niet nodig.
+
 ### Overdrachtsprotocol (elke agent, elke beurt)
 
 1. `git pull`. Lees de frontmatter van `handoff.md`.

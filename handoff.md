@@ -33,7 +33,7 @@ gh repo create ALV_Digitaal --private --source=. --remote=origin --push
 #    git remote add origin git@github.com:<account>/ALV_Digitaal.git ; git push -u origin main
 ```
 
-Verifieer bij stap 3 dat `git status` géén `mistral-lokaal/secure/`, `mistral-lokaal/out/`, `.env` of `data/` toont (PII-discipline, ADR-0005). Daarna: zet dit bestand op `DEV_IN_PROGRESS` en voer taak 10.2 uit. **Bas** verleent Gemini's GitHub-connector read/write op de repo vóór de `READY_FOR_TEST`-overdracht.
+Verifieer bij stap 3 dat `git status` géén `mistral-lokaal/secure/`, `mistral-lokaal/out/`, `.env` of `data/` toont (PII-discipline, ADR-0005). De commit bevat nu ook `.github/workflows/gemini-review.yml` (Gemini als PR-Action, ADR-0007). Daarna: `DEV_IN_PROGRESS` + taak 10.2, en werk als steward via **feature-branch → PR** (DEV→TEST loopt via een PR). **Bas** zet de repo-secret `GEMINI_API_KEY` (Settings → Secrets → Actions) vóór de eerste PR.
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
