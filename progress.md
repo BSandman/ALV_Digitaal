@@ -40,6 +40,8 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 - 2026-08-11 · Bas · Node.js-app op acceptatie aangemaakt (Node 20, Production, app-root `nodeapp`, `SECRETS_FILE` gezet).
 - 2026-08-11 · Claude · **PR #5 GROEN** (`docs/gates/Claude-validatie-sprint3.md`). Deploy-config-afstemming voor Bas: DirectAdmin app-root → `nodeapp/current`, startup → `src/start.js` (secrets-loader); GitHub repo-vars (SSH-host/poort/remote_dir) + secret `ACC_SSH_KEY`. Hostchecks (X-Forwarded-For, SECRETS_FILE-doorgifte) bij eerste echte deploy in blok 4. → Codex merge PR #5, dan blok 4.
 
+- 2026-08-11 · Codex · CloudLinux-correctie op **PR #6** (`feat/sprint-3-in-place-deploy`, t/m `2a9061a`): deploy rechtstreeks in de vaste `nodeapp`-root, zonder `current`-symlink; unieke backups en workdirs in de naastliggende `.deploy`-map; automatische rollback bij `npm ci`- of healthfalen; Passenger-herstart via `nodeapp/tmp/restart.txt`; expliciete operatorbevestiging dat geen stemronde openstaat. Workflows en runbook aangepast. Bewijs: 58/58 tests, Linux in-place/rollback-integratie, architectuur-, release- en PII-gates en Gemini-review groen. Gemini adviseert vóór productie een harde MariaDB-check; huidige poort is bewust operationeel en wordt door Claude als restrisico beoordeeld. **Geen echte acceptatiedeploy uitgevoerd.** → READY_FOR_VALIDATION.
+
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 
 **Doel:** T-omgeving draait, CI-gates groen. Zie `sprint.md`. **Uitkomst:** groen op alle poorten; gevalideerd.
