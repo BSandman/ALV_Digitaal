@@ -1,12 +1,12 @@
 ---
 sprint: 3
-state: READY_FOR_VALIDATION
-owner: claude
-since: 2026-08-11T13:10:18Z
-next: mistral
-action_required_by: claude
+state: READY_FOR_DEV
+owner: codex
+since: 2026-08-11T14:20:00Z
+next: claude
+action_required_by: none
 blocked: false
-note: "Claude valideert PR #5; gates en Gemini zijn groen, echte acceptatiedeploy en hostchecks volgen in blok 4."
+note: "Platform-vondst: current-symlink deploy botst met CloudLinux Node Selector (relocate-into-itself). Codex: pas deploy.sh aan naar IN-PLACE deploy in de app-root (nodeapp) + backup-rollback + restart.txt; geen current-symlink. Bas herstelt de Node-app parallel (app-root nodeapp, startup src/start.js)."
 ---
 
 # handoff.md — de estafettestok
@@ -15,16 +15,18 @@ note: "Claude valideert PR #5; gates en Gemini zijn groen, echte acceptatiedeplo
 
 ## Huidige beurt
 
-**Sprint 3 — Acceptatie (10.3), blok 3 Claude.** Valideer PR #5 tegen ADR-0002/0003/0005/0012/0013, met herstelprocedure en de hieronder genoemde hostrisico's als harde aandachtspunten.
+**Sprint 3 — deploy-model aanpassen (Codex).** Bij de eerste opzet bleek het `releases/current`-symlinkmodel te botsen met CloudLinux Node Selector: de app-root kan niet naar zijn eigen submap (`nodeapp/current`) worden verplaatst. Zie `docs/gates/Claude-validatie-sprint3.md §3b`.
 
-1. **Opgeleverd in PR #5:** doelgebonden `SECRETS_FILE`-bootstrap buiten app/webroot, vaste DB-coördinaten en sql_mode, database-afhankelijke `/healthz`, veilige code-only deploy met rollback, strikte SSH-hostkeycontrole en handmatige A/P-workflows met dubbele productiepoort.
-2. **Bewijs:** 57/57 tests, architectuur-/release-/PII-gates, Linux Bash-syntax, droge A/P-runs en tijdelijke MariaDB 11.8-bootstrap groen; GitHub gates + Gemini groen.
-3. **Nog echt te verifiëren:** LiteSpeed overschrijft `X-Forwarded-For` single-hop; Passenger krijgt `SECRETS_FILE`; GitHub secrets/variables en Environment-reviewer Bas staan goed; deploy tijdens een open stemronde blijft een operationele no-go. Er is nog geen echte A-deploy uitgevoerd.
+Codex — pas `scripts/deploy.sh` (+ de workflows waar nodig) aan:
+1. **In-place deploy** in de door CloudLinux beheerde app-root (`REMOTE_DIR = .../nodeapp`): rsync de code-only release naar de app-root, `npm ci --omit=dev`, Passenger-herstart via `nodeapp/tmp/restart.txt`.
+2. **Rollback** via een getimestampte backup van de vorige app-root (geen `current`-symlink).
+3. Healthcheck ná deploy blijft. Deploy tijdens een open stemronde blijft een no-go.
+Open een PR; gates + Gemini; daarna Claude her-valideert.
 
-Bas doet parallel de DirectAdmin-/SSH-/secrets-`.env`-/echte-export-stappen uit `sprint.md`.
+**Bas (parallel):** herstel de Node-app — app-root `domains/acceptatie.honigfabriek.nl/nodeapp`, startup `src/start.js`, mode Production. Daarna: secrets-`.env`, C2, en de eerste deploy zodra Codex' fix op `main` staat.
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
-- 2026-08-11 — Codex: Sprint 3 blok 0+1 op PR #5; acceptatie/CD-config, SSH-hardening en Gemini-5xx-backoff; gates + Gemini groen. → READY_FOR_VALIDATION (Claude).
-- 2026-08-11 — Codex: PR #4 gemerged (`8dc939a`). Sprint 2 compleet.
-- 2026-08-11 — Claude: Sprint 2 afgerond; Bas koos Sprint 3 = 10.3 A-domein. → READY_FOR_DEV (blok 0+1 Codex).
+- 2026-08-11 — Codex: PR #5 gemerged (`4131468`). Sprint 3 blok 0+1 compleet.
+- 2026-08-11 — Bas: DirectAdmin app-root-wijziging → CloudLinux relocate-fout (current-symlink onverenigbaar).
+- 2026-08-11 — Claude: deploy-model → in-place (§3b); terug naar Codex voor deploy.sh-aanpassing. → READY_FOR_DEV.
