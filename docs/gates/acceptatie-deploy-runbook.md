@@ -6,7 +6,7 @@ Dit runbook voert Sprint 3 blok 4 uit nadat PR-gates en Claude-validatie groen z
 
 1. Maak buiten application root en webroot `/home/cn111993/secrets/alv-acceptatie.env` op basis van `config/alv-acceptatie.env.example`.
 2. Vul de echte waarden lokaal op de server in en zet `chmod 600`; commit, upload of plak die waarden nergens anders.
-3. Configureer de DirectAdmin Node-app met application root `<ACCEPTATIE_REMOTE_DIR>/current`, startupbestand `src/start.js` en Node 20.
+3. Configureer de DirectAdmin Node-app met de vaste application root `<ACCEPTATIE_REMOTE_DIR>` (`.../nodeapp`, zonder `current`-submap), startupbestand `src/start.js`, Node 20 en mode Production.
 4. Zet in DirectAdmin uitsluitend `SECRETS_FILE=/home/cn111993/secrets/alv-acceptatie.env`. De bootstrap zet vervolgens productiegedrag en valideert dat de databasecoördinaten bij `acceptatie` horen.
 
 ## 2. Code-artefact en dry-run
@@ -25,16 +25,16 @@ scripts/deploy.sh --target acceptatie --dry-run
 Gebruik daarna het door CI bewaarde code-only artefact of de lokaal identiek gebouwde `.tgz`:
 
 ```bash
-scripts/deploy.sh --target acceptatie --artifact dist/alv-digitaal-app-v0.2.0.tgz
+scripts/deploy.sh --target acceptatie --confirm-no-open-round --artifact dist/alv-digitaal-app-v0.2.0.tgz
 ```
 
-Het script controleert de PII-gate, SHA-256, server-side secretslocatie/rechten, installeert in een onveranderlijke release-map, wisselt `current` atomair, triggert Passenger en vereist een HTTPS-healthcheck met werkende database. Bij een rode healthcheck wordt de vorige `current` automatisch hersteld.
+Voer de echte deploy alleen uit nadat is gecontroleerd dat geen stemronde openstaat. Het script controleert de PII-gate, SHA-256 en server-side secretslocatie/rechten. Daarna maakt het buiten de CloudLinux app-root een getimestampte backup onder `<ACCEPTATIE_REMOTE_DIR>.deploy/backups/`, synchroniseert uitsluitend `src/` en de package-manifesten in-place, draait `npm ci --omit=dev`, triggert Passenger via `<ACCEPTATIE_REMOTE_DIR>/tmp/restart.txt` en vereist een HTTPS-healthcheck met werkende database. Een installatie- of healthfout herstelt de vorige code uit de backup en installeert de bijbehorende dependencies opnieuw. De app-root zelf wordt nooit verplaatst of door een `current`-symlink vervangen.
 
 Na inrichting kan dezelfde acceptatiedeploy handmatig via GitHub Actions → **Deploy acceptatie**. Benodigde repository-/environmentconfig:
 
 - secret `ACC_SSH_KEY`;
 - variables `ACC_SSH_USER`, `ACC_SSH_HOST`, `ACC_SSH_PORT`, `ACC_REMOTE_DIR`, `ACC_SECRETS_FILE` en de vooraf buiten GitHub gecontroleerde hostkeyregel `ACC_SSH_KNOWN_HOSTS`;
-- workflow starten vanaf `main` (andere refs worden geweigerd).
+- workflow starten vanaf `main` (andere refs worden geweigerd) en het verplichte vak bevestigen dat geen stemronde openstaat.
 
 ## 3. Verificatie op A
 

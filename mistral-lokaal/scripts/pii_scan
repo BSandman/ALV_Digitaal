@@ -135,7 +135,7 @@ function scanFileName(label) {
   if (/(?:^|\/)snapshots?(?:\/|$)/i.test(normalized)) {
     findings.push({ kind: 'forbidden_snapshot', location: normalized, message: 'Snapshots zijn verboden in het release-artefact.' });
   }
-  if (/^(?:platform_alv_digitaal(?:\.pub)?|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)$/i.test(base)) {
+  if (/^(?:(?:platform_alv_digitaal|alv_acc_deploy)(?:\.pub)?|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)$/i.test(base)) {
     findings.push({ kind: 'deploy_key', location: normalized, message: 'SSH-deploysleutel hoort nooit in Git of release.' });
   }
 }

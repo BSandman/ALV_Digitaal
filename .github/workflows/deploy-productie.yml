@@ -11,6 +11,11 @@ on:
         description: Typ exact portaal.honigfabriek.nl
         required: true
         type: string
+      no_open_round:
+        description: Bevestig dat op productie geen stemronde openstaat
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -29,9 +34,14 @@ jobs:
         shell: bash
         env:
           CONFIRMATION: ${{ inputs.confirmation }}
+          NO_OPEN_ROUND: ${{ inputs.no_open_round }}
         run: |
           if [[ "$CONFIRMATION" != "portaal.honigfabriek.nl" ]]; then
             echo "Productiebevestiging komt niet exact overeen." >&2
+            exit 1
+          fi
+          if [[ "$NO_OPEN_ROUND" != "true" ]]; then
+            echo "Deploy geweigerd: bevestig dat geen stemronde openstaat." >&2
             exit 1
           fi
 
@@ -89,4 +99,4 @@ jobs:
         run: |
           artifacts=(dist/alv-digitaal-app-v*.tgz)
           test "${#artifacts[@]}" -eq 1
-          scripts/deploy.sh --target portaal --allow-production --artifact "${artifacts[0]}"
+          scripts/deploy.sh --target portaal --allow-production --confirm-no-open-round --artifact "${artifacts[0]}"
