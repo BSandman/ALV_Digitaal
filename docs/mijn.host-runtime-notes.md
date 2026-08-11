@@ -13,6 +13,12 @@ welke mitigaties en supportvragen resteren. Vult v0.1.0 §13 en ADR-0002 aan.
   op cPanel/Apache-hosts doet Phusion Passenger dit. De mechanismen zijn vergelijkbaar:
   de app draait als een **beheerd, los proces** dat **op aanvraag start** en **na inactiviteit
   wordt gestopt**.
+- Op deze host start LiteSpeed de app via **`lsnode.js`** en laadt het ingestelde
+  startupbestand met `require()`. `src/start.js` blijft daarom ESM zonder top-level `await` in
+  de statische modulegraph; asynchrone secretsconfiguratie en serverstart lopen binnen een
+  direct gestarte promise. LiteSpeed vervangt de TCP-listener door zijn beheerde Unix-socket,
+  dus een ontbrekende `PORT` is geen startfout. App-stderr staat in `nodeapp/stderr.log` en
+  `nodeapp/tmp/restart.txt` triggert de beheerde herstart.
 - **CloudLinux LVE** begrenst het account op o.a. **Entry Processes (EP)** en **NPROC**.
   EP = gelijktijdige "ingangen" (in-flight requests); default-plafonds liggen vaak rond 200,
   maar zijn **host-specifiek en niet publiek door mijn.host gepubliceerd**.

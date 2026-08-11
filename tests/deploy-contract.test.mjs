@@ -74,6 +74,12 @@ test('deploy controleert code-only artefact, serversecrets, health en rollback',
   assert.match(deploy, /rsync -a --delete payload\/src\/ "\$remote_dir\/src\/"/);
   assert.match(deploy, /nodeapp\/tmp\/restart\.txt|"\$remote_dir\/tmp\/restart\.txt"/);
   assert.match(deploy, /--confirm-no-open-round/);
+  assert.match(deploy, /lsnode stderr/);
+  assert.match(deploy, /stderr\.log/);
+  assert.match(deploy, /tail -n 120/);
+  assert.match(deploy, /\[REDACTED\]/);
+  assert.match(deploy, /mysql\|mariadb/);
+  assert.match(deploy, /DB_PASSWORD\|AUTH_PEPPER/);
   assert.doesNotMatch(deploy, /ln -sfn|readlink .*current|REMOTE_RELEASE|\/current\.next/);
   assert.doesNotMatch(deploy, /rsync[^\n]*--delete[^\n]*"\$remote_dir\/"/);
 });

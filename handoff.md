@@ -2,11 +2,11 @@
 sprint: 3
 state: READY_FOR_VALIDATION
 owner: claude
-since: 2026-08-11T21:56:46Z
+since: 2026-08-11T23:22:15Z
 next: codex
 action_required_by: none
 blocked: false
-note: "PR #7 is groen voor Claude-validatie: doelgebonden CloudLinux-nodevenv staat vóór remote checks, npm ci en rollback op PATH."
+note: "PR #8 is groen voor Claude-validatie: lsnode-requirebare startentry, gecontroleerd bootstrapfalen en geredigeerde stderr-diagnostiek."
 ---
 
 # handoff.md — de estafettestok
@@ -15,15 +15,16 @@ note: "PR #7 is groen voor Claude-validatie: doelgebonden CloudLinux-nodevenv st
 
 ## Huidige beurt
 
-**Sprint 3 — CloudLinux nodevenv-PATH (Claude-validatie).** PR #7 lost het eerste echte acceptatiedeployblok op: een niet-interactieve SSH-sessie bevat de per-app CloudLinux-nodevenv niet op het standaard-PATH.
+**Sprint 3 — LiteSpeed lsnode-startentry (Claude-validatie).** De definitieve oorzaak van de A-deploy-503 was `ERR_REQUIRE_ASYNC_MODULE`: LiteSpeed `lsnode.js` laadt `src/start.js` synchroon via `require()`, terwijl de entry top-level `await` bevatte.
 
 Codex heeft:
-1. `ACCEPTATIE_NODE_BIN`/`PORTAAL_NODE_BIN` verplicht en via `ACC_NODE_BIN`/`PROD_NODE_BIN` aan de workflows gekoppeld;
-2. het pad fail-closed gebonden aan dezelfde SSH-gebruiker én app-root, met een numerieke Node-versie;
-3. de gevalideerde fysieke nodevenv vóór remote commandocontrole, installatie en rollback op `PATH` gezet;
-4. rode Linux-scenario's toegevoegd voor ontbrekend pad, verkeerde prefix/gebruiker, pad-traversal en niet-bestaande remote versie.
+1. top-level `await` verwijderd en secretsconfiguratie + dynamische serverimport in een direct gestarte `startupPromise` geplaatst;
+2. onder Node 20 bewezen dat CommonJS `require('src/start.js')` de ESM-entry laadt en de server pas na configuratie start;
+3. bewezen dat een bootstrapfout geen listener opent, diagnostiek schrijft en het proces non-zero beëindigt;
+4. bij rode healthcheck vóór rollback maximaal 120 regels `nodeapp/stderr.log` toegevoegd, begrensd tot de app-root en met dotenv-, JSON- en MariaDB-URI-secrets geredigeerd;
+5. runtime-notities en acceptatierunbook gecorrigeerd van Passenger naar LiteSpeed/lsnode.
 
-Bewijs: 59/59 tests, architectuur-, release- en PII-gates groen; Linux Bash-syntax en in-place/rollbackintegratie groen; GitHub gates + Gemini groen. Claude — valideer PR #7. Daarna: Codex merge; Bas zet `ACC_NODE_BIN=/home/cn111993/nodevenv/domains/acceptatie.honigfabriek.nl/nodeapp/20/bin` en rerunt de acceptatiedeploy.
+Bewijs: 61/61 tests, architectuur-, release- en PII-gates groen; Node 20/Linux require- en faalscenario's groen; Linux in-place deploy, stderr-redactie en beide rollbackpaden groen; GitHub gates + Gemini groen. Claude — valideer PR #8. Daarna: Codex merge; Bas rerunt de acceptatiedeploy zonder handmatige `PORT`.
 
 ---
 
@@ -46,3 +47,4 @@ Codex (steward): **merge PR #6** naar `main`.
 - 2026-08-11 — Claude: deploy-model → in-place (§3b); terug naar Codex voor deploy.sh-aanpassing. → READY_FOR_DEV.
 - 2026-08-11 — Codex: PR #6 in-place deploy + rollback; 58 tests, gates en Gemini groen. → READY_FOR_VALIDATION.
 - 2026-08-11 — Codex: PR #7 CloudLinux nodevenv-PATH; 59 tests, Linux-randgevallen, gates en Gemini groen. → READY_FOR_VALIDATION.
+- 2026-08-12 — Codex: PR #8 LiteSpeed/lsnode-startentry; 61 tests, Node 20 require/failure, stderr-redactie, gates en Gemini groen. → READY_FOR_VALIDATION.

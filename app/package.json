@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node src/start.js",
     "dev": "node --watch src/start.js",
-    "test": "node --test ../tests/architecture-gate.test.mjs ../tests/auth-store.test.mjs ../tests/dataset-tools.test.mjs ../tests/deploy-contract.test.mjs ../tests/hardening-contracts.test.mjs ../tests/meeting-store.test.mjs ../tests/pii-scan.test.mjs ../tests/secrets-config.test.mjs ../tests/security.test.mjs ../tests/seed-preparer.test.mjs ../tests/server-health.test.mjs ../tests/transaction-retry.test.mjs ../tests/vote-result.test.mjs ../tests/vote-store.test.mjs",
+    "test": "node --test ../tests/architecture-gate.test.mjs ../tests/auth-store.test.mjs ../tests/dataset-tools.test.mjs ../tests/deploy-contract.test.mjs ../tests/hardening-contracts.test.mjs ../tests/lsnode-entrypoint.test.mjs ../tests/meeting-store.test.mjs ../tests/pii-scan.test.mjs ../tests/secrets-config.test.mjs ../tests/security.test.mjs ../tests/seed-preparer.test.mjs ../tests/server-health.test.mjs ../tests/transaction-retry.test.mjs ../tests/vote-result.test.mjs ../tests/vote-store.test.mjs",
     "gate:architecture": "node ../scripts/architecture-gate.mjs",
     "build:release": "node ../scripts/build-release.mjs"
   },
