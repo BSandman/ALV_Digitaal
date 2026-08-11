@@ -33,3 +33,5 @@ coverage/
 # Lokale GitHub Actions deploy-keypair (privé naar Secret, publiek naar DirectAdmin)
 platform_alv_digitaal
 platform_alv_digitaal.pub
+alv_acc_deploy
+alv_acc_deploy.pub
