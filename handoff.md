@@ -1,12 +1,12 @@
 ---
 sprint: 3
-state: READY_FOR_DEV
+state: DEV_IN_PROGRESS
 owner: codex
-since: 2026-08-11T14:20:00Z
+since: 2026-08-11T12:26:34Z
 next: claude
 action_required_by: none
 blocked: false
-note: "Sprint 3 (Acceptatie/10.3) - blok 0+1 Codex. Eerst docs-commit (ADR-0012 e.d.), dan deploy.sh + app-config voor acceptatie.honigfabriek.nl (DB-coords, SECRETS_FILE/ADR-0012, healthz). Zie sprint.md + docs/gates/Codex-Mistral-taak-10.3."
+note: "Codex bouwt de acceptatieconfiguratie en veilige twee-doelen-deployroute volgens 10.3 en ADR-0012."
 ---
 
 # handoff.md — de estafettestok
