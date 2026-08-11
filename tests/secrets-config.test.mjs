@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -60,6 +60,24 @@ test('productiestart weigert zonder SECRETS_FILE en secrets binnen de applicatio
   }
 });
 
+test('secrets binnen een app-rootsymlink blijven verboden', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'alv-secrets-symlink-'));
+  try {
+    const realAppRoot = path.join(root, 'application-real');
+    const linkedAppRoot = path.join(root, 'application-link');
+    const secretsFile = path.join(realAppRoot, 'config', 'server.env');
+    await mkdir(path.dirname(secretsFile), { recursive: true });
+    await writeFile(secretsFile, acceptanceSecrets(), { encoding: 'utf8', mode: 0o600 });
+    await symlink(realAppRoot, linkedAppRoot, process.platform === 'win32' ? 'junction' : 'dir');
+
+    await assert.rejects(() => loadRuntimeConfiguration({
+      env: { SECRETS_FILE: secretsFile }, appRoot: linkedAppRoot, platform: 'win32',
+    }), { code: 'SECRETS_FILE_INSIDE_APP' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('parser accepteert dotenv-quotes maar weigert dubbele en procesgevaarlijke sleutels', () => {
   const parsed = parseSecretsFile("DB_PASSWORD='met # teken'\nAUTH_PEPPER=abcdefghijklmnopqrstuvwxyz-123456\n");
   assert.equal(parsed.DB_PASSWORD, 'met # teken');
@@ -71,6 +89,24 @@ test('POSIX secretsrechten moeten owner-only zijn', () => {
   const regularFile = (mode) => ({ mode, isFile: () => true });
   assert.doesNotThrow(() => assertSecurePermissions(regularFile(0o100600), 'linux'));
   assert.throws(() => assertSecurePermissions(regularFile(0o100640), 'linux'), { code: 'SECRETS_FILE_PERMISSIONS' });
+});
+
+test('runtimeconfig bewaakt numerieke grenzen en meet AUTH_PEPPER in UTF-8-bytes', () => {
+  for (const DB_POOL_SIZE of ['0', '11', '-1', '5.5', '9007199254740992']) {
+    assert.throws(() => validateRuntimeConfiguration({ ...baseRuntime(), DB_POOL_SIZE }), {
+      code: 'RUNTIME_CONFIG_INVALID',
+    });
+  }
+  for (const DB_PORT of ['0', '65536', '-1', '3306.5', '9007199254740992']) {
+    assert.throws(() => validateRuntimeConfiguration({ ...baseRuntime(), DB_PORT }), {
+      code: 'RUNTIME_CONFIG_INVALID',
+    });
+  }
+
+  assert.doesNotThrow(() => validateRuntimeConfiguration({ ...baseRuntime(), AUTH_PEPPER: 'é'.repeat(16) }));
+  assert.throws(() => validateRuntimeConfiguration({ ...baseRuntime(), AUTH_PEPPER: 'é'.repeat(15) }), {
+    code: 'AUTH_PEPPER_INVALID',
+  });
 });
 
 function acceptanceSecrets() {

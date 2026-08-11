@@ -122,6 +122,19 @@ if [[ "$DRY_RUN" == true ]]; then
   exit 0
 fi
 
+SSH_OPTIONS=(
+  -p "$SSH_PORT"
+  -o BatchMode=yes
+  -o StrictHostKeyChecking=yes
+  -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
+)
+SCP_OPTIONS=(
+  -P "$SSH_PORT"
+  -o BatchMode=yes
+  -o StrictHostKeyChecking=yes
+  -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
+)
+
 [[ -n "$ARTIFACT" ]] || { echo "--artifact of DEPLOY_ARTIFACT is verplicht." >&2; exit 2; }
 [[ -f "$ARTIFACT" ]] || { echo "Release-artefact ontbreekt: $ARTIFACT" >&2; exit 2; }
 ARTIFACT="$(cd "$(dirname "$ARTIFACT")" && pwd)/$(basename "$ARTIFACT")"
@@ -139,7 +152,7 @@ RELEASE_ID="${COMMIT_SHA:0:12}-$(date -u +%Y%m%dT%H%M%SZ)"
 REMOTE_RELEASE="$REMOTE_DIR/releases/$RELEASE_ID"
 
 echo ">> 2. Server-side secretsgrens controleren"
-ssh -p "$SSH_PORT" "$SSH_HOST" sh -s -- "$REMOTE_DIR" "$REMOTE_SECRETS_FILE" "$TARGET" <<'REMOTE_CHECK'
+ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- "$REMOTE_DIR" "$REMOTE_SECRETS_FILE" "$TARGET" <<'REMOTE_CHECK'
 set -eu
 remote_dir="$1"
 secrets_file="$2"
@@ -154,9 +167,9 @@ grep -Eq "^DEPLOY_TARGET=${target}$" "$secrets_file" || { echo "DEPLOY_TARGET ho
 REMOTE_CHECK
 
 echo ">> 3. Nieuwe, onveranderlijke release uploaden en installeren"
-ssh -p "$SSH_PORT" "$SSH_HOST" "umask 077; test ! -e '$REMOTE_RELEASE'; mkdir -p '$REMOTE_RELEASE'"
-scp -P "$SSH_PORT" "$ARTIFACT" "$SSH_HOST:$REMOTE_RELEASE/app.tgz"
-ssh -p "$SSH_PORT" "$SSH_HOST" sh -s -- "$REMOTE_RELEASE" "$ARTIFACT_SHA256" <<'REMOTE_INSTALL'
+ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" "umask 077; test ! -e '$REMOTE_RELEASE'; mkdir -p '$REMOTE_RELEASE'"
+scp "${SCP_OPTIONS[@]}" "$ARTIFACT" "$SSH_HOST:$REMOTE_RELEASE/app.tgz"
+ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- "$REMOTE_RELEASE" "$ARTIFACT_SHA256" <<'REMOTE_INSTALL'
 set -eu
 release_dir="$1"
 expected_hash="$2"
@@ -168,12 +181,12 @@ npm ci --omit=dev --no-audit --no-fund
 REMOTE_INSTALL
 
 echo ">> 4. Atomair activeren en Passenger herstarten"
-PREVIOUS_RELEASE="$(ssh -p "$SSH_PORT" "$SSH_HOST" "readlink '$REMOTE_DIR/current' || true")"
+PREVIOUS_RELEASE="$(ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" "readlink '$REMOTE_DIR/current' || true")"
 if [[ -n "$PREVIOUS_RELEASE" && "$PREVIOUS_RELEASE" != "$REMOTE_DIR/releases/"* ]]; then
   echo "Bestaande current-link wijst niet naar een beheerde release; deploy afgebroken." >&2
   exit 15
 fi
-ssh -p "$SSH_PORT" "$SSH_HOST" sh -s -- "$REMOTE_DIR" "$REMOTE_RELEASE" <<'REMOTE_ACTIVATE'
+ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- "$REMOTE_DIR" "$REMOTE_RELEASE" <<'REMOTE_ACTIVATE'
 set -eu
 remote_dir="$1"
 release_dir="$2"
@@ -195,7 +208,7 @@ done
 
 if [[ "$HEALTH_OK" != true ]]; then
   echo "Healthcheck rood; vorige release wordt hersteld." >&2
-  ssh -p "$SSH_PORT" "$SSH_HOST" sh -s -- "$REMOTE_DIR" "$PREVIOUS_RELEASE" <<'REMOTE_ROLLBACK'
+  ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- "$REMOTE_DIR" "$PREVIOUS_RELEASE" <<'REMOTE_ROLLBACK'
 set -eu
 remote_dir="$1"
 previous_release="$2"

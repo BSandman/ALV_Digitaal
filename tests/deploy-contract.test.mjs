@@ -20,6 +20,9 @@ test('deployroute kiest acceptatie standaard en heeft doelgebonden coördinaten'
   assert.match(deploy, /PORTAAL_REMOTE_DIR/);
   assert.match(deploy, /PORTAAL_SSH_PORT/);
   assert.match(deploy, /https:\/\/portaal\.honigfabriek\.nl\/healthz/);
+  assert.match(deploy, /StrictHostKeyChecking=yes/);
+  assert.match(deploy, /UserKnownHostsFile=/);
+  assert.match(deploy, /BatchMode=yes/);
   assert.doesNotMatch(deploy, /stem\.honigfabriek\.nl/);
 });
 
