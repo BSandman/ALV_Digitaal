@@ -315,7 +315,10 @@ stderr_real="$(realpath -e "$stderr_file")"
 case "$stderr_real" in "$remote_real"/*) ;; *) echo "Diagnostiek weigert stderr.log buiten app-root." >&2; exit 40;; esac
 echo ">> lsnode stderr (laatste 120 regels; herkenbare secretsleutels geredigeerd):" >&2
 tail -n 120 "$stderr_real" \
-  | sed -E 's/^((DB_PASSWORD|AUTH_PEPPER|SMTP_[A-Z0-9_]*(PASSWORD|SECRET|TOKEN|KEY)|ADMIN_[A-Z0-9_]*(PASSWORD|SECRET|TOKEN|KEY))[[:space:]]*=).*/\1[REDACTED]/'
+  | sed -E \
+      -e 's/^((DB_PASSWORD|AUTH_PEPPER|SMTP_[A-Z0-9_]*(PASSWORD|SECRET|TOKEN|KEY)|ADMIN_[A-Z0-9_]*(PASSWORD|SECRET|TOKEN|KEY))[[:space:]]*=).*/\1[REDACTED]/' \
+      -e 's/("(DB_PASSWORD|AUTH_PEPPER|SMTP_[A-Z0-9_]*(PASSWORD|SECRET|TOKEN|KEY)|ADMIN_[A-Z0-9_]*(PASSWORD|SECRET|TOKEN|KEY))"[[:space:]]*:[[:space:]]*")[^"]*/\1[REDACTED]/g' \
+      -e 's#((mysql|mariadb)://[^:/@[:space:]]+:)[^@/[:space:]]+@#\1[REDACTED]@#g'
 REMOTE_STDERR
 }
 

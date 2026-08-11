@@ -38,3 +38,24 @@ test('LiteSpeed lsnode kan de ESM-startentry synchroon require()n zonder top-lev
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.doesNotMatch(result.stderr, /ERR_REQUIRE_ASYNC_MODULE|top-level await/i);
 });
+
+test('een mislukte async bootstrap opent geen listener en beëindigt het lsnode-proces non-zero', () => {
+  const environment = {
+    ...process.env,
+    NODE_ENV: 'production',
+    SECRETS_FILE: path.join(root, 'niet-bestaande-secrets', 'acceptatie.env'),
+    PORT: '0',
+  };
+  delete environment.DEPLOY_TARGET;
+
+  const result = spawnSync(
+    process.execPath,
+    ['--input-type=commonjs', '--eval', `require(${JSON.stringify(entrypoint)});`],
+    { cwd: root, env: environment, encoding: 'utf8', timeout: 10_000 }
+  );
+
+  assert.equal(result.error, undefined, result.error?.message);
+  assert.notEqual(result.status, 0, 'startupfout moet een niet-nul exitstatus geven');
+  assert.match(result.stderr, /\[alv-app\] startup mislukt:/);
+  assert.doesNotMatch(result.stdout, /luistert op/);
+});
