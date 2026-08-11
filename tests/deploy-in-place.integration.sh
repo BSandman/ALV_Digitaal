@@ -8,17 +8,21 @@ command -v rsync >/dev/null 2>&1 || { echo "rsync is vereist voor de deploy-inte
 
 TEST_USER="$(id -un)"
 TEST_HOME="/home/$TEST_USER"
-mkdir -p "$TEST_HOME/domains" "$TEST_HOME/secrets"
+mkdir -p "$TEST_HOME/domains" "$TEST_HOME/secrets" "$TEST_HOME/nodevenv"
 TEST_BASE="$(mktemp -d "$TEST_HOME/domains/alv-in-place-test.XXXXXX")"
 REMOTE_DIR="$TEST_BASE/nodeapp"
 REMOTE_DEPLOY_ROOT="${REMOTE_DIR}.deploy"
+NODE_ENV_TEST_BASE="$TEST_HOME/nodevenv${TEST_BASE#"$TEST_HOME"}"
+NODE_ENV_ROOT="$NODE_ENV_TEST_BASE/nodeapp/20"
+NODE_BIN="$NODE_ENV_ROOT/bin"
+mkdir -p "$NODE_BIN"
 SECRETS_FILE="$(mktemp "$TEST_HOME/secrets/alv-acceptatie-test.XXXXXX.env")"
 FAKE_BIN="$(mktemp -d)"
 HEALTH_STATE="$(mktemp)"
 NPM_STATE="$(mktemp)"
 
 cleanup() {
-  rm -rf "$TEST_BASE" "$REMOTE_DEPLOY_ROOT" "$FAKE_BIN"
+  rm -rf "$TEST_BASE" "$REMOTE_DEPLOY_ROOT" "$NODE_ENV_TEST_BASE" "$FAKE_BIN"
   rm -f "$SECRETS_FILE" "$HEALTH_STATE" "$NPM_STATE"
 }
 trap cleanup EXIT
@@ -64,7 +68,7 @@ cat > "$FAKE_BIN/sleep" <<'FAKE_SLEEP'
 exit 0
 FAKE_SLEEP
 
-cat > "$FAKE_BIN/npm" <<'FAKE_NPM'
+cat > "$NODE_BIN/npm" <<'FAKE_NPM'
 #!/usr/bin/env bash
 set -eu
 [[ "${1:-}" = "ci" ]] || { echo "Onverwachte npm-aanroep in deploytest." >&2; exit 90; }
@@ -76,7 +80,11 @@ fi
 mkdir -p node_modules
 printf 'fake npm ci\n' > node_modules/.deploy-test
 FAKE_NPM
-chmod 700 "$FAKE_BIN/ssh" "$FAKE_BIN/scp" "$FAKE_BIN/curl" "$FAKE_BIN/sleep" "$FAKE_BIN/npm"
+cat > "$NODE_BIN/node" <<'FAKE_NODE'
+#!/usr/bin/env sh
+exit 0
+FAKE_NODE
+chmod 700 "$FAKE_BIN/ssh" "$FAKE_BIN/scp" "$FAKE_BIN/curl" "$FAKE_BIN/sleep" "$NODE_BIN/npm" "$NODE_BIN/node"
 
 mkdir -p "$REMOTE_DIR/src"
 printf 'oude code\n' > "$REMOTE_DIR/src/old.txt"
@@ -100,8 +108,42 @@ export FAKE_NPM_STATE="$NPM_STATE"
 export ACCEPTATIE_SSH_HOST="${TEST_USER}@test.invalid"
 export ACCEPTATIE_SSH_PORT=26
 export ACCEPTATIE_REMOTE_DIR="$REMOTE_DIR"
+export ACCEPTATIE_NODE_BIN="$NODE_BIN"
 export ACCEPTATIE_SECRETS_FILE="$SECRETS_FILE"
 export DEPLOY_COMMIT_SHA=1111111111111111111111111111111111111111
+
+saved_node_bin="$ACCEPTATIE_NODE_BIN"
+unset ACCEPTATIE_NODE_BIN
+set +e
+"$PROJECT_ROOT/scripts/deploy.sh" --target acceptatie --dry-run >/dev/null 2>&1
+missing_node_bin_status=$?
+set -e
+[[ "$missing_node_bin_status" -eq 2 ]] || { echo "Deploy zonder nodevenv-bin gaf $missing_node_bin_status in plaats van 2." >&2; exit 1; }
+export ACCEPTATIE_NODE_BIN="$FAKE_BIN"
+set +e
+"$PROJECT_ROOT/scripts/deploy.sh" --target acceptatie --dry-run >/dev/null 2>&1
+unsafe_node_bin_status=$?
+set -e
+[[ "$unsafe_node_bin_status" -eq 2 ]] || { echo "Deploy met nodevenv-bin buiten /home/<user>/nodevenv gaf $unsafe_node_bin_status in plaats van 2." >&2; exit 1; }
+export ACCEPTATIE_NODE_BIN="$NODE_ENV_TEST_BASE/nodeapp/20/bin/../bin"
+set +e
+"$PROJECT_ROOT/scripts/deploy.sh" --target acceptatie --dry-run >/dev/null 2>&1
+traversal_node_bin_status=$?
+set -e
+[[ "$traversal_node_bin_status" -eq 2 ]] || { echo "Deploy met pad-ontsnapping in nodevenv-bin gaf $traversal_node_bin_status in plaats van 2." >&2; exit 1; }
+export ACCEPTATIE_NODE_BIN="/home/andere_gebruiker/nodevenv${REMOTE_DIR#"$TEST_HOME"}/20/bin"
+set +e
+"$PROJECT_ROOT/scripts/deploy.sh" --target acceptatie --dry-run >/dev/null 2>&1
+other_user_node_bin_status=$?
+set -e
+[[ "$other_user_node_bin_status" -eq 2 ]] || { echo "Deploy met nodevenv van een andere gebruiker gaf $other_user_node_bin_status in plaats van 2." >&2; exit 1; }
+export ACCEPTATIE_NODE_BIN="$NODE_ENV_TEST_BASE/nodeapp/21/bin"
+set +e
+"$PROJECT_ROOT/scripts/deploy.sh" --target acceptatie --confirm-no-open-round --artifact "$ARTIFACT" >/dev/null 2>&1
+missing_remote_node_bin_status=$?
+set -e
+[[ "$missing_remote_node_bin_status" -eq 10 ]] || { echo "Deploy met ontbrekende remote nodevenv-versie gaf $missing_remote_node_bin_status in plaats van 10." >&2; exit 1; }
+export ACCEPTATIE_NODE_BIN="$saved_node_bin"
 
 set +e
 "$PROJECT_ROOT/scripts/deploy.sh" --target acceptatie --artifact "$ARTIFACT" >/dev/null 2>&1
@@ -115,6 +157,7 @@ printf 'success\n' > "$NPM_STATE"
 [[ -f "$REMOTE_DIR/src/start.js" ]]
 [[ ! -e "$REMOTE_DIR/current" ]]
 [[ -f "$REMOTE_DIR/tmp/restart.txt" ]]
+[[ -f "$REMOTE_DIR/node_modules/.deploy-test" ]]
 first_backup="$(find "$REMOTE_DEPLOY_ROOT/backups" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 [[ -f "$first_backup/.backup-ready" ]]
 [[ "$(cat "$first_backup/managed/src/old.txt")" = "oude code" ]]

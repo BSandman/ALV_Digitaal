@@ -93,6 +93,7 @@ jobs:
           PORTAAL_SSH_HOST: ${{ format('{0}@{1}', vars.PROD_SSH_USER, vars.PROD_SSH_HOST) }}
           PORTAAL_SSH_PORT: ${{ vars.PROD_SSH_PORT }}
           PORTAAL_REMOTE_DIR: ${{ vars.PROD_REMOTE_DIR }}
+          PORTAAL_NODE_BIN: ${{ vars.PROD_NODE_BIN }}
           PORTAAL_SECRETS_FILE: ${{ vars.PROD_SECRETS_FILE }}
           DEPLOY_COMMIT_SHA: ${{ github.sha }}
           BAS_PRODUCTION_GO: JA

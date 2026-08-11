@@ -20,8 +20,8 @@ Een echte deploy vereist daarnaast --confirm-no-open-round: de operator bevestig
 dat er op het doel geen stemronde openstaat.
 
 Per doel vereist:
-  ACCEPTATIE_SSH_HOST / ACCEPTATIE_SSH_PORT / ACCEPTATIE_REMOTE_DIR
-  PORTAAL_SSH_HOST    / PORTAAL_SSH_PORT    / PORTAAL_REMOTE_DIR
+  ACCEPTATIE_SSH_HOST / ACCEPTATIE_SSH_PORT / ACCEPTATIE_REMOTE_DIR / ACCEPTATIE_NODE_BIN
+  PORTAAL_SSH_HOST    / PORTAAL_SSH_PORT    / PORTAAL_REMOTE_DIR    / PORTAAL_NODE_BIN
 
 Optioneel zijn *_HEALTH_URL en *_SECRETS_FILE; veilige defaults zijn ingebouwd.
 USAGE
@@ -68,6 +68,7 @@ case "$TARGET" in
     SSH_HOST="${ACCEPTATIE_SSH_HOST:-}"
     SSH_PORT="${ACCEPTATIE_SSH_PORT:-22}"
     REMOTE_DIR="${ACCEPTATIE_REMOTE_DIR:-}"
+    NODE_BIN="${ACCEPTATIE_NODE_BIN:-}"
     HEALTH_URL="${ACCEPTATIE_HEALTH_URL:-https://acceptatie.honigfabriek.nl/healthz}"
     REMOTE_SECRETS_FILE="${ACCEPTATIE_SECRETS_FILE:-/home/cn111993/secrets/alv-acceptatie.env}"
     EXPECTED_HEALTH_URL="https://acceptatie.honigfabriek.nl/healthz"
@@ -80,6 +81,7 @@ case "$TARGET" in
     SSH_HOST="${PORTAAL_SSH_HOST:-}"
     SSH_PORT="${PORTAAL_SSH_PORT:-22}"
     REMOTE_DIR="${PORTAAL_REMOTE_DIR:-}"
+    NODE_BIN="${PORTAAL_NODE_BIN:-}"
     HEALTH_URL="${PORTAAL_HEALTH_URL:-https://portaal.honigfabriek.nl/healthz}"
     REMOTE_SECRETS_FILE="${PORTAAL_SECRETS_FILE:-/home/cn111993/secrets/alv-portaal.env}"
     EXPECTED_HEALTH_URL="https://portaal.honigfabriek.nl/healthz"
@@ -96,6 +98,7 @@ esac
 }
 SSH_USER="${SSH_HOST%%@*}"
 REMOTE_DIR="${REMOTE_DIR%/}"
+NODE_BIN="${NODE_BIN%/}"
 [[ "$SSH_PORT" =~ ^[0-9]+$ ]] && ((SSH_PORT >= 1 && SSH_PORT <= 65535)) || {
   echo "${TARGET^^}_SSH_PORT moet tussen 1 en 65535 liggen." >&2
   exit 2
@@ -110,6 +113,16 @@ case "$REMOTE_DIR" in
     exit 2
     ;;
 esac
+[[ "$NODE_BIN" =~ ^/[A-Za-z0-9._/-]+$ ]] || {
+  echo "${TARGET^^}_NODE_BIN ontbreekt of is geen veilig absoluut pad." >&2
+  exit 2
+}
+case "$NODE_BIN" in
+  *"//"*|*"/../"*|*"/./"*)
+    echo "${TARGET^^}_NODE_BIN bevat onveilige padsegmenten." >&2
+    exit 2
+    ;;
+esac
 case "$REMOTE_DIR" in
   "/home/$SSH_USER/domains/"*/nodeapp) ;;
   *)
@@ -117,6 +130,20 @@ case "$REMOTE_DIR" in
     exit 2
     ;;
 esac
+NODE_BIN_PREFIX="/home/$SSH_USER/nodevenv${REMOTE_DIR#"/home/$SSH_USER"}"
+case "$NODE_BIN" in
+  "$NODE_BIN_PREFIX"/*/bin) ;;
+  *)
+    echo "${TARGET^^}_NODE_BIN moet bij dezelfde CloudLinux app-root horen: $NODE_BIN_PREFIX/<node-versie>/bin." >&2
+    exit 2
+    ;;
+esac
+NODE_VERSION="${NODE_BIN#"$NODE_BIN_PREFIX"/}"
+NODE_VERSION="${NODE_VERSION%/bin}"
+[[ "$NODE_VERSION" =~ ^[0-9]+([.][0-9]+){0,2}$ ]] || {
+  echo "${TARGET^^}_NODE_BIN bevat geen veilige numerieke Node-versie." >&2
+  exit 2
+}
 [[ "$REMOTE_SECRETS_FILE" =~ ^/[A-Za-z0-9._/-]+$ ]] || {
   echo "Secrets-pad is geen veilig absoluut pad." >&2
   exit 2
@@ -143,6 +170,7 @@ echo ">> Host: $SSH_HOST"
 echo ">> SSH-poort: $SSH_PORT"
 echo ">> Application root (in-place): $REMOTE_DIR"
 echo ">> Backup root: ${REMOTE_DIR}.deploy/backups"
+echo ">> Node-runtime: app-specifieke CloudLinux nodevenv"
 echo ">> Healthcheck: $HEALTH_URL"
 echo ">> Secrets: server-side buiten application root (inhoud wordt niet gelezen of getoond)"
 
@@ -188,20 +216,28 @@ REMOTE_WORK="$REMOTE_DEPLOY_ROOT/work/$RELEASE_ID"
 REMOTE_BACKUP="$REMOTE_DEPLOY_ROOT/backups/$RELEASE_ID"
 
 echo ">> 2. CloudLinux app-root en server-side secretsgrens controleren"
-ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- "$REMOTE_DIR" "$REMOTE_SECRETS_FILE" "$TARGET" "$REMOTE_DEPLOY_ROOT" "$REMOTE_WORK" <<'REMOTE_CHECK'
+ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- "$REMOTE_DIR" "$REMOTE_SECRETS_FILE" "$TARGET" "$REMOTE_DEPLOY_ROOT" "$REMOTE_WORK" "$NODE_BIN" <<'REMOTE_CHECK'
 set -eu
 remote_dir="$1"
 secrets_file="$2"
 target="$3"
 deploy_root="$4"
 work_dir="$5"
+node_bin="$6"
 case "$remote_dir" in /home/*/domains/*/nodeapp) ;; *) echo "Onveilige CloudLinux app-root." >&2; exit 10;; esac
 test -d "$remote_dir" || { echo "CloudLinux app-root ontbreekt." >&2; exit 10; }
 test ! -L "$remote_dir" || { echo "CloudLinux app-root mag geen symlink zijn." >&2; exit 10; }
 test ! -e "$remote_dir/current" || { echo "Oud current-layout aangetroffen; app-root moet nodeapp zelf blijven." >&2; exit 10; }
 test "$deploy_root" = "${remote_dir}.deploy" || { echo "Backup-root hoort niet bij app-root." >&2; exit 10; }
 test ! -L "$deploy_root" || { echo "Backup-root mag geen symlink zijn." >&2; exit 10; }
-for command_name in rsync npm tar sha256sum realpath; do
+remote_user="$(id -un)"
+node_bin_prefix="/home/$remote_user/nodevenv${remote_dir#"/home/$remote_user"}"
+case "$node_bin" in "$node_bin_prefix"/*/bin) ;; *) echo "CloudLinux nodevenv hoort niet bij de app-root." >&2; exit 10;; esac
+node_bin_real="$(CDPATH= cd -P "$node_bin" 2>/dev/null && pwd -P)" || { echo "CloudLinux nodevenv-bin ontbreekt." >&2; exit 10; }
+case "$node_bin_real" in "$node_bin_prefix"/*/bin) ;; *) echo "CloudLinux nodevenv ontsnapt uit de app-specifieke gebruikersmap." >&2; exit 10;; esac
+PATH="$node_bin_real:$PATH"
+export PATH
+for command_name in rsync node npm tar sha256sum realpath; do
   command -v "$command_name" >/dev/null 2>&1 || { echo "Servercommando ontbreekt: $command_name" >&2; exit 10; }
 done
 remote_real="$(realpath -e "$remote_dir")"
@@ -224,15 +260,23 @@ echo ">> 3. Code-only release uploaden, backup maken en in-place installeren"
 scp "${SCP_OPTIONS[@]}" "$ARTIFACT" "$SSH_HOST:$REMOTE_WORK/app.tgz"
 
 rollback_remote() {
-  ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- "$REMOTE_DIR" "$REMOTE_DEPLOY_ROOT" "$REMOTE_BACKUP" <<'REMOTE_ROLLBACK'
+  ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- "$REMOTE_DIR" "$REMOTE_DEPLOY_ROOT" "$REMOTE_BACKUP" "$NODE_BIN" <<'REMOTE_ROLLBACK'
 set -eu
 remote_dir="$1"
 deploy_root="$2"
 backup_dir="$3"
+node_bin="$4"
 case "$remote_dir" in /home/*/domains/*/nodeapp) ;; *) echo "Rollback weigert onveilige app-root." >&2; exit 30;; esac
 test "$deploy_root" = "${remote_dir}.deploy" || { echo "Rollback weigert onveilige backup-root." >&2; exit 30; }
 test -d "$remote_dir" && test ! -L "$remote_dir"
 test "$(realpath -e "$remote_dir")" = "$remote_dir" || { echo "Rollback weigert app-root met symlinks of omwegen." >&2; exit 30; }
+remote_user="$(id -un)"
+node_bin_prefix="/home/$remote_user/nodevenv${remote_dir#"/home/$remote_user"}"
+case "$node_bin" in "$node_bin_prefix"/*/bin) ;; *) echo "Rollback-nodevenv hoort niet bij de app-root." >&2; exit 30;; esac
+node_bin_real="$(CDPATH= cd -P "$node_bin" 2>/dev/null && pwd -P)" || { echo "Rollback mist CloudLinux nodevenv-bin." >&2; exit 30; }
+case "$node_bin_real" in "$node_bin_prefix"/*/bin) ;; *) echo "Rollback-nodevenv ontsnapt uit de app-specifieke gebruikersmap." >&2; exit 30;; esac
+PATH="$node_bin_real:$PATH"
+export PATH
 test -f "$backup_dir/.backup-ready" || { echo "Rollback-backup is niet compleet." >&2; exit 31; }
 lock_dir="$deploy_root/deploy.lock"
 mkdir "$lock_dir" 2>/dev/null || { echo "Een andere deploy of rollback is actief." >&2; exit 32; }
@@ -253,7 +297,7 @@ touch "$remote_dir/tmp/restart.txt"
 REMOTE_ROLLBACK
 }
 
-if ! ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- "$REMOTE_DIR" "$REMOTE_DEPLOY_ROOT" "$REMOTE_WORK" "$REMOTE_BACKUP" "$ARTIFACT_SHA256" "$COMMIT_SHA" <<'REMOTE_INSTALL'
+if ! ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- "$REMOTE_DIR" "$REMOTE_DEPLOY_ROOT" "$REMOTE_WORK" "$REMOTE_BACKUP" "$ARTIFACT_SHA256" "$COMMIT_SHA" "$NODE_BIN" <<'REMOTE_INSTALL'
 set -eu
 remote_dir="$1"
 deploy_root="$2"
@@ -261,10 +305,18 @@ work_dir="$3"
 backup_dir="$4"
 expected_hash="$5"
 commit_sha="$6"
+node_bin="$7"
 case "$remote_dir" in /home/*/domains/*/nodeapp) ;; *) echo "Installatie weigert onveilige app-root." >&2; exit 16;; esac
 test "$deploy_root" = "${remote_dir}.deploy" || { echo "Installatie weigert onveilige deploy-root." >&2; exit 16; }
 test -d "$remote_dir" && test ! -L "$remote_dir"
 test "$(realpath -e "$remote_dir")" = "$remote_dir" || { echo "Installatie weigert app-root met symlinks of omwegen." >&2; exit 16; }
+remote_user="$(id -un)"
+node_bin_prefix="/home/$remote_user/nodevenv${remote_dir#"/home/$remote_user"}"
+case "$node_bin" in "$node_bin_prefix"/*/bin) ;; *) echo "Installatie-nodevenv hoort niet bij de app-root." >&2; exit 16;; esac
+node_bin_real="$(CDPATH= cd -P "$node_bin" 2>/dev/null && pwd -P)" || { echo "Installatie mist CloudLinux nodevenv-bin." >&2; exit 16; }
+case "$node_bin_real" in "$node_bin_prefix"/*/bin) ;; *) echo "Installatie-nodevenv ontsnapt uit de app-specifieke gebruikersmap." >&2; exit 16;; esac
+PATH="$node_bin_real:$PATH"
+export PATH
 lock_dir="$deploy_root/deploy.lock"
 mkdir "$lock_dir" 2>/dev/null || { echo "Een andere deploy is actief." >&2; exit 17; }
 trap 'rmdir "$lock_dir" 2>/dev/null || true' EXIT HUP INT TERM
