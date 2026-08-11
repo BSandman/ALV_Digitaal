@@ -23,9 +23,6 @@ export function formatWeight(units) {
  * er komt nergens IEEE-754-drijvende-kommarekenkunde aan te pas (ADR-0008 §3).
  */
 export function calculateVoteResult(rows, {
-  eligibleWeight,
-  quorumNumerator,
-  quorumDenominator,
   majorityNumerator,
   majorityDenominator,
 }) {
@@ -35,28 +32,34 @@ export function calculateVoteResult(rows, {
     totals[row.choice] += parseWeight(row.weight);
   }
 
-  const eligible = parseWeight(eligibleWeight);
-  const present = CHOICES.reduce((sum, choice) => sum + totals[choice], 0n);
+  const accounted = CHOICES.reduce((sum, choice) => sum + totals[choice], 0n);
   const decisive = totals.voor + totals.tegen;
-  const quorum = normalizeRatio(quorumNumerator, quorumDenominator, 'quorum');
   const majority = normalizeRatio(majorityNumerator, majorityDenominator, 'meerderheid');
 
   return {
     perChoiceWeight: Object.fromEntries(CHOICES.map((choice) => [choice, formatWeight(totals[choice])])),
-    eligibleWeight: formatWeight(eligible),
-    presentWeight: formatWeight(present),
+    accountedWeight: formatWeight(accounted),
     decisiveWeight: formatWeight(decisive),
     count: rows.length,
-    quorum: {
-      numerator: quorum.numerator,
-      denominator: quorum.denominator,
-      met: eligible > 0n && present * quorum.denominatorBig >= eligible * quorum.numeratorBig,
-    },
     majority: {
       numerator: majority.numerator,
       denominator: majority.denominator,
       met: decisive > 0n && totals.voor * majority.denominatorBig >= decisive * majority.numeratorBig,
     },
+  };
+}
+
+/** Bepaal éénmalig de vergadering-brede quorumvlag uit de bevroren presentiebasis. */
+export function calculateMeetingQuorum(basisWeight, eligibleWeight, numerator, denominator) {
+  const basis = parseWeight(basisWeight);
+  const eligible = parseWeight(eligibleWeight);
+  const quorum = normalizeRatio(numerator, denominator, 'quorum');
+  return {
+    basisWeight: formatWeight(basis),
+    eligibleWeight: formatWeight(eligible),
+    numerator: quorum.numerator,
+    denominator: quorum.denominator,
+    met: eligible > 0n && basis * quorum.denominatorBig >= eligible * quorum.numeratorBig,
   };
 }
 

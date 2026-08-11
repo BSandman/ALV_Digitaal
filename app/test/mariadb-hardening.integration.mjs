@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { closePool, withConnection } from '../src/db/pool.js';
 import { createAuthStoreMariaDB } from '../src/stores/mariadb/AuthStoreMariaDB.js';
+import { createMeetingStoreMariaDB } from '../src/stores/mariadb/MeetingStoreMariaDB.js';
 import { createVoteStoreMariaDB } from '../src/stores/mariadb/VoteStoreMariaDB.js';
 
 const pepper = process.env.AUTH_PEPPER;
@@ -8,6 +9,7 @@ if (!pepper) throw new Error('AUTH_PEPPER ontbreekt voor integratietest.');
 
 const ids = await seedScenario();
 const auth = createAuthStoreMariaDB({ pepper });
+const meetings = createMeetingStoreMariaDB();
 const votes = createVoteStoreMariaDB();
 
 const { code } = await auth.provisionCredential({
@@ -44,6 +46,18 @@ assert.deepEqual(
   { participantId: ids.ownerId, meetingId: ids.meetingId }
 );
 
+const quorum = await meetings.establishQuorum(ids.meetingId, {
+  setBy: 'chair:integration', quorumNumerator: 1, quorumDenominator: 2,
+});
+assert.equal(quorum.met, true);
+assert.equal(quorum.basisWeight, '6.0000');
+assert.deepEqual(
+  await meetings.establishQuorum(ids.meetingId, {
+    setBy: 'chair:other', quorumNumerator: 2, quorumDenominator: 3,
+  }),
+  quorum
+);
+
 const round = await votes.openRound(ids.motionId, 30);
 assert.ok(round.remainingSeconds > 0 && round.remainingSeconds <= 30);
 assert.equal('closesAt' in round, false);
@@ -62,9 +76,11 @@ assert.equal('closesAt' in status, false);
 
 const result = await votes.closeRoundAtomically(round.id);
 assert.equal(result.snapshot.quorum.met, true);
+assert.equal(result.snapshot.quorum.frozen, true);
 assert.equal(result.snapshot.majority.met, true);
+assert.deepEqual(result.snapshot.automaticAbstentions, { count: 1, weight: '1.0000' });
 assert.deepEqual(result.snapshot.perChoiceWeight, {
-  voor: '2.0000', tegen: '1.0000', blanco: '0.0000', onthouding: '2.0000',
+  voor: '2.0000', tegen: '1.0000', blanco: '0.0000', onthouding: '3.0000',
 });
 
 const attackAuth = createAuthStoreMariaDB({ pepper, maxIpFailures: 2, maxCredentialFailures: 10 });
@@ -117,7 +133,20 @@ const evidence = await withConnection(async (conn) => {
     'SELECT failed_attempts, locked_until FROM credential WHERE id = 2'
   );
   const [[sqlMode]] = await conn.execute('SELECT @@SESSION.sql_mode AS value');
-  return { power, audit, sessions, attempts, failedCredential, sqlMode };
+  const [[autoAbstention]] = await conn.execute(
+    'SELECT COUNT(*) AS amount FROM round_automatic_abstention WHERE round_id = ?',
+    [round.id]
+  );
+  const [[autoAudit]] = await conn.execute(
+    "SELECT COUNT(*) AS amount FROM audit_event WHERE action = 'round_non_votes_registered_as_abstention'"
+  );
+  const [[quorumAudit]] = await conn.execute(
+    "SELECT COUNT(*) AS amount FROM audit_event WHERE action = 'meeting_quorum_established'"
+  );
+  return {
+    power, audit, sessions, attempts, failedCredential, sqlMode,
+    autoAbstention, autoAudit, quorumAudit,
+  };
 });
 assert.equal(evidence.power.status, 'invalidated_owner_login');
 assert.ok(evidence.power.invalidated_at);
@@ -127,6 +156,9 @@ assert.equal(Number(evidence.attempts.amount), 3);
 assert.equal(Number(evidence.failedCredential.failed_attempts), 1);
 assert.ok(evidence.failedCredential.locked_until);
 assert.match(evidence.sqlMode.value, /NO_BACKSLASH_ESCAPES/);
+assert.equal(Number(evidence.autoAbstention.amount), 1);
+assert.equal(Number(evidence.autoAudit.amount), 1);
+assert.equal(Number(evidence.quorumAudit.amount), 1);
 await assert.rejects(
   withConnection((conn) => conn.execute(
     "UPDATE power_of_attorney SET status = 'active', invalidated_at = NULL WHERE entitlement_id = ?",
@@ -134,12 +166,30 @@ await assert.rejects(
   )),
   /power_of_attorney_invalidation_is_irreversible/
 );
+await assert.rejects(
+  withConnection((conn) => conn.execute(
+    'UPDATE meeting_quorum SET quorum_met = 0 WHERE meeting_id = ?',
+    [ids.meetingId]
+  )),
+  /meeting_quorum_is_frozen/
+);
+await assert.rejects(
+  withConnection((conn) => conn.execute(
+    `INSERT INTO meeting_quorum_entitlement
+       (meeting_id, entitlement_id, attendance_present, power_submitted, weight_snapshot)
+     VALUES (?, ?, 1, 0, 1.0000)`,
+    [ids.meetingId, ids.ownerPgId]
+  )),
+  /meeting_quorum_entitlements_are_frozen/
+);
 
 console.log(JSON.stringify({
   rowLevelAuthorization: 'green',
   oneActiveDevice: 'green',
   powerInvalidationAudit: 'green',
   exactBoundaryMath: 'green',
+  frozenMeetingQuorum: 'green',
+  automaticAbstentionAudit: 'green',
   relativeTimer: 'green',
   bruteForceLockout: 'green',
   irreversiblePowerInvalidation: 'green',
@@ -173,12 +223,19 @@ async function seedScenario() {
       "INSERT INTO entitlement (participant_id, splitsing_code, weight) VALUES (?, 'PG', 2.0000)",
       [other.insertId]
     );
+    await conn.execute(
+      "INSERT INTO entitlement (participant_id, splitsing_code, weight) VALUES (?, 'TF', 1.0000)",
+      [other.insertId]
+    );
     const [motion] = await conn.execute(
       `INSERT INTO motion
-         (meeting_id, title, splitsingen, quorum_numerator, quorum_denominator,
-          majority_numerator, majority_denominator)
-       VALUES (?, 'Synthetisch hardeningvoorstel', NULL, 1, 2, 2, 3)`,
+         (meeting_id, title, splitsingen, majority_numerator, majority_denominator)
+       VALUES (?, 'Synthetisch hardeningvoorstel', NULL, 2, 3)`,
       [meetingId]
+    );
+    await conn.execute(
+      'INSERT INTO attendance (meeting_id, participant_id, present) VALUES (?, ?, 1), (?, ?, 1)',
+      [meetingId, owner.insertId, meetingId, other.insertId]
     );
     await conn.execute(
       'INSERT INTO power_of_attorney (meeting_id, entitlement_id) VALUES (?, ?)',

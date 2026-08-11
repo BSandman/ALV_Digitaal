@@ -16,6 +16,16 @@ test('schema bevat persistente auth-limits, apparaatbinding en onherstelbare mac
   assert.match(schema, /SIGNAL SQLSTATE '45000'/);
 });
 
+test('schema bevriest vergaderingquorum en automatische onthoudingen', async () => {
+  const schema = await readFile(path.join(root, 'infra/mysql/init/01-schema.sql'), 'utf8');
+  assert.match(schema, /CREATE TABLE meeting_quorum \(/);
+  assert.match(schema, /CREATE TABLE meeting_quorum_entitlement \(/);
+  assert.match(schema, /meeting_quorum_is_frozen/);
+  assert.match(schema, /CREATE TABLE round_automatic_abstention \(/);
+  assert.match(schema, /automatic_abstention_is_immutable/);
+  assert.doesNotMatch(schema, /motion[\s\S]{0,400}quorum_numerator/);
+});
+
 test('vaste sessie-sql_mode bevat NO_BACKSLASH_ESCAPES in app en T-configuratie', async () => {
   const pool = await readFile(path.join(root, 'app/src/db/pool.js'), 'utf8');
   const compose = await readFile(path.join(root, 'infra/docker-compose.yml'), 'utf8');

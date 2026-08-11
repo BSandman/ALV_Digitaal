@@ -26,6 +26,7 @@ Testbewijs (Codex): 30/30 unit-/contracttests, MariaDB-integratie, concurrency (
 - Haal de quorumberekening uit `calculateVoteResult`; behoud de meerderheidsberekening. De ronde-uitslag **rapporteert** de bevroren vlag.
 - Gekwalificeerde-meerderheid-openstelling toetst tegen dezelfde vergadering-brede grondslag.
 - Behoud exacte integerrekenkunde (ADR-0008 §3). Voeg tests toe die het vergadering-brede, bevroren gedrag vastpinnen.
+- **Onderdeel van A7 (ADR-0010):** registreer bij sluiting voor elk deelnemend recht zonder geldige tijdige stem een **Onthouding** (geauditeerd). Keuzes = Voor/Tegen/Blanco/Onthouding; Blanco en Onthouding blijven niet-beslissend (meerderheid over voor+tegen). Tests: deelnemer stemt niet → onthouding in de uitslag.
 
 ## 3. Routing
 

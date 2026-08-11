@@ -3,12 +3,17 @@ import http from 'node:http';
 import { closePool, withConnection } from '../src/db/pool.js';
 import { createRequestHandler } from '../src/server.js';
 import { createAuthStoreMariaDB } from '../src/stores/mariadb/AuthStoreMariaDB.js';
+import { createMeetingStoreMariaDB } from '../src/stores/mariadb/MeetingStoreMariaDB.js';
 import { createVoteStoreMariaDB } from '../src/stores/mariadb/VoteStoreMariaDB.js';
 
 const votes = createVoteStoreMariaDB();
+const meetings = createMeetingStoreMariaDB();
 const pepper = process.env.AUTH_PEPPER;
 if (!pepper) throw new Error('AUTH_PEPPER ontbreekt voor integratietest.');
 const ids = await seedScenario();
+await meetings.establishQuorum(ids.meetingId, {
+  setBy: 'chair:concurrency', quorumNumerator: 1, quorumDenominator: 2,
+});
 const round = await votes.openRound(ids.motionId, 60);
 const authStore = {
   async verifySession() {
@@ -75,6 +80,9 @@ try {
   // Eigenaarlogin en stemmen op hetzelfde gemachtigde recht mogen nooit een
   // onafgehandelde deadlock of dubbele representatie opleveren.
   const powerRace = await seedPowerRace();
+  await meetings.establishQuorum(powerRace.meetingId, {
+    setBy: 'chair:power-race', quorumNumerator: 1, quorumDenominator: 2,
+  });
   const auth = createAuthStoreMariaDB({ pepper });
   const { code } = await auth.provisionCredential({
     participantId: powerRace.participantId,
@@ -155,10 +163,13 @@ async function seedScenario() {
     );
     const [motion] = await conn.execute(
       `INSERT INTO motion
-         (meeting_id, title, splitsingen, quorum_numerator, quorum_denominator,
-          majority_numerator, majority_denominator)
-       VALUES (?, 'Synthetische race-test', NULL, 1, 2, 2, 3)`,
+         (meeting_id, title, splitsingen, majority_numerator, majority_denominator)
+       VALUES (?, 'Synthetische race-test', NULL, 2, 3)`,
       [meeting.insertId]
+    );
+    await conn.execute(
+      'INSERT INTO attendance (meeting_id, participant_id, present) VALUES (?, ?, 1)',
+      [meeting.insertId, participant.insertId]
     );
     return {
       meetingId: meeting.insertId,
