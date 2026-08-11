@@ -1,12 +1,12 @@
 ---
 sprint: 3
-state: READY_FOR_VALIDATION
-owner: claude
-since: 2026-08-11T21:56:46Z
-next: codex
+state: DEV_IN_PROGRESS
+owner: codex
+since: 2026-08-11T23:12:50Z
+next: claude
 action_required_by: none
 blocked: false
-note: "PR #7 is groen voor Claude-validatie: doelgebonden CloudLinux-nodevenv staat vóór remote checks, npm ci en rollback op PATH."
+note: "Codex bouwt PR #8: lsnode-requirebare startentry zonder top-level await, regressietest en stderr-diagnostiek bij rode healthcheck."
 ---
 
 # handoff.md — de estafettestok
