@@ -22,7 +22,7 @@ Voor een volledig offline en byte-reproduceerbare run:
 node mistral-lokaal/scripts/gen_synthetic.mjs --seed 20260811 --offline
 ```
 
-`docker compose -f infra/docker-compose.yml up` zet deze JSON automatisch om in seed-SQL, hasht de leesbare toegangscodes en laadt de set in MariaDB 11.8.
+`docker compose -f infra/docker-compose.yml up` zet deze JSON automatisch om in seed-SQL, hasht de leesbare toegangscodes met dezelfde fictieve `AUTH_PEPPER` als de app en laadt de set in MariaDB 11.8.
 
 ## C2 — gepseudonimiseerde A-set
 

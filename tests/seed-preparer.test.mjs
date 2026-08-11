@@ -11,6 +11,14 @@ const preparer = path.join(projectRoot, 'infra', 'mysql', 'prepare-seed.mjs');
 const schema = path.join(projectRoot, 'infra', 'mysql', 'init', '01-schema.sql');
 const fallback = path.join(projectRoot, 'infra', 'mysql', 'init', '02-seed-synthetic.sql');
 
+test('T-seed en app delen exact dezelfde fictieve AUTH_PEPPER', async () => {
+  const compose = await readFile(path.join(projectRoot, 'infra', 'docker-compose.yml'), 'utf8');
+  assert.match(compose, /SEED_AUTH_PEPPER: \$\{AUTH_PEPPER:-synthetic-dev-pepper-change-before-acceptance\}/);
+  const pepperValues = [...compose.matchAll(/^\s+(?:SEED_)?AUTH_PEPPER: (.+)$/gm)].map((match) => match[1]);
+  assert.equal(pepperValues.length, 2);
+  assert.equal(pepperValues[0], pepperValues[1]);
+});
+
 test('seedvoorbereiding kiest de fictieve 120-deelnemersfallback als Mistral-uitvoer ontbreekt', async () => {
   const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), 'alv-seed-fallback-'));
   try {
