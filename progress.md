@@ -22,6 +22,18 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 - 2026-08-11 · Claude · M1 vereist de C1/C2-generatorscripts, die nog niet bestaan → baton gericht teruggedragen aan Codex met `docs/gates/Codex-taak-C1C2_datasets.md`. Na C1/C2 draait Mistral (Bas+Ollama) M1. → READY_FOR_DEV.
 - 2026-08-11 · Codex · **C1/C2** op PR #4 (t/m `2a8da8e`): deterministische C1-generator met lokaal `mistral-nemo`/fallback en byte-reproduceerbare offline-run; exacte PG/TF/NB-gewichten, multi-VvE, presentie, machtigingen, overlap zonder dubbeltelling en niet-stemmers. C2 houdt bron/mapping/sleutel fail-closed in `secure/`, behoudt structuur/gewicht en verwijdert identiteit/toegangscodes uit de uitvoer. Seedroute schrijft presentie/machtigingen en alleen HMAC+scrypt-credentials met dezelfde fictieve pepper als de app. Bewijs: 42/42 tests; architectuur-, release-, Compose- en PII-gate groen; verse MariaDB 11.8.8-load 12 deelnemers/24 rechten/12 credentials/3 machtigingen, elke splitsing exact `10000.0000`; GitHub gates + Gemini groen. → READY_FOR_INTEGRATION (Mistral/M1).
 
+- 2026-08-11 · Codex · C1/C2 gebouwd op **PR #4** (`gen_synthetic.mjs`, `pseudonymize.mjs`, seedroute, `mistral-lokaal/README.md`); 42/42 tests, MariaDB-load (12 deelnemers, 24 rechten, PG/TF/NB elk `10000.0000`, overlap telt één keer), gates + Gemini groen. → READY_FOR_INTEGRATION.
+- 2026-08-11 · Bas (Mistral) · C1 gedraaid via lokale Ollama `mistral-nemo`; PII-scan op synthetische output GROEN. (C2 fail-closed zonder echte export — hoort bij A/Sprint 3.)
+- 2026-08-11 · Claude · **C1/C2-domeinvalidatie GROEN**: sommen exact, multi-VvE `PG+TF`/`PG+NB` zonder samenvoeging, quorumbasis-scenario's + niet-stemmers aanwezig, PII schoon (zie `docs/gates/Claude-validatie-sprint2.md §5`). PR #4 mag mergen; M1 (T-scope) klaar → Codex merge → go/no-go Bas. Sprint 2 inhoudelijk rond.
+
+- 2026-08-11 · Codex · **PR #4 gemerged** naar `main` (`8dc939a`). **Sprint 2 compleet**: A1–A8 + M1 (C1/C2) op `main`, vier gates groen. Openstaand: kleine docs-commit (ADR-0012 e.d.); Bas go + Sprint 3-keuze.
+
+## Sprint 3 — Acceptatie (10.3 A-domein) (loopt)
+
+**Doel:** gevalideerde backend draaiend op `acceptatie.honigfabriek.nl` (echt platform bewijzen vóór frontend). Blok-cadans; Bas doet DirectAdmin/secrets/echte-export parallel. Zie `sprint.md`.
+
+- 2026-08-11 · Claude · Sprint 2 geaccepteerd; Bas koos richting **10.3 A-domein**. Sprint 3 opgezet in blokken; baton → Codex (blok 0 docs-commit, blok 1 deploy.sh/app-config voor acceptatie). DB's + subdomeinen staan klaar in DirectAdmin; secrets-lijn = ADR-0012.
+
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 
 **Doel:** T-omgeving draait, CI-gates groen. Zie `sprint.md`. **Uitkomst:** groen op alle poorten; gevalideerd.

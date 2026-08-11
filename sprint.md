@@ -1,43 +1,36 @@
-# sprint.md — Sprint 2: Hardening (stemlogica correct & veilig)
+# sprint.md — Sprint 3: Acceptatie (10.3 A-domein)
 
-**Doel:** de skeleton-stores worden echte, correcte en veilige stemverwerking. De validatie-acties uit `docs/gates/Claude-validatie-sprint1.md` + de domeinregels uit ADR-0008 worden gebouwd, getest en gevalideerd. **10.3 (A-domein) volgt in Sprint 3** — Acceptatie pas ná gevalideerde hardening.
+**Doel:** de gevalideerde backend (main, v0.2.0) draaiend krijgen op **`acceptatie.honigfabriek.nl`** — het echte mijn.host-platform bewijzen (Passenger, MariaDB 11.8.8, secrets buiten webroot) vóór de frontend erop komt. Detailopdracht: `docs/gates/Codex-Mistral-taak-10.3_A-domein.md`. Besluiten: ADR-0002/0003/0004/0005/0012.
 
-**Sprintversie:** app `v0.2.0` (nieuwe functionaliteit op v0.1.0). Achtergrond in `bijbel.md`; besluiten in ADR-0002/0006/0008.
-
-## Cadans — vier blokken (operating model in `AGENTS.md`)
+## Cadans — blokken
 
 | Blok | Rol | Watcher | Inhoud |
 |---|---|---|---|
-| 1 | **Codex** (dev) | `--role codex` | Merge PR #1 → `main`; branch `feat/sprint-2-hardening`; A1–A6; open PR |
-| 2 | *auto* | — (serverless) | CI-gates + Gemini-review draaien op de PR |
-| 3 | **Claude** (validatie) | `--role claude` | Toets A1–A6 tegen ADR-0002/0006/0008; verwerk Gemini-punten |
-| 4 | **Mistral** (integratie) | `--role mistral` | M1: datasets met multi-VvE + machtiging; PII-gate schoon |
+| 0 | **Codex** (klein) | `--role codex` | Eerst: docs-commit van de losse architect-docs (ADR-0012 e.d.) naar `main` |
+| 1 | **Codex** (dev/infra) | `--role codex` | `deploy.sh` + app-config voor acceptatie: DB-coördinaten, `SECRETS_FILE` (ADR-0012), healthz, per-verbinding sql_mode, `X-Forwarded-For` achter LiteSpeed; PR |
+| 2 | *auto* | — | CI-gates + Gemini-review |
+| 3 | **Claude** (validatie) | `--role claude` | Deploy-config tegen ADR-0002/0003/0005/0012; herstelprocedure als harde eis |
+| 4 | **Mistral + Bas** | `--role mistral` | C2 met de echte export → A-data; deploy naar acceptatie; testronde end-to-end; PII schoon; geoefend herstel |
 
-Bas (parallel, elk moment): **B1** — machtiging-vervalt-bij-login opnemen in de voorwaarden/instructie-tekst.
+## Bas — handmatige infra (parallel, DirectAdmin/SSH)
 
-## Scope per rol
-
-**Codex (dev) — A1 t/m A6:**
-- **A1** Row-level autorisatie: een recht mag alleen gestemd/gelezen door de ingelogde eigenaarsgroep, server-side (vervangt de TODO in `recordVote`/`getCurrentVote`).
-- **A2** `NO_BACKSLASH_ESCAPES` toevoegen aan `DB_SESSION_SQL_MODE`.
-- **A3** Exacte rekenkunde: vervang `computeResultPlaceholder`'s `Number()`-sommatie door exacte decimal-/SQL-aggregatie (`SUM(weight)`); ronden alleen voor weergave; drempels tegen exacte totalen (ADR-0008 §3). Roep hier de geïsoleerde, met regressietests vastgepinde VvE-rekenkern aan.
-- **A4** Auth-hardening: rate limiting per IP én credential, lockout/backoff, apparaatbinding (één actieve sessie), entropie + serverzijdige hash op het codedeel.
-- **A5** Machtiging vervalt onherstelbaar bij login van de eigenaar, geauditeerd (servertijd-UTC) — ADR-0008 §2.
-- **A6** Sluiting met server-relatieve aftelling (resterende seconden, geen absolute eindtijd). De sluiting blijft één servermoment voor iedereen.
-- **A7** (uit validatie, ADR-0009) Quorummodel corrigeren: vergadering-breed en éénmalig door de voorzitter vastgesteld (grondslag aanwezigen + machtigingen), bevroren; haal quorum uit `calculateVoteResult` (behoud meerderheid). Op de PR #2-branch, vóór merge.
-
-**Gemini (test) — G1 t/m G5:** multi-VvE `{PG,TF}`/`{PG,NB}` (niet samenvoegen); machtiging-conflict (login doet machtiging vervallen, dubbel stemmen onmogelijk); load met gespreide aankomst; quorum/2⁄3 exact op de grens; brute-force op de toegangscode.
-
-**Mistral (integratie) — M1:** synthetische (T) en gepseudonimiseerde (A) datasets bevatten de multi-VvE-combinaties en machtiging-scenario's; lokale denylist bijhouden; PII-gate schoon. Geen deploy deze sprint.
+- DirectAdmin **Node.js-app** op `acceptatie` aanmaken (Node 20, app-root, startup-file) — pas koppelen als de code klaar is om te deployen.
+- **Secrets-`.env`** op de server: `/home/cn111993/secrets/alv-acceptatie.env` (`chmod 600`), met DB-wachtwoord (`cn111993_acceptatie`), credential-pepper, SMTP. Zet in de DirectAdmin-env alleen `SECRETS_FILE` naar dat pad (ADR-0012).
+- **SSH-toegang** bevestigen voor `deploy.sh` (host/pad).
+- De **echte eigenaars-export** lokaal in `mistral-lokaal/secure/owners.real.json` zetten zodat C2 kan draaien (blijft lokaal, ADR-0005).
 
 ## Definition of done
 
-- A1–A6 geïmplementeerd en door Claude **groen** gevalideerd tegen ADR-0002/0006/0008.
-- Gemini-review op de PR verwerkt; G1–G5-tests groen met bewijs.
-- Exacte-rekenkunde-tests op quorum/2⁄3-drempels groen; machtiging-vervalt-test groen.
-- Datasets met multi-VvE klaar (M1); PII-gate groen.
-- App getagd `v0.2.0`; `handoff.md` op `SPRINT_DONE`.
+- `acceptatie.honigfabriek.nl` draait de backend op de eigen DB, met **gepseudonimiseerde** data (C2).
+- Een **stemronde end-to-end** doorlopen (via API): quorum vaststellen, ronde openen/sluiten, auto-onthouding, uitslag — op het echte platform.
+- Secrets uit een `.env` buiten de webroot via `SECRETS_FILE`; geen secrets/PII in Git of artefact.
+- **Geoefend** export + herstel op A (een niet-geoefend herstel bestaat niet).
+- `deploy.sh` deployt reproduceerbaar naar acceptatie; productiepad (`portaal`) staat achter een expliciete vlag + latere Bas-go.
+
+## Open te verifiëren (spike / mijn.host-support)
+
+Passenger cold start + doorgifte van `SECRETS_FILE` aan het Node-proces; entry-process- en MySQL-connectielimieten op `.starter` (v0.1.0 §13). Geen aannames; vastleggen in een ADR/notitie.
 
 ## Buiten scope
 
-10.3 A-domein (Sprint 3) · echte productie-deploy · digitaal machtigingsbeheer (blijft buiten, v0.1.0).
+Productie-deploy naar `portaal` (aparte A→P-poort + Bas-go) · de frontend (Sprint 4) · een echte proefvergadering met mensen (vereist de frontend).

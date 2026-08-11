@@ -4,6 +4,15 @@
 **Referenties:** `OTAP_opzet_v1.0.0.md` §3–§4, ADR-0004 (A = gepseudonimiseerd), ADR-0005 (PII buiten release), `bijbel.md` §3.
 **Doel:** `acceptatie.honigfabriek.nl` als werkende A-omgeving op mijn.host `.starter`, gescheiden van productie.
 
+## Omgevingscoördinaten (door Bas aangemaakt, 11 aug — géén wachtwoorden hier)
+
+| Omgeving | Subdomein | DB-host | DB-naam | DB-user |
+|---|---|---|---|---|
+| A — Acceptatie | `acceptatie.honigfabriek.nl` | `localhost` | `cn111993_acceptatie` | `cn111993_acceptatie` |
+| P — Productie | `portaal.honigfabriek.nl` | `localhost` | `cn111993_portaal` | `cn111993_portaal` |
+
+De **wachtwoorden** staan uitsluitend in het server-side secrets-bestand per omgeving (ADR-0012), nooit in Git of het artefact. A en P delen nooit een database (ADR-0004).
+
 ## Codex — infrastructuur & deploy
 
 - Richt op mijn.host een **apart subdomein** `acceptatie.honigfabriek.nl` in met een **eigen application root** en een **eigen (derde) MariaDB-database**, volledig gescheiden van `portaal.honigfabriek.nl` (P). A en P delen nooit een database.

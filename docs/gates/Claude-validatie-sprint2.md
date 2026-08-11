@@ -41,3 +41,14 @@ A1–A6 zijn goedgekeurd, maar PR #2 bevat de onjuiste quorumlogica. Daarom **ni
 - Exacte integerrekenkunde behouden; 37/37 tests, MariaDB-integratie + concurrency groen; gates + Gemini groen.
 
 **Verdict:** PR #2 goedgekeurd. Baton → Codex (merge) → Mistral (M1).
+
+## 5. C1/C2-domeinvalidatie (11 aug, PR #4) — GROEN
+
+Geverifieerd op de gegenereerde `owners.synthetic.json`:
+- Gewichtssommen per splitsing exact `10000.0000` (integer-gecontroleerd, geen float-drift).
+- Multi-VvE: exact `PG+TF` (6×) en `PG+NB` (6×); 0 deelnemers met samengevoegde/dubbele splitsing (ADR-0008).
+- Quorumbasis als benoemde scenario's: present+machtiging-overlap (telt één keer), power-only, absent (ADR-0009).
+- Niet-stemmers benoemd voor auto-onthouding (ADR-0010); reproduceerbaar via seed; PII-scan groen.
+- C2: fail-closed zonder echte invoer; mapping/sleutel/invoer alleen in `secure/`; uitvoer zonder PII. Echte C2-run hoort bij het A-domein (Sprint 3).
+
+**Verdict:** C1/C2 goedgekeurd. PR #4 kan mergen; M1 (T-scope) klaar. Baton → Codex (merge PR #4) → Bas go/no-go Sprint 2.
