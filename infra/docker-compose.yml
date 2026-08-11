@@ -17,6 +17,9 @@ services:
     image: node:20-bookworm-slim
     container_name: alv-seed-prepare
     restart: "no"
+    environment:
+      # Uitsluitend voor de fictieve T-seed; nooit hergebruiken in A/P.
+      SEED_AUTH_PEPPER: ${SEED_AUTH_PEPPER:-synthetic-seed-pepper-at-least-32-bytes}
     command:
       - node
       - /seed-tools/prepare-seed.mjs
