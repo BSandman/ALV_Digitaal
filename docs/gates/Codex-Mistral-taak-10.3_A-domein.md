@@ -13,6 +13,8 @@
 
 De **wachtwoorden** staan uitsluitend in het server-side secrets-bestand per omgeving (ADR-0012), nooit in Git of het artefact. A en P delen nooit een database (ADR-0004).
 
+**Deploy-coördinaten (SSH, niet-geheim — bij voorkeur als GitHub repo-variables, niet hardcoded):** host `217.180.14.63`, poort `26`, user `cn111993`. App-root wordt bepaald bij het aanmaken van de Node.js-app in DirectAdmin (`Setup Node.js App`); parametriseer `deploy.sh` daarop (`REMOTE_DIR`). De SSH-privé-sleutel leeft uitsluitend in GitHub Secret `ACC_SSH_KEY` (ADR-0013).
+
 ## Codex — infrastructuur & deploy
 
 - Richt op mijn.host een **apart subdomein** `acceptatie.honigfabriek.nl` in met een **eigen application root** en een **eigen (derde) MariaDB-database**, volledig gescheiden van `portaal.honigfabriek.nl` (P). A en P delen nooit een database.
