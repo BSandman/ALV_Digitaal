@@ -1,12 +1,12 @@
 ---
 sprint: 3
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-11T21:45:57Z
-next: claude
+state: READY_FOR_VALIDATION
+owner: claude
+since: 2026-08-11T21:56:46Z
+next: codex
 action_required_by: none
 blocked: false
-note: "Codex bouwt PR #7: configureerbare CloudLinux-nodevenv vóór remote commandocontrole en npm ci."
+note: "PR #7 is groen voor Claude-validatie: doelgebonden CloudLinux-nodevenv staat vóór remote checks, npm ci en rollback op PATH."
 ---
 
 # handoff.md — de estafettestok
@@ -15,11 +15,15 @@ note: "Codex bouwt PR #7: configureerbare CloudLinux-nodevenv vóór remote comm
 
 ## Huidige beurt
 
-**Sprint 3 — deploy.sh: CloudLinux nodevenv-PATH (Codex).** Bij de eerste echte acceptatiedeploy: SSH-auth werkt nu, maar `deploy.sh` stopt op "Servercommando ontbreekt: npm" — CloudLinux zet `node`/`npm` in een **per-app nodevenv**, niet in het standaard-PATH van een niet-interactieve SSH-sessie.
+**Sprint 3 — CloudLinux nodevenv-PATH (Claude-validatie).** PR #7 lost het eerste echte acceptatiedeployblok op: een niet-interactieve SSH-sessie bevat de per-app CloudLinux-nodevenv niet op het standaard-PATH.
 
-Codex — pas `deploy.sh` aan: activeer de nodevenv (of prepend de bin op het remote PATH) vóór de commando-check en `npm ci`. Bin-pad voor acceptatie: `/home/cn111993/nodevenv/domains/acceptatie.honigfabriek.nl/nodeapp/20/bin` (source `.../bin/activate`). Maak het pad configureerbaar (repo-var, bv. `ACC_NODE_BIN`), niet gegokt — het is domein-/versie-specifiek. Verplaats de `rsync/npm/tar/sha256sum/realpath`-check tot ná het PATH-zetten. Open een PR; gates + Gemini; Claude her-valideert.
+Codex heeft:
+1. `ACCEPTATIE_NODE_BIN`/`PORTAAL_NODE_BIN` verplicht en via `ACC_NODE_BIN`/`PROD_NODE_BIN` aan de workflows gekoppeld;
+2. het pad fail-closed gebonden aan dezelfde SSH-gebruiker én app-root, met een numerieke Node-versie;
+3. de gevalideerde fysieke nodevenv vóór remote commandocontrole, installatie en rollback op `PATH` gezet;
+4. rode Linux-scenario's toegevoegd voor ontbrekend pad, verkeerde prefix/gebruiker, pad-traversal en niet-bestaande remote versie.
 
-Bas: na Codex' fix voeg je repo-var `ACC_NODE_BIN` toe (= pad hierboven) en Re-runt de deploy.
+Bewijs: 59/59 tests, architectuur-, release- en PII-gates groen; Linux Bash-syntax en in-place/rollbackintegratie groen; GitHub gates + Gemini groen. Claude — valideer PR #7. Daarna: Codex merge; Bas zet `ACC_NODE_BIN=/home/cn111993/nodevenv/domains/acceptatie.honigfabriek.nl/nodeapp/20/bin` en rerunt de acceptatiedeploy.
 
 ---
 
@@ -41,3 +45,4 @@ Codex (steward): **merge PR #6** naar `main`.
 - 2026-08-11 — Bas: DirectAdmin app-root-wijziging → CloudLinux relocate-fout (current-symlink onverenigbaar).
 - 2026-08-11 — Claude: deploy-model → in-place (§3b); terug naar Codex voor deploy.sh-aanpassing. → READY_FOR_DEV.
 - 2026-08-11 — Codex: PR #6 in-place deploy + rollback; 58 tests, gates en Gemini groen. → READY_FOR_VALIDATION.
+- 2026-08-11 — Codex: PR #7 CloudLinux nodevenv-PATH; 59 tests, Linux-randgevallen, gates en Gemini groen. → READY_FOR_VALIDATION.
