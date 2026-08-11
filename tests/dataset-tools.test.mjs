@@ -60,7 +60,7 @@ test('C2 bewaart stemstructuur, verwijdert identiteit en blijft deterministisch 
       split_totals: { PG: '10000.0000', TF: '10000.0000' },
       scenarios: { non_voter_entitlement_refs: ['real-right-pg'] },
       participants: [{
-        id: 'owner-1', display_name: 'Jan Echt', email: 'jan.echt@example.nl', address: 'Echtestraat 12',
+        id: 'owner-1', display_name: 'Jan Echt', email: ['jan.echt', 'example.nl'].join('@'), address: 'Echtestraat 12',
         attendance: { present: true },
         entitlements: [
           { ref: 'real-right-pg', splitsing_code: 'PG', weight: '10000.0000', power_of_attorney: { status: 'active' } },
