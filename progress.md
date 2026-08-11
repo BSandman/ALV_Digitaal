@@ -20,6 +20,7 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 
 - 2026-08-11 · Codex · `.gitattributes` + `git add --renormalize .` (CRLF-ruis structureel opgelost); openstaande docs gecommit; **PR #2 gemerged** (`e6d0684`); **A8** (ADR-0011: `recordVote` alleen voor/tegen) via **PR #3** (`cfdee79`). 37/37 tests, integratie/concurrency/gates/Gemini groen; `main` schoon. → READY_FOR_INTEGRATION.
 - 2026-08-11 · Claude · M1 vereist de C1/C2-generatorscripts, die nog niet bestaan → baton gericht teruggedragen aan Codex met `docs/gates/Codex-taak-C1C2_datasets.md`. Na C1/C2 draait Mistral (Bas+Ollama) M1. → READY_FOR_DEV.
+- 2026-08-11 · Codex · **C1/C2** op PR #4 (t/m `2a8da8e`): deterministische C1-generator met lokaal `mistral-nemo`/fallback en byte-reproduceerbare offline-run; exacte PG/TF/NB-gewichten, multi-VvE, presentie, machtigingen, overlap zonder dubbeltelling en niet-stemmers. C2 houdt bron/mapping/sleutel fail-closed in `secure/`, behoudt structuur/gewicht en verwijdert identiteit/toegangscodes uit de uitvoer. Seedroute schrijft presentie/machtigingen en alleen HMAC+scrypt-credentials met dezelfde fictieve pepper als de app. Bewijs: 42/42 tests; architectuur-, release-, Compose- en PII-gate groen; verse MariaDB 11.8.8-load 12 deelnemers/24 rechten/12 credentials/3 machtigingen, elke splitsing exact `10000.0000`; GitHub gates + Gemini groen. → READY_FOR_INTEGRATION (Mistral/M1).
 
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 
