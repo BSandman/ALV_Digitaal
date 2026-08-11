@@ -2,11 +2,11 @@
 sprint: 2
 state: READY_FOR_INTEGRATION
 owner: mistral
-since: 2026-08-11T10:45:10Z
-next: codex
+since: 2026-08-11T11:21:28Z
+next: claude
 action_required_by: none
 blocked: false
-note: "PR #2 is gemerged en A8 beperkt eigenaar-invoer tot voor/tegen; Mistral voert M1 uit met presentie, machtigingen en niet-stemmers."
+note: "PR #4 is groen; Mistral draait C1/C2 voor M1 en bevestigt de lokale privacy- en integratiegate."
 ---
 
 # handoff.md — de estafettestok
@@ -15,16 +15,44 @@ note: "PR #2 is gemerged en A8 beperkt eigenaar-invoer tot voor/tegen; Mistral v
 
 ## Huidige beurt
 
-**Sprint 2 — gereed voor Mistral-integratie (M1).** Codex heeft:
+**Sprint 2 — C1/C2 gereed voor Mistral-integratie (M1).**
 
-1. `.gitattributes` toegevoegd en alle tekst met `git add --renormalize .` genormaliseerd.
-2. Claude's groene validatie + ADR-0011 vastgelegd; PR #2 gemerged naar `main` (`e6d0684`).
-3. **A8 / ADR-0011:** `recordVote` accepteert alleen `voor`/`tegen`; `blanco` en `onthouding` worden vóór databasegebruik geweigerd. Resultaatberekening behoudt alle vier toestanden. Bewijs: 37/37 tests, architectuur/release en verse MariaDB 11.8-integratie + concurrency groen.
+**Datum/tijd (UTC):** 2026-08-11 11:21:28
+**Versie/commit:** PR #4, code t/m `2a8da8e`
 
-Mistral: voer **M1** uit met datasets voor presentie, machtigingen en niet-stemmers; bewijs quorum zonder dubbeltelling, auto-onthouding en een schone PII-gate. De gewenste C1/C2-generatorroute staat in `docs/gates/Codex-taak-C1C2_datasets.md`; als ontbrekende scaffold blokkeert, draag gericht terug aan Codex.
+### 1. Doel
+
+C1 en C2 deblokkeren M1: reproduceerbare fictieve T-data en lokaal gepseudonimiseerde A-data, met schema-gelijke rechten, exacte gewichten en privacygrenzen conform ADR-0004/0005/0008/0009/0010.
+
+### 2. Gewijzigde bestanden
+
+`mistral-lokaal/scripts/gen_synthetic.mjs`, `mistral-lokaal/scripts/pseudonymize.mjs`, `mistral-lokaal/README.md`, `infra/mysql/prepare-seed.mjs`, `infra/docker-compose.yml`, `infra/.env.example`, `app/package.json`, `tests/dataset-tools.test.mjs`, `tests/seed-preparer.test.mjs`.
+
+### 3. Testbewijs
+
+42/42 unit-/contracttests, architectuur- en releasegate, PII-gate en Compose-config groen. C1 draaide via lokaal `mistral-nemo:latest`. Verse MariaDB 11.8.8-load: 12 deelnemers, 24 losse rechten, 12 gehashte credentials, 12 presentieregels en 3 machtigingen; PG/TF/NB elk exact `10000.0000`; één presentie+machtiging-overlap telde eenmaal. GitHub gates + Gemini-review op PR #4 groen.
+
+### 4. Privacyclassificatie (Mistral-gate)
+
+Repo/diff/fixtures bevatten geen echte PII. C1 is volledig fictief. C2 weigert invoer, sleutel en mapping buiten `mistral-lokaal/secure/`; uitvoer kopieert geen naam, adres, e-mail of echte toegangscode. Lokale en CI-PII-gate: groen.
+
+### 5. Open risico's
+
+Mistral moet C1 en C2 nog tegen de lokale M1-bronnen draaien en de gegenereerde uitvoer opnieuw scannen. Niet exact naar vier decimalen omzetbare breuken worden bewust fail-closed geweigerd omdat het databaseschema `DECIMAL(12,4)` voorschrijft. Niet-offline namen kunnen per modelversie variëren; `--offline --seed` is byte-reproduceerbaar.
+
+### 6. Rollback
+
+Revert de C1/C2-commits `df7b333`, `ebbdca2` en `2a8da8e`; verwijder daarna uitsluitend de gitignored gegenereerde mappen `mistral-lokaal/out/` en, indien gewenst, de lokaal aangemaakte C2-mapping/sleutel in `mistral-lokaal/secure/`.
+
+**Gate-uitslag:**
+
+- [ ] Claude — C1/C2-domeinvalidatie
+- [x] Gemini — PR-review en gates
+- [ ] Mistral — privacy- & integratiegate (nu aan zet)
+- [ ] Bas — go/no-go
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
-- 2026-08-11 — Codex: A7 + ADR-0010: PR #2 (`d0c8071`); 37/37 tests, gates + Gemini groen. → READY_FOR_VALIDATION.
-- 2026-08-11 — Claude: her-validatie GROEN (ADR-0009/0010 bevestigd in code); PR #2 goedgekeurd. Nieuwe ADR-0011 (in-app alleen voor/tegen) + follow-up A8. → READY_FOR_DEV (merge, dan Mistral).
-- 2026-08-11 — Codex: EOL genormaliseerd, PR #2 gemerged en A8 groen op unit/MariaDB/concurrency. → READY_FOR_INTEGRATION (Mistral).
+- 2026-08-11 — Codex: EOL genormaliseerd, PR #2 (`e6d0684`) + A8/PR #3 (`cfdee79`) gemerged; 37/37 groen. → READY_FOR_INTEGRATION.
+- 2026-08-11 — Claude: M1 vereist C1/C2 (bestaan nog niet) → gericht teruggedragen aan Codex met de C1/C2-taak. → READY_FOR_DEV.
+- 2026-08-11 — Codex: C1/C2 gebouwd en bewezen op PR #4; 42/42, MariaDB 11.8.8, PII, gates en Gemini groen. → READY_FOR_INTEGRATION.

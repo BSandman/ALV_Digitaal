@@ -17,6 +17,9 @@ services:
     image: node:20-bookworm-slim
     container_name: alv-seed-prepare
     restart: "no"
+    environment:
+      # Uitsluitend voor de fictieve T-seed; nooit hergebruiken in A/P.
+      SEED_AUTH_PEPPER: ${AUTH_PEPPER:-synthetic-dev-pepper-change-before-acceptance}
     command:
       - node
       - /seed-tools/prepare-seed.mjs
@@ -90,7 +93,7 @@ services:
       # App zet per verbinding een vaste, productie-onafhankelijke strict mode.
       DB_SESSION_SQL_MODE: "STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION,NO_BACKSLASH_ESCAPES"
       # Uitsluitend fictieve O/T-pepper; A/P krijgt een geheim buiten de release.
-      AUTH_PEPPER: "synthetic-dev-pepper-change-before-acceptance"
+      AUTH_PEPPER: ${AUTH_PEPPER:-synthetic-dev-pepper-change-before-acceptance}
       # App draait als EEN proces (geen cluster/PM2-fork) — spiegelt shared hosting/Passenger.
       APP_SINGLE_PROCESS: "true"
       # Vertrouw alleen de proxyheader van alv-proxy (geverifieerd client-IP).
