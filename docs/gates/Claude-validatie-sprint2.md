@@ -33,3 +33,11 @@ Testbewijs (Codex): 30/30 unit-/contracttests, MariaDB-integratie, concurrency (
 A1–A6 zijn goedgekeurd, maar PR #2 bevat de onjuiste quorumlogica. Daarom **niet mergen** vóór A7: Codex vult A7 aan op dezelfde branch, gates + Gemini draaien opnieuw, en de baton komt terug naar Claude voor her-validatie. Daarna merge → Mistral (M1). Baton: `READY_FOR_DEV`, owner Codex.
 
 **Los signaal voor Bas:** mogelijk staat dezelfde quorumfout in fase 1 (ALV-STEM-APP) — apart te verifiëren (ADR-0009 §Gevolgen).
+
+## 4. Her-validatie A7 + ADR-0010 (11 aug, commit `d0c8071`) — GROEN, goedgekeurd voor merge
+
+- **ADR-0009** — `MeetingStore.establishQuorum`: éénmalig/idempotent, `FOR UPDATE`, weigert ná de eerste ronde (`QUORUM_TOO_LATE`), basis = aanwezige rechten + actieve machtigingen zonder dubbeltelling, bevroren weggeschreven (`meeting_quorum` + `meeting_quorum_entitlement`). Ronde rekent alleen meerderheid via `calculateVoteResult`; quorum eruit gehaald. ✓
+- **ADR-0010** — sluiting: bevroren deelnemende set leidend, ontbrekende revisie → onthouding; individueel geregistreerd (`round_automatic_abstention`, gewicht-snapshot) én batch-geaudit met entitlement-IDs (per recht herleidbaar). Blanco + onthouding niet-beslissend. ✓
+- Exacte integerrekenkunde behouden; 37/37 tests, MariaDB-integratie + concurrency groen; gates + Gemini groen.
+
+**Verdict:** PR #2 goedgekeurd. Baton → Codex (merge) → Mistral (M1).

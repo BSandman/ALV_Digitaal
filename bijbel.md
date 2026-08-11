@@ -66,6 +66,7 @@ Geneste, **aan/uit-schakelbare** modules. Aanpak: modulaire monoliet in één re
 - ADR-0008 — Domeinregels: multi-VvE-stemrechten (PG + TF/NB, nooit samenvoegen), machtiging vervalt bij login, exacte rekenkunde
 - ADR-0009 — Quorummodel: vergadering-breed, éénmalig door voorzitter vastgesteld, grondslag aanwezigen + machtigingen, bevroren; geen herberekening per ronde
 - ADR-0010 — Stemregistratie: niet/te laat gestemd = onthouding (geauditeerd), gelijk aan blanco stemformulier; blanco+onthouding niet-beslissend
+- ADR-0011 — In-app stemkeuze: alleen Voor/Tegen (twee knoppen); onthouding (afgeleid) en blanco (fysiek formulier) alleen als resultaat
 
 ## 10. Sleuteldocumenten
 

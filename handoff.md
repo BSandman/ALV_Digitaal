@@ -1,12 +1,12 @@
 ---
 sprint: 2
-state: READY_FOR_VALIDATION
-owner: claude
-since: 2026-08-11T09:13:41Z
-next: codex
+state: DEV_IN_PROGRESS
+owner: codex
+since: 2026-08-11T10:33:00Z
+next: mistral
 action_required_by: none
 blocked: false
-note: "A7 + ADR-0010 staan op PR #2; 37/37 tests, MariaDB-integratie, concurrency, gates en Gemini groen; Claude her-valideert vóór merge."
+note: "Codex normaliseert EOL, legt de groene validatie vast, merge PR #2 en implementeert A8 vóór overdracht aan Mistral."
 ---
 
 # handoff.md — de estafettestok
@@ -15,16 +15,15 @@ note: "A7 + ADR-0010 staan op PR #2; 37/37 tests, MariaDB-integratie, concurrenc
 
 ## Huidige beurt
 
-**Sprint 2 — Claude her-valideert A7 + ADR-0010: PR #2.** Codex heeft op `feat/sprint-2-hardening` geleverd:
+**Sprint 2 — PR #2 goedgekeurd voor merge.** Claude her-valideerde A7 + ADR-0010 groen (zie `docs/gates/Claude-validatie-sprint2.md §4`): quorum vergadering-breed/bevroren, auto-onthouding per recht geregistreerd + geaudit, ronde rekent alleen meerderheid.
 
-1. **A7 / ADR-0009:** vergadering-brede, eenmalige voorzittersactie; deelnemende set uit aanwezige rechten + actieve machtigingen zonder dubbeltelling; DB-bevroren en geauditeerd. Rondeberekening doet alleen meerderheid en rapporteert de bevroren quorumstaat. Gekwalificeerde openstelling gebruikt dezelfde basis.
-2. **ADR-0010:** niet/te laat gestemde deelnemende rechten worden bij atomair sluiten individueel als onthouding vastgelegd en als batch geauditeerd; blanco + onthouding blijven niet-beslissend.
-3. Bewijs: commits `d0c8071` + workflowfix `a3aa80b`; 37/37 unit-/contracttests; verse MariaDB 11.8-integratie groen; 50 gelijktijdige HTTP-stemmen, 0 na sluiting, dubbele sluiting één resultaat, login/machtigingsrace veilig; GitHub gates + Gemini groen.
+Codex (steward):
+1. **Merge PR #2** naar `main`.
+2. Zet daarna `state: READY_FOR_INTEGRATION`, `owner: mistral` voor **M1** (datasets met presentie, machtiging én niet-stemmers, zodat quorum + auto-onthouding toetsbaar zijn).
 
-Claude: her-valideer tegen ADR-0009/ADR-0010; geef bij groen terug aan Codex voor merge van PR #2. Daarna gaat de baton naar Mistral (M1: datasets met presentie, machtiging en niet-stemmers).
+**Kleine follow-up A8 (ADR-0011)** — geen merge-blokker: het eigenaar-steminvoerpad (`recordVote`) accepteert uitsluitend `voor`/`tegen`; een ingediende `blanco`/`onthouding` wordt geweigerd (blanco = fysiek formulier, onthouding = afgeleid). Fold je 'm nu mee in de merge, prima; anders pak je 'm in het volgende dev-blok. De bijbehorende frontend-regel (twee knoppen) hoort bij de latere frontend-sprint.
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
-- 2026-08-11 — Codex: PR #1 gemerged; A1–A6 op PR #2 groen (30/30 tests, k6 0% fouten, gates + Gemini groen). → READY_FOR_VALIDATION.
-- 2026-08-11 — Claude: A1–A6 gevalideerd groen; quorummodel onjuist → ADR-0009 + A7. Terug naar Codex vóór merge. → READY_FOR_DEV.
-- 2026-08-11 — Codex: A7 + ADR-0010: geïmplementeerd en alle lokale/CI/Gemini-gates groen. → READY_FOR_VALIDATION.
+- 2026-08-11 — Codex: A7 + ADR-0010: PR #2 (`d0c8071`); 37/37 tests, gates + Gemini groen. → READY_FOR_VALIDATION.
+- 2026-08-11 — Claude: her-validatie GROEN (ADR-0009/0010 bevestigd in code); PR #2 goedgekeurd. Nieuwe ADR-0011 (in-app alleen voor/tegen) + follow-up A8. → READY_FOR_DEV (merge, dan Mistral).
