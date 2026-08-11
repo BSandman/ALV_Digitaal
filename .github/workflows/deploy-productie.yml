@@ -1,0 +1,92 @@
+name: Deploy productie
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Bestaande release-tag die naar productie mag
+        required: true
+        type: string
+      confirmation:
+        description: Typ exact portaal.honigfabriek.nl
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-productie
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Goedgekeurde code-only deploy naar productie
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Expliciete doelbevestiging
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [[ "$CONFIRMATION" != "portaal.honigfabriek.nl" ]]; then
+            echo "Productiebevestiging komt niet exact overeen." >&2
+            exit 1
+          fi
+
+      - name: Checkout uitsluitend de opgegeven tag
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.release_tag }}
+          fetch-depth: 0
+
+      - name: Bevestig dat checkout een bestaande tag is
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          test -n "$RELEASE_TAG"
+          tag_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          test "$tag_commit" = "$GITHUB_SHA"
+
+      - name: Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Test en bouw code-only artefact
+        run: |
+          npm ci --prefix app --no-audit --no-fund
+          npm test --prefix app
+          npm run build:release --prefix app
+
+      - name: SSH-sleutel en bekende host instellen
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ vars.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Deploy na GitHub Environment-approval
+        shell: bash
+        env:
+          PORTAAL_SSH_HOST: ${{ format('{0}@{1}', vars.PROD_SSH_USER, vars.PROD_SSH_HOST) }}
+          PORTAAL_SSH_PORT: ${{ vars.PROD_SSH_PORT }}
+          PORTAAL_REMOTE_DIR: ${{ vars.PROD_REMOTE_DIR }}
+          PORTAAL_SECRETS_FILE: ${{ vars.PROD_SECRETS_FILE }}
+          DEPLOY_COMMIT_SHA: ${{ github.sha }}
+          BAS_PRODUCTION_GO: JA
+        run: |
+          artifacts=(dist/alv-digitaal-app-v*.tgz)
+          test "${#artifacts[@]}" -eq 1
+          scripts/deploy.sh --target portaal --allow-production --artifact "${artifacts[0]}"

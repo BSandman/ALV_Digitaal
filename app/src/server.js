@@ -1,8 +1,8 @@
 import http from 'node:http';
-import { fileURLToPath } from 'node:url';
 import { createAuthStoreMariaDB } from './stores/mariadb/AuthStoreMariaDB.js';
 import { createVoteStoreMariaDB } from './stores/mariadb/VoteStoreMariaDB.js';
 import { getVerifiedClientIp } from './security/client-ip.js';
+import { withConnection } from './db/pool.js';
 
 const PORT = Number(process.env.PORT || 3000);
 
@@ -12,13 +12,15 @@ export function createRequestHandler({
     : null,
   voteStore = createVoteStoreMariaDB(),
   trustProxy = process.env.TRUST_PROXY === '1',
+  healthCheck = checkDatabaseHealth,
 } = {}) {
   return async function requestHandler(req, res) {
     try {
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
       if (req.method === 'GET' && url.pathname === '/healthz') {
-        return json(res, 200, { ok: true, time: new Date().toISOString() });
+        await healthCheck();
+        return json(res, 200, { ok: true, database: 'up', time: new Date().toISOString() });
       }
 
       if (req.method === 'GET' && url.pathname === '/deelnemen/api/status') {
@@ -151,10 +153,15 @@ function json(res, status, body, headers = {}) {
   res.end(JSON.stringify(body));
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+export function startServer() {
   const handler = createRequestHandler();
   const server = http.createServer(handler);
   server.listen(PORT, () => {
     console.log(`[alv-app] luistert op :${PORT} (single process)`);
   });
+  return server;
+}
+
+async function checkDatabaseHealth() {
+  await withConnection((conn) => conn.execute('SELECT 1'));
 }
