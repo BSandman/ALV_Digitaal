@@ -1,12 +1,12 @@
 ---
 sprint: 3
-state: READY_FOR_DEV
+state: DEV_IN_PROGRESS
 owner: codex
-since: 2026-08-11T14:20:00Z
+since: 2026-08-11T15:49:41Z
 next: claude
 action_required_by: none
 blocked: false
-note: "Platform-vondst: current-symlink deploy botst met CloudLinux Node Selector (relocate-into-itself). Codex: pas deploy.sh aan naar IN-PLACE deploy in de app-root (nodeapp) + backup-rollback + restart.txt; geen current-symlink. Bas herstelt de Node-app parallel (app-root nodeapp, startup src/start.js)."
+note: "Codex bouwt de CloudLinux-compatibele in-place deploy met getimestampte backup-rollback en zonder current-symlink."
 ---
 
 # handoff.md — de estafettestok
