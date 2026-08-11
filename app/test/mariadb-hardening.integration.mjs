@@ -64,7 +64,12 @@ assert.equal('closesAt' in round, false);
 
 await votes.recordVote(round.id, ids.ownerId, { entitlementId: ids.ownerPgId, choice: 'voor' });
 await votes.recordVote(round.id, ids.ownerId, { entitlementId: ids.ownerTfId, choice: 'tegen' });
-await votes.recordVote(round.id, ids.otherId, { entitlementId: ids.otherPgId, choice: 'onthouding' });
+for (const choice of ['blanco', 'onthouding']) {
+  await assert.rejects(
+    votes.recordVote(round.id, ids.otherId, { entitlementId: ids.otherPgId, choice }),
+    { code: 'INVALID_INPUT' }
+  );
+}
 await assert.rejects(
   votes.recordVote(round.id, ids.ownerId, { entitlementId: ids.otherPgId, choice: 'voor' }),
   { code: 'ENTITLEMENT_FORBIDDEN' }
@@ -78,7 +83,8 @@ const result = await votes.closeRoundAtomically(round.id);
 assert.equal(result.snapshot.quorum.met, true);
 assert.equal(result.snapshot.quorum.frozen, true);
 assert.equal(result.snapshot.majority.met, true);
-assert.deepEqual(result.snapshot.automaticAbstentions, { count: 1, weight: '1.0000' });
+assert.equal(result.snapshot.submittedVoteCount, 2);
+assert.deepEqual(result.snapshot.automaticAbstentions, { count: 2, weight: '3.0000' });
 assert.deepEqual(result.snapshot.perChoiceWeight, {
   voor: '2.0000', tegen: '1.0000', blanco: '0.0000', onthouding: '3.0000',
 });
@@ -156,7 +162,7 @@ assert.equal(Number(evidence.attempts.amount), 3);
 assert.equal(Number(evidence.failedCredential.failed_attempts), 1);
 assert.ok(evidence.failedCredential.locked_until);
 assert.match(evidence.sqlMode.value, /NO_BACKSLASH_ESCAPES/);
-assert.equal(Number(evidence.autoAbstention.amount), 1);
+assert.equal(Number(evidence.autoAbstention.amount), 2);
 assert.equal(Number(evidence.autoAudit.amount), 1);
 assert.equal(Number(evidence.quorumAudit.amount), 1);
 await assert.rejects(

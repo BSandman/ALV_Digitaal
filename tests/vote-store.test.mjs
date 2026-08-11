@@ -71,15 +71,17 @@ test('een verstreken serverdeadline wordt als closing met nul seconden gepublice
   });
 });
 
-test('ongeldige stemkeuze wordt vóór databasegebruik afgewezen', async () => {
+test('recordVote accepteert alleen voor/tegen en wijst resultaatkeuzes vóór databasegebruik af', async () => {
   let usedDatabase = false;
   const store = createVoteStoreMariaDB({
     withTransaction: async () => { usedDatabase = true; },
   });
-  await assert.rejects(
-    store.recordVote(3, 11, { entitlementId: 7, choice: 'misschien' }),
-    { code: 'INVALID_INPUT' }
-  );
+  for (const choice of ['misschien', 'blanco', 'onthouding']) {
+    await assert.rejects(
+      store.recordVote(3, 11, { entitlementId: 7, choice }),
+      { code: 'INVALID_INPUT' }
+    );
+  }
   assert.equal(usedDatabase, false);
 });
 

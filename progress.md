@@ -16,6 +16,8 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 - 2026-08-11 · Codex (`d0c8071`) · A7 + ADR-0010: vergadering-brede bevroren quorumstaat (`meeting_quorum` + `meeting_quorum_entitlement`), weigert quorum ná eerste ronde, basis aanwezigen+machtigingen zonder dubbeltelling; ronde rekent alleen meerderheid; niet-stemmers → auto-onthouding, individueel geregistreerd (`round_automatic_abstention`) + batch-geaudit. 37/37 tests, integratie/concurrency/gates/Gemini groen. → READY_FOR_VALIDATION.
 - 2026-08-11 · Claude · Her-validatie **GROEN** (ADR-0009/ADR-0010: in code bevestigd, per-recht traceerbaarheid gedekt). PR #2 goedgekeurd voor merge. Nieuwe UI/domeinregel **ADR-0011** (in-app alleen Voor/Tegen; onthouding afgeleid, blanco fysiek; beide alleen als resultaat) + kleine backend-follow-up **A8** (`recordVote` weigert blanco/onthouding als invoer). → Codex merge → Mistral (M1).
 
+- 2026-08-11 · Codex · Steward-afronding: `.gitattributes` (`* text=auto`, shellscripts LF) + volledige renormalisatie vastgelegd; Claude-validatie/ADR-0011; taaknotitie C1/C2 gecommit; PR #2 groen gemerged naar `main` (`e6d0684`). **A8** op `feat/sprint-2-a8-owner-vote-choices`: eigenaar-`recordVote` accepteert alleen `voor`/`tegen`, weigert `blanco`/`onthouding` als `INVALID_INPUT` vóór DB-gebruik; uitslagmodel behoudt vier toestanden. Bewijs: 37/37 unit-/contracttests, architectuur- en releasegate groen, verse MariaDB 11.8 hardening + concurrency groen (50 HTTP-stemmen, 0 na sluiting, dubbele sluiting één resultaat). → READY_FOR_INTEGRATION (Mistral/M1).
+
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 
 **Doel:** T-omgeving draait, CI-gates groen. Zie `sprint.md`. **Uitkomst:** groen op alle poorten; gevalideerd.

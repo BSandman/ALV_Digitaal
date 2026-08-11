@@ -19,7 +19,7 @@
 /**
  * @typedef {Object} VoteChoice
  * @property {number} entitlementId
- * @property {'voor'|'tegen'|'blanco'|'onthouding'} choice
+ * @property {'voor'|'tegen'} choice  eigenaar-invoer; blanco/onthouding zijn geen in-app keuze (ADR-0011)
  */
 
 /**

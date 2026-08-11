@@ -311,7 +311,9 @@ function assertOwnerScope(participantId, entitlementId) {
 }
 
 function assertChoice(choice) {
-  if (!['voor', 'tegen', 'blanco', 'onthouding'].includes(choice)) {
+  // ADR-0011: het eigenaarpad kent uitsluitend de twee in-app knoppen.
+  // Blanco komt later via het papier-/adminpad; onthouding ontstaat bij sluiten.
+  if (!['voor', 'tegen'].includes(choice)) {
     const error = new Error('choice_invalid');
     error.code = 'INVALID_INPUT';
     throw error;
