@@ -1,0 +1,49 @@
+# Runbook — acceptatie.honigfabriek.nl
+
+Dit runbook voert Sprint 3 blok 4 uit nadat PR-gates en Claude-validatie groen zijn. Code en data blijven aparte stromen: `deploy.sh` raakt uitsluitend het code-artefact; Mistral provisioneert de gepseudonimiseerde C2-data afzonderlijk.
+
+## 1. Eenmalige serverinrichting (Bas)
+
+1. Maak buiten application root en webroot `/home/cn111993/secrets/alv-acceptatie.env` op basis van `config/alv-acceptatie.env.example`.
+2. Vul de echte waarden lokaal op de server in en zet `chmod 600`; commit, upload of plak die waarden nergens anders.
+3. Configureer de DirectAdmin Node-app met application root `<ACCEPTATIE_REMOTE_DIR>/current`, startupbestand `src/start.js` en Node 20.
+4. Zet in DirectAdmin uitsluitend `SECRETS_FILE=/home/cn111993/secrets/alv-acceptatie.env`. De bootstrap zet vervolgens productiegedrag en valideert dat de databasecoördinaten bij `acceptatie` horen.
+
+## 2. Code-artefact en dry-run
+
+```bash
+npm ci --prefix app --no-audit --no-fund
+npm test --prefix app
+npm run build:release --prefix app
+
+export ACCEPTATIE_SSH_HOST='<user>@<mijn.host-ssh-host>'
+export ACCEPTATIE_SSH_PORT='<door-Bas-bevestigde-poort>'
+export ACCEPTATIE_REMOTE_DIR='<absoluut-door-Bas-bevestigd-app-pad>'
+scripts/deploy.sh --target acceptatie --dry-run
+```
+
+Gebruik daarna het door CI bewaarde code-only artefact of de lokaal identiek gebouwde `.tgz`:
+
+```bash
+scripts/deploy.sh --target acceptatie --artifact dist/alv-digitaal-app-v0.2.0.tgz
+```
+
+Het script controleert de PII-gate, SHA-256, server-side secretslocatie/rechten, installeert in een onveranderlijke release-map, wisselt `current` atomair, triggert Passenger en vereist een HTTPS-healthcheck met werkende database. Bij een rode healthcheck wordt de vorige `current` automatisch hersteld.
+
+Na inrichting kan dezelfde acceptatiedeploy handmatig via GitHub Actions → **Deploy acceptatie**. Benodigde repository-/environmentconfig:
+
+- secret `ACC_SSH_KEY`;
+- variables `ACC_SSH_USER`, `ACC_SSH_HOST`, `ACC_SSH_PORT`, `ACC_REMOTE_DIR`, `ACC_SECRETS_FILE` en de vooraf buiten GitHub gecontroleerde hostkeyregel `ACC_SSH_KNOWN_HOSTS`;
+- workflow starten vanaf `main` (andere refs worden geweigerd).
+
+## 3. Verificatie op A
+
+- Bevestig dat `/healthz` HTTP 200 en `"database":"up"` retourneert.
+- Verifieer in de echte LiteSpeed-route dat precies één geldige `X-Forwarded-For`-waarde de app bereikt; een keten met meerdere waarden moet `UNVERIFIED_CLIENT_IP` opleveren.
+- Mistral draait C2 lokaal, scant `mistral-lokaal/out/pseudo/` en provisioneert de dataset los van het code-artefact.
+- Doorloop quorum, openen, stemmen, sluiten, auto-onthouding en uitslag end-to-end.
+- Exporteer A, herstel die export in de afgesproken herstelomgeving en leg tijdstip plus SHA-256 vast.
+
+## 4. Productie blijft dicht
+
+`portaal` is technisch voorbereid maar wordt geweigerd tenzij zowel `--allow-production` als `BAS_PRODUCTION_GO=JA` aanwezig zijn. De workflow **Deploy productie** vereist daarnaast een bestaande release-tag, exacte domeinbevestiging en het GitHub Environment `production`. Bas moet daar als required reviewer worden ingesteld. Dat is geen toestemming om nu naar productie te deployen; de latere A→P-poort en expliciete go van Bas blijven vereist.

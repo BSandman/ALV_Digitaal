@@ -135,6 +135,9 @@ function scanFileName(label) {
   if (/(?:^|\/)snapshots?(?:\/|$)/i.test(normalized)) {
     findings.push({ kind: 'forbidden_snapshot', location: normalized, message: 'Snapshots zijn verboden in het release-artefact.' });
   }
+  if (/^(?:platform_alv_digitaal(?:\.pub)?|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)$/i.test(base)) {
+    findings.push({ kind: 'deploy_key', location: normalized, message: 'SSH-deploysleutel hoort nooit in Git of release.' });
+  }
 }
 
 function scanText(label, content) {
@@ -149,6 +152,9 @@ function scanText(label, content) {
   ];
   for (const [kind, expression, message] of patterns) {
     if (expression.test(content)) findings.push({ kind, location: label, message });
+  }
+  if (/-----BEGIN (?:OPENSSH|RSA|DSA|EC|ENCRYPTED) PRIVATE KEY-----/.test(content)) {
+    findings.push({ kind: 'private_key', location: label, message: 'Privésleutelmateriaal aangetroffen.' });
   }
   const lower = content.toLocaleLowerCase('nl-NL');
   for (const blocked of denylist) {

@@ -1,12 +1,12 @@
 ---
 sprint: 3
-state: READY_FOR_DEV
-owner: codex
-since: 2026-08-11T14:20:00Z
-next: claude
-action_required_by: none
+state: READY_FOR_VALIDATION
+owner: claude
+since: 2026-08-11T13:10:18Z
+next: mistral
+action_required_by: claude
 blocked: false
-note: "Sprint 3 (Acceptatie/10.3) - blok 0+1 Codex. Eerst docs-commit (ADR-0012 e.d.), dan deploy.sh + app-config voor acceptatie.honigfabriek.nl (DB-coords, SECRETS_FILE/ADR-0012, healthz). Zie sprint.md + docs/gates/Codex-Mistral-taak-10.3."
+note: "Claude valideert PR #5; gates en Gemini zijn groen, echte acceptatiedeploy en hostchecks volgen in blok 4."
 ---
 
 # handoff.md — de estafettestok
@@ -15,14 +15,16 @@ note: "Sprint 3 (Acceptatie/10.3) - blok 0+1 Codex. Eerst docs-commit (ADR-0012 
 
 ## Huidige beurt
 
-**Sprint 3 — Acceptatie (10.3), blok 0+1 Codex.** Bas koos: A-domein eerst. Start je watcher (`python scripts/watch_handoff.py --role codex`).
+**Sprint 3 — Acceptatie (10.3), blok 3 Claude.** Valideer PR #5 tegen ADR-0002/0003/0005/0012/0013, met herstelprocedure en de hieronder genoemde hostrisico's als harde aandachtspunten.
 
-1. **Blok 0 (klein):** commit de losse architect-docs naar `main` — ADR-0012, de DB-coördinaten in de 10.3-taak, en `bijbel.md`/`sprint.md`/`handoff.md`/`progress.md`/`Claude-validatie-sprint2.md`. Direct docs-commit is prima.
-2. **Blok 1 (dev/infra):** wire `scripts/deploy.sh` + app-config voor **`acceptatie.honigfabriek.nl`** volgens `docs/gates/Codex-Mistral-taak-10.3_A-domein.md`: DB-coördinaten (`cn111993_acceptatie`), `SECRETS_FILE`-lezing (ADR-0012, `.env` buiten webroot), healthz, per-verbinding sql_mode, `X-Forwarded-For`. Open een PR; na gates + Gemini groen → `state: READY_FOR_VALIDATION`, `owner: claude`.
+1. **Opgeleverd in PR #5:** doelgebonden `SECRETS_FILE`-bootstrap buiten app/webroot, vaste DB-coördinaten en sql_mode, database-afhankelijke `/healthz`, veilige code-only deploy met rollback, strikte SSH-hostkeycontrole en handmatige A/P-workflows met dubbele productiepoort.
+2. **Bewijs:** 57/57 tests, architectuur-/release-/PII-gates, Linux Bash-syntax, droge A/P-runs en tijdelijke MariaDB 11.8-bootstrap groen; GitHub gates + Gemini groen.
+3. **Nog echt te verifiëren:** LiteSpeed overschrijft `X-Forwarded-For` single-hop; Passenger krijgt `SECRETS_FILE`; GitHub secrets/variables en Environment-reviewer Bas staan goed; deploy tijdens een open stemronde blijft een operationele no-go. Er is nog geen echte A-deploy uitgevoerd.
 
 Bas doet parallel de DirectAdmin-/SSH-/secrets-`.env`-/echte-export-stappen uit `sprint.md`.
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
+- 2026-08-11 — Codex: Sprint 3 blok 0+1 op PR #5; acceptatie/CD-config, SSH-hardening en Gemini-5xx-backoff; gates + Gemini groen. → READY_FOR_VALIDATION (Claude).
 - 2026-08-11 — Codex: PR #4 gemerged (`8dc939a`). Sprint 2 compleet.
 - 2026-08-11 — Claude: Sprint 2 afgerond; Bas koos Sprint 3 = 10.3 A-domein. → READY_FOR_DEV (blok 0+1 Codex).

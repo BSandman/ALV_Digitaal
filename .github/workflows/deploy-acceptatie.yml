@@ -1,0 +1,68 @@
+name: Deploy acceptatie
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-acceptatie
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Code-only deploy naar acceptatie
+    runs-on: ubuntu-latest
+    environment: acceptance
+    steps:
+      - name: Alleen main mag naar acceptatie
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Acceptatiedeploy is uitsluitend vanaf main toegestaan." >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Test en bouw code-only artefact
+        run: |
+          npm ci --prefix app --no-audit --no-fund
+          npm test --prefix app
+          npm run build:release --prefix app
+
+      - name: SSH-sleutel en bekende host instellen
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ACC_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ vars.ACC_SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Deploy naar acceptatie en controleer healthz
+        shell: bash
+        env:
+          ACCEPTATIE_SSH_HOST: ${{ format('{0}@{1}', vars.ACC_SSH_USER, vars.ACC_SSH_HOST) }}
+          ACCEPTATIE_SSH_PORT: ${{ vars.ACC_SSH_PORT }}
+          ACCEPTATIE_REMOTE_DIR: ${{ vars.ACC_REMOTE_DIR }}
+          ACCEPTATIE_SECRETS_FILE: ${{ vars.ACC_SECRETS_FILE }}
+          DEPLOY_COMMIT_SHA: ${{ github.sha }}
+        run: |
+          artifacts=(dist/alv-digitaal-app-v*.tgz)
+          test "${#artifacts[@]}" -eq 1
+          scripts/deploy.sh --target acceptatie --artifact "${artifacts[0]}"
