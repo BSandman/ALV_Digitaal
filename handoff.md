@@ -1,12 +1,12 @@
 ---
 sprint: 3
-state: READY_FOR_VALIDATION
-owner: claude
-since: 2026-08-11T23:22:15Z
-next: codex
-action_required_by: none
-blocked: false
-note: "PR #8 is groen voor Claude-validatie: lsnode-requirebare startentry, gecontroleerd bootstrapfalen en geredigeerde stderr-diagnostiek."
+state: BLOCKED
+owner: bas
+since: 2026-08-11T23:50:04Z
+next: mistral
+action_required_by: bas
+blocked: true
+note: "PR #8 is gemerged naar main (7d63f60); Bas: rerun Deploy acceptatie zonder handmatige PORT en bevestig dat healthz groen is."
 ---
 
 # handoff.md — de estafettestok
