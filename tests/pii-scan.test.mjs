@@ -56,11 +56,13 @@ test('PII-scan blokkeert een e-mailadres in fixtures', async () => {
 test('PII-scan blokkeert een lokaal SSH-deploysleutelbestand', async () => {
   const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), 'alv-pii-key-'));
   try {
-    const keyPath = path.join(fixtureRoot, 'platform_alv_digitaal');
-    await writeFile(keyPath, ['-----BEGIN OPENSSH', 'PRIVATE KEY-----'].join(' ') + '\nfictief\n', 'utf8');
-    const result = runScanner('--path', keyPath);
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /deploy_key|private_key/);
+    for (const keyName of ['platform_alv_digitaal', 'alv_acc_deploy.pub']) {
+      const keyPath = path.join(fixtureRoot, keyName);
+      await writeFile(keyPath, 'fictief sleutelbestand\n', 'utf8');
+      const result = runScanner('--path', keyPath);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /deploy_key/);
+    }
   } finally {
     await rm(fixtureRoot, { recursive: true, force: true });
   }

@@ -2,6 +2,12 @@ name: Deploy acceptatie
 
 on:
   workflow_dispatch:
+    inputs:
+      no_open_round:
+        description: Bevestig dat op acceptatie geen stemronde openstaat
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -18,9 +24,15 @@ jobs:
     steps:
       - name: Alleen main mag naar acceptatie
         shell: bash
+        env:
+          NO_OPEN_ROUND: ${{ inputs.no_open_round }}
         run: |
           if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
             echo "Acceptatiedeploy is uitsluitend vanaf main toegestaan." >&2
+            exit 1
+          fi
+          if [[ "$NO_OPEN_ROUND" != "true" ]]; then
+            echo "Deploy geweigerd: bevestig dat geen stemronde openstaat." >&2
             exit 1
           fi
 
@@ -65,4 +77,4 @@ jobs:
         run: |
           artifacts=(dist/alv-digitaal-app-v*.tgz)
           test "${#artifacts[@]}" -eq 1
-          scripts/deploy.sh --target acceptatie --artifact "${artifacts[0]}"
+          scripts/deploy.sh --target acceptatie --confirm-no-open-round --artifact "${artifacts[0]}"

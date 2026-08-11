@@ -36,6 +36,10 @@ jobs:
       - name: Bouw code-only release-artefact
         run: npm run build:release --prefix app
 
+      - name: CloudLinux in-place deploy en rollback
+        shell: bash
+        run: bash tests/deploy-in-place.integration.sh dist/alv-digitaal-app-v0.2.0.tgz
+
       - name: Gate B — diff, fixtures en release-artefact
         shell: bash
         run: |

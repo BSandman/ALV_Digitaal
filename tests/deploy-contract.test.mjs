@@ -33,6 +33,8 @@ test('CD is handmatig, hoofdbranchgebonden en gebruikt gepinde SSH-hostsleutels'
   assert.match(acceptance, /refs\/heads\/main/);
   assert.match(acceptance, /secrets\.ACC_SSH_KEY/);
   assert.match(acceptance, /vars\.ACC_SSH_KNOWN_HOSTS/);
+  assert.match(acceptance, /no_open_round:[\s\S]*type: boolean/);
+  assert.match(acceptance, /--confirm-no-open-round/);
   assert.match(acceptance, /concurrency:[\s\S]*cancel-in-progress: false/);
 });
 
@@ -45,6 +47,8 @@ test('productie-CD vereist tag, exacte bevestiging en GitHub production-environm
   assert.match(production, /secrets\.PROD_SSH_KEY/);
   assert.match(production, /BAS_PRODUCTION_GO: JA/);
   assert.match(production, /--allow-production/);
+  assert.match(production, /no_open_round:[\s\S]*type: boolean/);
+  assert.match(production, /--confirm-no-open-round/);
 });
 
 test('productiedeploy vereist expliciete vlag én afzonderlijke Bas-go', async () => {
@@ -60,7 +64,21 @@ test('deploy controleert code-only artefact, serversecrets, health en rollback',
   assert.match(deploy, /stat -c '%a'.*600/);
   assert.match(deploy, /SECRETS_FILE|REMOTE_SECRETS_FILE/);
   assert.match(deploy, /"database":"up"/);
-  assert.match(deploy, /PREVIOUS_RELEASE/);
-  assert.match(deploy, /REMOTE_ROLLBACK/);
-  assert.doesNotMatch(deploy, /rsync[\s\S]*--delete/);
+  assert.match(deploy, /REMOTE_BACKUP/);
+  assert.match(deploy, /\.backup-ready/);
+  assert.match(deploy, /rollback_remote/);
+  assert.match(deploy, /rsync -a --delete payload\/src\/ "\$remote_dir\/src\/"/);
+  assert.match(deploy, /nodeapp\/tmp\/restart\.txt|"\$remote_dir\/tmp\/restart\.txt"/);
+  assert.match(deploy, /--confirm-no-open-round/);
+  assert.doesNotMatch(deploy, /ln -sfn|readlink .*current|REMOTE_RELEASE|\/current\.next/);
+  assert.doesNotMatch(deploy, /rsync[^\n]*--delete[^\n]*"\$remote_dir\/"/);
+});
+
+test('CloudLinux app-root blijft vast en backup staat in een siblingpad', async () => {
+  const deploy = await readFile(deployPath, 'utf8');
+  assert.match(deploy, /Application root \(in-place\): \$REMOTE_DIR/);
+  assert.match(deploy, /REMOTE_DEPLOY_ROOT="\$\{REMOTE_DIR\}\.deploy"/);
+  assert.match(deploy, /REMOTE_BACKUP="\$REMOTE_DEPLOY_ROOT\/backups\/\$RELEASE_ID"/);
+  assert.match(deploy, /\/home\/\$SSH_USER\/domains\//);
+  assert.doesNotMatch(deploy, /Application root: \$REMOTE_DIR\/current/);
 });
