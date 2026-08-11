@@ -24,6 +24,7 @@ Bas (parallel, elk moment): **B1** — machtiging-vervalt-bij-login opnemen in d
 - **A4** Auth-hardening: rate limiting per IP én credential, lockout/backoff, apparaatbinding (één actieve sessie), entropie + serverzijdige hash op het codedeel.
 - **A5** Machtiging vervalt onherstelbaar bij login van de eigenaar, geauditeerd (servertijd-UTC) — ADR-0008 §2.
 - **A6** Sluiting met server-relatieve aftelling (resterende seconden, geen absolute eindtijd). De sluiting blijft één servermoment voor iedereen.
+- **A7** (uit validatie, ADR-0009) Quorummodel corrigeren: vergadering-breed en éénmalig door de voorzitter vastgesteld (grondslag aanwezigen + machtigingen), bevroren; haal quorum uit `calculateVoteResult` (behoud meerderheid). Op de PR #2-branch, vóór merge.
 
 **Gemini (test) — G1 t/m G5:** multi-VvE `{PG,TF}`/`{PG,NB}` (niet samenvoegen); machtiging-conflict (login doet machtiging vervallen, dubbel stemmen onmogelijk); load met gespreide aankomst; quorum/2⁄3 exact op de grens; brute-force op de toegangscode.
 

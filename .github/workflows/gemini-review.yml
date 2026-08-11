@@ -34,9 +34,10 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash   # actueel model (aug 2026); bij 404 toont het log de beschikbare modellen voor jouw key
         run: |
-          DIFF_CONTENT=$(jq -sR . pr_diff.txt)
-          PROMPT="Je bent de Lead Tester in een softwareontwikkelingsteam voor een VvE-stem/presentie-app (server-side stemverwerking in MariaDB, atomair sluiten, quorum en gekwalificeerde meerderheden). Analyseer onderstaande code-diff. Schrijf concrete suggesties voor unit-tests, randgevallen (edge cases) en risico's, met bijzondere aandacht voor race-condities bij gelijktijdig stemmen en voor server-side autorisatie per eigenaarsgroep:\n\n$DIFF_CONTENT"
-          PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{ contents: [{ parts: [{ text: $prompt }] }] }')
+          INTRO="Je bent de Lead Tester in een softwareontwikkelingsteam voor een VvE-stem/presentie-app (server-side stemverwerking in MariaDB, atomair sluiten, quorum en gekwalificeerde meerderheden). Analyseer onderstaande code-diff. Schrijf concrete suggesties voor unit-tests, randgevallen (edge cases) en risico's, met bijzondere aandacht voor race-condities bij gelijktijdig stemmen en voor server-side autorisatie per eigenaarsgroep:"
+          jq -n --arg intro "$INTRO" --rawfile diff pr_diff.txt \
+            '{ contents: [{ parts: [{ text: ($intro + "\n\n" + $diff) }] }] }' \
+            > payload.json
 
           # Roep de API aan met retry + exponentiële backoff op 429 (rate-limit).
           # De respons-body bevat de API-key NIET; Actions-logs zijn privé voor collaborators.
@@ -44,7 +45,7 @@ jobs:
           HTTP_CODE=""
           for attempt in 1 2 3 4 5; do
             HTTP_CODE=$(curl -s -w "%{http_code}" -o response.json -X POST "$URL" \
-              -H "Content-Type: application/json" -d "$PAYLOAD")
+              -H "Content-Type: application/json" --data-binary @payload.json)
             echo "Poging $attempt — HTTP $HTTP_CODE (model: ${GEMINI_MODEL})"
             if [ "$HTTP_CODE" = "200" ]; then break; fi
             if [ "$HTTP_CODE" = "429" ]; then

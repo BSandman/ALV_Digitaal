@@ -38,6 +38,8 @@ Fase-1-domeinen: `stem.honigfabriek.nl` → Node-app gestopt, statische onderhou
 - **Datamodel:** een stem hoort bij het **appartementsrecht**, niet bij de persoon ("stem door recht X, ttv ALV vertegenwoordigd door [persoon]"; persoon = snapshot). → ADR-0006.
 - **Retentie:** ALV-resultaat (agenda, voorstellen, notulen, stemmen, resultaat) **7 jaar**; persoonsdata zolang eigenaar **+ 2 jaar** na voldane verplichtingen. → ADR-0006.
 - **Stemprocedure:** ronde sluiten → server berekent atomair → voorzitter **verifieert** uitkomst + besluitvoorstel → voorzitter **stelt vast** (aparte geauditeerde toestand). → ADR-0006.
+- **Quorum (ADR-0009):** vergadering-breed en éénmalig — de voorzitter stelt het vóór de eerste ronde vast op grondslag van aanwezigen + ingeleverde machtigingen; daarna bevroren. Een ronde herberekent geen quorum, alleen de meerderheid.
+- **Stemregistratie (ADR-0010):** keuzes = Voor, Tegen, Blanco, Onthouding. Een deelnemend recht dat niet/te laat stemt wordt bij sluiting als **Onthouding** vastgelegd (gelijk aan blanco stemformulier). Blanco + Onthouding zijn niet-beslissend; de meerderheid rekent over voor+tegen.
 - **Domeinregels (ADR-0008):** een eigenaar kan rechten in twee sub-VvE's hebben — altijd PG + (TF óf NB) — nooit samengevoegd, per recht apart gestemd. Een afgegeven machtiging vervalt onherstelbaar zodra de eigenaar zelf inlogt. Stemgewichten (`DECIMAL(12,4)`) exact verwerken (SQL/decimal, geen float).
 
 ## 6. Toegangscode
@@ -62,6 +64,9 @@ Geneste, **aan/uit-schakelbare** modules. Aanpak: modulaire monoliet in één re
 - ADR-0006 — Bewaartermijnen + datamodel + stemvaststelling
 - ADR-0007 — Repo-scope (ALV_Digitaal = eigen repo) + coördinatie-topologie
 - ADR-0008 — Domeinregels: multi-VvE-stemrechten (PG + TF/NB, nooit samenvoegen), machtiging vervalt bij login, exacte rekenkunde
+- ADR-0009 — Quorummodel: vergadering-breed, éénmalig door voorzitter vastgesteld, grondslag aanwezigen + machtigingen, bevroren; geen herberekening per ronde
+- ADR-0010 — Stemregistratie: niet/te laat gestemd = onthouding (geauditeerd), gelijk aan blanco stemformulier; blanco+onthouding niet-beslissend
+- ADR-0011 — In-app stemkeuze: alleen Voor/Tegen (twee knoppen); onthouding (afgeleid) en blanco (fysiek formulier) alleen als resultaat
 
 ## 10. Sleuteldocumenten
 
