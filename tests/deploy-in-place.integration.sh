@@ -125,6 +125,24 @@ set +e
 unsafe_node_bin_status=$?
 set -e
 [[ "$unsafe_node_bin_status" -eq 2 ]] || { echo "Deploy met nodevenv-bin buiten /home/<user>/nodevenv gaf $unsafe_node_bin_status in plaats van 2." >&2; exit 1; }
+export ACCEPTATIE_NODE_BIN="$NODE_ENV_TEST_BASE/nodeapp/20/bin/../bin"
+set +e
+"$PROJECT_ROOT/scripts/deploy.sh" --target acceptatie --dry-run >/dev/null 2>&1
+traversal_node_bin_status=$?
+set -e
+[[ "$traversal_node_bin_status" -eq 2 ]] || { echo "Deploy met pad-ontsnapping in nodevenv-bin gaf $traversal_node_bin_status in plaats van 2." >&2; exit 1; }
+export ACCEPTATIE_NODE_BIN="/home/andere_gebruiker/nodevenv${REMOTE_DIR#"$TEST_HOME"}/20/bin"
+set +e
+"$PROJECT_ROOT/scripts/deploy.sh" --target acceptatie --dry-run >/dev/null 2>&1
+other_user_node_bin_status=$?
+set -e
+[[ "$other_user_node_bin_status" -eq 2 ]] || { echo "Deploy met nodevenv van een andere gebruiker gaf $other_user_node_bin_status in plaats van 2." >&2; exit 1; }
+export ACCEPTATIE_NODE_BIN="$NODE_ENV_TEST_BASE/nodeapp/21/bin"
+set +e
+"$PROJECT_ROOT/scripts/deploy.sh" --target acceptatie --confirm-no-open-round --artifact "$ARTIFACT" >/dev/null 2>&1
+missing_remote_node_bin_status=$?
+set -e
+[[ "$missing_remote_node_bin_status" -eq 10 ]] || { echo "Deploy met ontbrekende remote nodevenv-versie gaf $missing_remote_node_bin_status in plaats van 10." >&2; exit 1; }
 export ACCEPTATIE_NODE_BIN="$saved_node_bin"
 
 set +e
