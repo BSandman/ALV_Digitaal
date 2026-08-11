@@ -18,6 +18,9 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 
 - 2026-08-11 · Codex · Steward-afronding: `.gitattributes` (`* text=auto`, shellscripts LF) + volledige renormalisatie vastgelegd; Claude-validatie/ADR-0011; taaknotitie C1/C2 gecommit; PR #2 groen gemerged naar `main` (`e6d0684`). **A8** op `feat/sprint-2-a8-owner-vote-choices`: eigenaar-`recordVote` accepteert alleen `voor`/`tegen`, weigert `blanco`/`onthouding` als `INVALID_INPUT` vóór DB-gebruik; uitslagmodel behoudt vier toestanden. Bewijs: 37/37 unit-/contracttests, architectuur- en releasegate groen, verse MariaDB 11.8 hardening + concurrency groen (50 HTTP-stemmen, 0 na sluiting, dubbele sluiting één resultaat). → READY_FOR_INTEGRATION (Mistral/M1).
 
+- 2026-08-11 · Codex · `.gitattributes` + `git add --renormalize .` (CRLF-ruis structureel opgelost); openstaande docs gecommit; **PR #2 gemerged** (`e6d0684`); **A8** (ADR-0011: `recordVote` alleen voor/tegen) via **PR #3** (`cfdee79`). 37/37 tests, integratie/concurrency/gates/Gemini groen; `main` schoon. → READY_FOR_INTEGRATION.
+- 2026-08-11 · Claude · M1 vereist de C1/C2-generatorscripts, die nog niet bestaan → baton gericht teruggedragen aan Codex met `docs/gates/Codex-taak-C1C2_datasets.md`. Na C1/C2 draait Mistral (Bas+Ollama) M1. → READY_FOR_DEV.
+
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 
 **Doel:** T-omgeving draait, CI-gates groen. Zie `sprint.md`. **Uitkomst:** groen op alle poorten; gevalideerd.

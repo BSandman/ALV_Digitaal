@@ -1,12 +1,12 @@
 ---
 sprint: 2
-state: READY_FOR_INTEGRATION
-owner: mistral
-since: 2026-08-11T10:45:10Z
-next: codex
+state: DEV_IN_PROGRESS
+owner: codex
+since: 2026-08-11T10:55:57Z
+next: mistral
 action_required_by: none
 blocked: false
-note: "PR #2 is gemerged en A8 beperkt eigenaar-invoer tot voor/tegen; Mistral voert M1 uit met presentie, machtigingen en niet-stemmers."
+note: "Codex bouwt en valideert C1/C2 volgens docs/gates/Codex-taak-C1C2_datasets.md; daarna baton naar Mistral voor M1."
 ---
 
 # handoff.md — de estafettestok
@@ -15,16 +15,13 @@ note: "PR #2 is gemerged en A8 beperkt eigenaar-invoer tot voor/tegen; Mistral v
 
 ## Huidige beurt
 
-**Sprint 2 — gereed voor Mistral-integratie (M1).** Codex heeft:
+**Sprint 2 — Codex bouwt C1/C2 (randvoorwaarde voor M1).** PR #2 + A8 staan op `main`; EOL genormaliseerd via `.gitattributes`. De baton stond kort op Mistral, maar M1 kan niet draaien zonder de generatorscripts — dus terug naar Codex, conform de anticipatie in de vorige handoff.
 
-1. `.gitattributes` toegevoegd en alle tekst met `git add --renormalize .` genormaliseerd.
-2. Claude's groene validatie + ADR-0011 vastgelegd; PR #2 gemerged naar `main` (`e6d0684`).
-3. **A8 / ADR-0011:** `recordVote` accepteert alleen `voor`/`tegen`; `blanco` en `onthouding` worden vóór databasegebruik geweigerd. Resultaatberekening behoudt alle vier toestanden. Bewijs: 37/37 tests, architectuur/release en verse MariaDB 11.8-integratie + concurrency groen.
+Codex: bouw C1 (synthetische generator, T) en C2 (pseudonimisator, A) volgens **`docs/gates/Codex-taak-C1C2_datasets.md`** — Ollama `mistral-nemo`, veldgelijk aan het schema, dekkend voor multi-VvE (ADR-0008), quorumbasis zonder dubbeltelling (ADR-0009) en niet-stemmers (ADR-0010); PII alleen in `secure/` (ADR-0005). Open een PR; na groen zet je `state: READY_FOR_INTEGRATION`, `owner: mistral`.
 
-Mistral: voer **M1** uit met datasets voor presentie, machtigingen en niet-stemmers; bewijs quorum zonder dubbeltelling, auto-onthouding en een schone PII-gate. De gewenste C1/C2-generatorroute staat in `docs/gates/Codex-taak-C1C2_datasets.md`; als ontbrekende scaffold blokkeert, draag gericht terug aan Codex.
+Daarna: Mistral (Bas + Ollama) draait C1 → T-dataset en C2 → A-dataset (M1).
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
-- 2026-08-11 — Codex: A7 + ADR-0010: PR #2 (`d0c8071`); 37/37 tests, gates + Gemini groen. → READY_FOR_VALIDATION.
-- 2026-08-11 — Claude: her-validatie GROEN (ADR-0009/0010 bevestigd in code); PR #2 goedgekeurd. Nieuwe ADR-0011 (in-app alleen voor/tegen) + follow-up A8. → READY_FOR_DEV (merge, dan Mistral).
-- 2026-08-11 — Codex: EOL genormaliseerd, PR #2 gemerged en A8 groen op unit/MariaDB/concurrency. → READY_FOR_INTEGRATION (Mistral).
+- 2026-08-11 — Codex: EOL genormaliseerd, PR #2 (`e6d0684`) + A8/PR #3 (`cfdee79`) gemerged; 37/37 groen. → READY_FOR_INTEGRATION.
+- 2026-08-11 — Claude: M1 vereist C1/C2 (bestaan nog niet) → gericht teruggedragen aan Codex met de C1/C2-taak. → READY_FOR_DEV.
