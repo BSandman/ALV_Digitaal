@@ -1,12 +1,12 @@
 ---
 sprint: 2
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-11T08:50:06Z
-next: claude
+state: READY_FOR_VALIDATION
+owner: claude
+since: 2026-08-11T09:13:41Z
+next: codex
 action_required_by: none
 blocked: false
-note: "Codex voert A7 uit conform ADR-0009: vergadering-brede, eenmalig door de voorzitter vastgestelde en bevroren quorumstaat; rondeberekening houdt alleen meerderheid."
+note: "A7 + ADR-0010 staan op PR #2; 37/37 tests, MariaDB-integratie, concurrency, gates en Gemini groen; Claude her-valideert vóór merge."
 ---
 
 # handoff.md — de estafettestok
@@ -15,15 +15,16 @@ note: "Codex voert A7 uit conform ADR-0009: vergadering-brede, eenmalig door de 
 
 ## Huidige beurt
 
-**Sprint 2 — terug naar Codex voor A7 (quorumcorrectie).** Mijn validatie: A1–A6 groen (zie `docs/gates/Claude-validatie-sprint2.md`). Eén structurele bevinding: `calculateVoteResult` berekent quorum per ronde uit uitgebrachte stemmen; dat is onjuist.
+**Sprint 2 — Claude her-valideert A7 + ADR-0010 op PR #2.** Codex heeft op `feat/sprint-2-hardening` geleverd:
 
-Codex — op dezelfde branch `feat/sprint-2-hardening`, vóór merge:
-1. Implementeer **A7** conform **ADR-0009**: quorum wordt vergadering-breed, éénmalig door de voorzitter vastgesteld (grondslag: aanwezigen + ingeleverde machtigingen/stemformulieren), geauditeerd en bevroren. Haal de quorumberekening uit `calculateVoteResult`; behoud de meerderheidsberekening. Ronde-uitslag rapporteert de bevroren vlag. Tests die dit vastpinnen.
-2. Push → gates + Gemini draaien opnieuw → zet `state: READY_FOR_VALIDATION`, `owner: claude`.
+1. **A7 / ADR-0009:** vergadering-brede, eenmalige voorzittersactie; deelnemende set uit aanwezige rechten + actieve machtigingen zonder dubbeltelling; DB-bevroren en geauditeerd. Rondeberekening doet alleen meerderheid en rapporteert de bevroren quorumstaat. Gekwalificeerde openstelling gebruikt dezelfde basis.
+2. **ADR-0010:** niet/te laat gestemde deelnemende rechten worden bij atomair sluiten individueel als onthouding vastgelegd en als batch geauditeerd; blanco + onthouding blijven niet-beslissend.
+3. Bewijs: commits `d0c8071` + workflowfix `a3aa80b`; 37/37 unit-/contracttests; verse MariaDB 11.8-integratie groen; 50 gelijktijdige HTTP-stemmen, 0 na sluiting, dubbele sluiting één resultaat, login/machtigingsrace veilig; GitHub gates + Gemini groen.
 
-Daarna: Claude her-valideert → merge PR #2 → Mistral (M1: datasets met presentie + machtiging).
+Claude: her-valideer tegen ADR-0009/0010 en geef bij groen terug aan Codex voor merge van PR #2. Daarna gaat de baton naar Mistral (M1: datasets met presentie, machtiging en niet-stemmers).
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
 - 2026-08-11 — Codex: PR #1 gemerged; A1–A6 op PR #2 groen (30/30 tests, k6 0% fouten, gates + Gemini groen). → READY_FOR_VALIDATION.
 - 2026-08-11 — Claude: A1–A6 gevalideerd groen; quorummodel onjuist → ADR-0009 + A7. Terug naar Codex vóór merge. → READY_FOR_DEV.
+- 2026-08-11 — Codex: A7 + ADR-0010 geïmplementeerd en alle lokale/CI/Gemini-gates groen. → READY_FOR_VALIDATION.
