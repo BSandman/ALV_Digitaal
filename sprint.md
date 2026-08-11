@@ -7,7 +7,7 @@
 | Blok | Rol | Watcher | Inhoud |
 |---|---|---|---|
 | 0 | **Codex** (klein) | `--role codex` | Eerst: docs-commit van de losse architect-docs (ADR-0012 e.d.) naar `main` |
-| 1 | **Codex** (dev/infra) | `--role codex` | `deploy.sh` + app-config voor acceptatie: DB-coördinaten, `SECRETS_FILE` (ADR-0012), healthz, per-verbinding sql_mode, `X-Forwarded-For` achter LiteSpeed; PR |
+| 1 | **Codex** (dev/infra) | `--role codex` | `deploy.sh` (non-interactief) + app-config voor acceptatie (DB-coords, `SECRETS_FILE`/ADR-0012, healthz, sql_mode, `X-Forwarded-For`) **+ CD-workflow `deploy-acceptatie.yml` (workflow_dispatch, ADR-0013)** + productie-workflow achter Environment-approval; PR |
 | 2 | *auto* | — | CI-gates + Gemini-review |
 | 3 | **Claude** (validatie) | `--role claude` | Deploy-config tegen ADR-0002/0003/0005/0012; herstelprocedure als harde eis |
 | 4 | **Mistral + Bas** | `--role mistral` | C2 met de echte export → A-data; deploy naar acceptatie; testronde end-to-end; PII schoon; geoefend herstel |

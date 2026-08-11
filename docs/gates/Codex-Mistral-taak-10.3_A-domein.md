@@ -20,6 +20,13 @@ De **wachtwoorden** staan uitsluitend in het server-side secrets-bestand per omg
 - Voer de per-verbinding strikte `sql_mode` door tegen de mijn.host-MariaDB (ADR-0003), en verifieer `X-Forwarded-For`-gedrag achter LiteSpeed op de echte host.
 - Release-artefact blijft **alleen code** (ADR-0005); data komt via Mistral, apart.
 
+## Codex — CD-automatisering (ADR-0013)
+
+- Maak `deploy.sh` **non-interactief + idempotent**, met een healthcheck ná deploy.
+- Bouw `.github/workflows/deploy-acceptatie.yml` met **`workflow_dispatch`** (handmatige knop): checkout, SSH-setup uit secret `ACC_SSH_KEY`, `deploy.sh` naar acceptatie, healthcheck. Host/poort/user/app-pad als niet-geheime config/vars.
+- Zet de **productie**-workflow op achter een GitHub Environment `production` met required reviewer (Bas) — opgezet maar nog niet gebruikt (pas bij echte P-livegang).
+- Geen secrets in de repo (ADR-0005/0012); alleen `SECRETS_FILE`-verwijzing en de niet-geheime SSH-config.
+
 ## Mistral — data & gates
 
 - Lever de **gepseudonimiseerde** set (`mistral-lokaal/out/pseudo/owners.pseudo.json`, script C2) en provisioneer die naar de A-database, los van de codedeploy. De echt↔pseudoniem-mapping blijft in `secure/`.

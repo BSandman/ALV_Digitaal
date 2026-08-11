@@ -68,6 +68,7 @@ Geneste, **aan/uit-schakelbare** modules. Aanpak: modulaire monoliet in één re
 - ADR-0010 — Stemregistratie: niet/te laat gestemd = onthouding (geauditeerd), gelijk aan blanco stemformulier; blanco+onthouding niet-beslissend
 - ADR-0011 — In-app stemkeuze: alleen Voor/Tegen (twee knoppen); onthouding (afgeleid) en blanco (fysiek formulier) alleen als resultaat
 - ADR-0012 — Secrets-locatie: configbestand buiten de webroot (chmod 600) per omgeving, via niet-geheime `SECRETS_FILE`; nooit in Git/artefact/.htaccess
+- ADR-0013 — CD-automatisering: acceptatie via handmatige `workflow_dispatch`; productie achter GitHub Environment + verplichte approval (Bas); SSH via deploy-key in Secrets. Agent-autorun = aparte track
 
 ## 10. Sleuteldocumenten
 
