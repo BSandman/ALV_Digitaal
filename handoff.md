@@ -1,12 +1,12 @@
 ---
 sprint: 2
-state: READY_FOR_VALIDATION
-owner: claude
-since: 2026-08-10T23:06:06Z
-next: mistral
+state: DEV_IN_PROGRESS
+owner: codex
+since: 2026-08-11T08:50:06Z
+next: claude
 action_required_by: none
 blocked: false
-note: "PR #2 en alle gates groen; valideer A1-A6 en de quorumgrondslag (stemmen versus attendance) tegen ADR-0002/0006/0008."
+note: "Codex voert A7 uit conform ADR-0009: vergadering-brede, eenmalig door de voorzitter vastgestelde en bevroren quorumstaat; rondeberekening houdt alleen meerderheid."
 ---
 
 # handoff.md — de estafettestok
@@ -15,16 +15,15 @@ note: "PR #2 en alle gates groen; valideer A1-A6 en de quorumgrondslag (stemmen 
 
 ## Huidige beurt
 
-**Sprint 2, blok 3 — Claude (validatie).** PR #2 bevat A1–A6 en is lokaal plus in GitHub groen. Volgorde:
+**Sprint 2 — terug naar Codex voor A7 (quorumcorrectie).** Mijn validatie: A1–A6 groen (zie `docs/gates/Claude-validatie-sprint2.md`). Eén structurele bevinding: `calculateVoteResult` berekent quorum per ronde uit uitgebrachte stemmen; dat is onjuist.
 
-1. Valideer **PR #2** tegen ADR-0002/0006/0008; toets daarbij de criteria A1–A6.
-2. Bevestig welke juridische presentiebasis voor quorum geldt: uitgebrachte stemmen of `attendance`.
-3. Verwerk de Gemini-review en draag bij groen over naar Mistral (`READY_FOR_INTEGRATION`).
+Codex — op dezelfde branch `feat/sprint-2-hardening`, vóór merge:
+1. Implementeer **A7** conform **ADR-0009**: quorum wordt vergadering-breed, éénmalig door de voorzitter vastgesteld (grondslag: aanwezigen + ingeleverde machtigingen/stemformulieren), geauditeerd en bevroren. Haal de quorumberekening uit `calculateVoteResult`; behoud de meerderheidsberekening. Ronde-uitslag rapporteert de bevroren vlag. Tests die dit vastpinnen.
+2. Push → gates + Gemini draaien opnieuw → zet `state: READY_FOR_VALIDATION`, `owner: claude`.
 
-Bij een blokker: `state: BLOCKED`, `action_required_by: bas`. Window leeg? Baton blijft staan; volgend blok verder.
+Daarna: Claude her-valideert → merge PR #2 → Mistral (M1: datasets met presentie + machtiging).
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
-- 2026-08-10 — Sprint 1 afgerond (Fundament), gevalideerd groen. → SPRINT_DONE.
-- 2026-08-10 — Claude: Sprint 2 (Hardening) opgezet in blok-cadans; 10.3 A-domein → Sprint 3. → READY_FOR_DEV (blok 1 Codex).
-- 2026-08-10 — Codex: PR #1 gemerged; A1–A6 op PR #2, lokale/CI/Gemini-gates groen. → READY_FOR_VALIDATION.
+- 2026-08-11 — Codex: PR #1 gemerged; A1–A6 op PR #2 groen (30/30 tests, k6 0% fouten, gates + Gemini groen). → READY_FOR_VALIDATION.
+- 2026-08-11 — Claude: A1–A6 gevalideerd groen; quorummodel onjuist → ADR-0009 + A7. Terug naar Codex vóór merge. → READY_FOR_DEV.
