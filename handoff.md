@@ -1,12 +1,12 @@
 ---
 sprint: 3
-state: READY_FOR_VALIDATION
-owner: claude
-since: 2026-08-11T16:37:14Z
-next: codex
+state: DEV_IN_PROGRESS
+owner: codex
+since: 2026-08-11T21:45:57Z
+next: claude
 action_required_by: none
 blocked: false
-note: "PR #6 is groen voor Claude-validatie; beoordeel expliciet de operatorbevestiging voor geen open stemronde als resterende operationele waarborg."
+note: "Codex bouwt PR #7: configureerbare CloudLinux-nodevenv vóór remote commandocontrole en npm ci."
 ---
 
 # handoff.md — de estafettestok
@@ -15,17 +15,25 @@ note: "PR #6 is groen voor Claude-validatie; beoordeel expliciet de operatorbeve
 
 ## Huidige beurt
 
-**Sprint 3 — CloudLinux in-place deploy (Claude-validatie).** PR #6 vervangt het onverenigbare `releases/current`-model door deploy in de vaste app-root `nodeapp`, met backups buiten de app-root, automatische rollback bij installatie- of healthfalen en Passenger-herstart via `nodeapp/tmp/restart.txt`.
+**Sprint 3 — deploy.sh: CloudLinux nodevenv-PATH (Codex).** Bij de eerste echte acceptatiedeploy: SSH-auth werkt nu, maar `deploy.sh` stopt op "Servercommando ontbreekt: npm" — CloudLinux zet `node`/`npm` in een **per-app nodevenv**, niet in het standaard-PATH van een niet-interactieve SSH-sessie.
 
-Bewijs voor validatie:
-1. **58/58 tests groen**, inclusief Linux-integratie voor succesvolle deploy, rollback na `npm ci`-falen en rollback na rode healthcheck.
-2. Architectuur-, release- en PII-gates groen; Gemini Lead Tester Review groen.
-3. Geen `current`-symlink; code-only artefact, gepinde SSH-hostkey en doel-/padcontroles blijven intact.
-4. Workflows eisen expliciete `no_open_round`-bevestiging en `deploy.sh` weigert zonder `--confirm-no-open-round` (exit 4).
+Codex — pas `deploy.sh` aan: activeer de nodevenv (of prepend de bin op het remote PATH) vóór de commando-check en `npm ci`. Bin-pad voor acceptatie: `/home/cn111993/nodevenv/domains/acceptatie.honigfabriek.nl/nodeapp/20/bin` (source `.../bin/activate`). Maak het pad configureerbaar (repo-var, bv. `ACC_NODE_BIN`), niet gegokt — het is domein-/versie-specifiek. Verplaats de `rsync/npm/tar/sha256sum/realpath`-check tot ná het PATH-zetten. Open een PR; gates + Gemini; Claude her-valideert.
 
-Claude — her-valideer het aangepaste deploymodel en beoordeel het door Gemini gemarkeerde restrisico: de geen-open-rondepoort is een operatorattestatie en nog geen live MariaDB-query. Er is nog **geen echte acceptatiedeploy** uitgevoerd.
+Bas: na Codex' fix voeg je repo-var `ACC_NODE_BIN` toe (= pad hierboven) en Re-runt de deploy.
 
-**Bas (parallel):** herstel de Node-app — app-root `domains/acceptatie.honigfabriek.nl/nodeapp`, startup `src/start.js`, mode Production. Daarna: secrets-`.env`, C2, en de eerste deploy zodra Codex' fix op `main` staat.
+---
+
+## Vorige beurt (referentie)
+
+**Sprint 3 — PR #6 GROEN (Claude), klaar voor merge.** In-place deploy in de vaste app-root `nodeapp`, backups buiten de app-root, auto-rollback bij npm ci-/health-falen, symlink-/pad-weigeringen, lock, SHA256-check. 58/58 tests + rollback-scenario's, gates + Gemini groen. Zie `docs/gates/Claude-validatie-sprint3.md §5`.
+
+**Follow-up (productie, niet-blokker acceptatie):** de `--confirm-no-open-round`-poort is een operator-attestatie; vóór de portaal-livegang toevoegen: live MariaDB-check die deployen weigert bij een ronde met status `open`/`closing`.
+
+Codex (steward): **merge PR #6** naar `main`.
+
+**Blok 4 (Bas) na merge:** (1) schema `infra/mysql/init/01-schema.sql` laden in `cn111993_acceptatie`; (2) GitHub → Actions → "Deploy acceptatie" → Run workflow (main) met de no-open-round-bevestiging; (3) healthz groen checken. Verifieer daarbij `SECRETS_FILE`-doorgifte + `X-Forwarded-For`. Node-app staat al goed (app-root `nodeapp`, startup `src/start.js`, Production). Daarna valideert Claude het draaiende systeem.
+
+**Openstaand (design):** ADR-0014 basisdatamodel — rechten autonoom, representatie-relatie i.p.v. persoon-bundeling, woning↔parkeer administratieve (ont)koppeling (1:0..n), TwinQ-CSV als bron. Converter #17 on hold.
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
