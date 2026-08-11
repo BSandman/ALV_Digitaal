@@ -297,6 +297,28 @@ touch "$remote_dir/tmp/restart.txt"
 REMOTE_ROLLBACK
 }
 
+capture_remote_stderr() {
+  ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- "$REMOTE_DIR" <<'REMOTE_STDERR'
+set -eu
+remote_dir="$1"
+case "$remote_dir" in /home/*/domains/*/nodeapp) ;; *) echo "Diagnostiek weigert onveilige app-root." >&2; exit 40;; esac
+test -d "$remote_dir" && test ! -L "$remote_dir" || { echo "Diagnostiek mist veilige app-root." >&2; exit 40; }
+remote_real="$(realpath -e "$remote_dir")"
+test "$remote_real" = "$remote_dir" || { echo "Diagnostiek weigert app-root met symlinks of omwegen." >&2; exit 40; }
+stderr_file="$remote_dir/stderr.log"
+if [ ! -e "$stderr_file" ]; then
+  echo ">> lsnode stderr: $stderr_file bestaat niet." >&2
+  exit 0
+fi
+test -f "$stderr_file" && test ! -L "$stderr_file" || { echo "Diagnostiek weigert onveilig stderr.log." >&2; exit 40; }
+stderr_real="$(realpath -e "$stderr_file")"
+case "$stderr_real" in "$remote_real"/*) ;; *) echo "Diagnostiek weigert stderr.log buiten app-root." >&2; exit 40;; esac
+echo ">> lsnode stderr (laatste 120 regels; herkenbare secretsleutels geredigeerd):" >&2
+tail -n 120 "$stderr_real" \
+  | sed -E 's/^((DB_PASSWORD|AUTH_PEPPER|SMTP_[A-Z0-9_]*(PASSWORD|SECRET|TOKEN|KEY)|ADMIN_[A-Z0-9_]*(PASSWORD|SECRET|TOKEN|KEY))[[:space:]]*=).*/\1[REDACTED]/'
+REMOTE_STDERR
+}
+
 if ! ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- "$REMOTE_DIR" "$REMOTE_DEPLOY_ROOT" "$REMOTE_WORK" "$REMOTE_BACKUP" "$ARTIFACT_SHA256" "$COMMIT_SHA" "$NODE_BIN" <<'REMOTE_INSTALL'
 set -eu
 remote_dir="$1"
@@ -387,6 +409,9 @@ done
 
 if [[ "$HEALTH_OK" != true ]]; then
   echo "Healthcheck rood; getimestampte backup wordt hersteld." >&2
+  if ! capture_remote_stderr; then
+    echo "WAARSCHUWING: lsnode stderr kon niet veilig worden opgehaald." >&2
+  fi
   if rollback_remote; then
     echo "Rollback na rode healthcheck voltooid." >&2
     exit 20

@@ -20,10 +20,11 @@ SECRETS_FILE="$(mktemp "$TEST_HOME/secrets/alv-acceptatie-test.XXXXXX.env")"
 FAKE_BIN="$(mktemp -d)"
 HEALTH_STATE="$(mktemp)"
 NPM_STATE="$(mktemp)"
+STDERR_OUTPUT="$(mktemp)"
 
 cleanup() {
   rm -rf "$TEST_BASE" "$REMOTE_DEPLOY_ROOT" "$NODE_ENV_TEST_BASE" "$FAKE_BIN"
-  rm -f "$SECRETS_FILE" "$HEALTH_STATE" "$NPM_STATE"
+  rm -f "$SECRETS_FILE" "$HEALTH_STATE" "$NPM_STATE" "$STDERR_OUTPUT"
 }
 trap cleanup EXIT
 
@@ -163,12 +164,16 @@ first_backup="$(find "$REMOTE_DEPLOY_ROOT/backups" -mindepth 1 -maxdepth 1 -type
 [[ "$(cat "$first_backup/managed/src/old.txt")" = "oude code" ]]
 
 printf 'stabiele code vóór fout\n' > "$REMOTE_DIR/src/rollback-marker.txt"
+printf 'ERR_REQUIRE_ASYNC_MODULE: testmarker\nDB_PASSWORD=mag-nooit-in-actions\n' > "$REMOTE_DIR/stderr.log"
 printf 'failure\n' > "$HEALTH_STATE"
 set +e
-"$PROJECT_ROOT/scripts/deploy.sh" --target acceptatie --confirm-no-open-round --artifact "$ARTIFACT"
+"$PROJECT_ROOT/scripts/deploy.sh" --target acceptatie --confirm-no-open-round --artifact "$ARTIFACT" >"$STDERR_OUTPUT" 2>&1
 rollback_status=$?
 set -e
 [[ "$rollback_status" -eq 20 ]] || { echo "Rode healthcheck gaf $rollback_status in plaats van 20." >&2; exit 1; }
+grep -q 'ERR_REQUIRE_ASYNC_MODULE: testmarker' "$STDERR_OUTPUT"
+grep -q 'DB_PASSWORD=\[REDACTED\]' "$STDERR_OUTPUT"
+! grep -q 'mag-nooit-in-actions' "$STDERR_OUTPUT"
 [[ "$(cat "$REMOTE_DIR/src/rollback-marker.txt")" = "stabiele code vóór fout" ]]
 [[ -f "$REMOTE_DIR/tmp/restart.txt" ]]
 [[ ! -e "$REMOTE_DIR/current" ]]
