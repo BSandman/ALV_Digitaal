@@ -15,10 +15,12 @@ test('deployroute kiest acceptatie standaard en heeft doelgebonden coördinaten'
   assert.match(deploy, /ACCEPTATIE_SSH_HOST/);
   assert.match(deploy, /ACCEPTATIE_REMOTE_DIR/);
   assert.match(deploy, /ACCEPTATIE_SSH_PORT/);
+  assert.match(deploy, /ACCEPTATIE_NODE_BIN/);
   assert.match(deploy, /https:\/\/acceptatie\.honigfabriek\.nl\/healthz/);
   assert.match(deploy, /PORTAAL_SSH_HOST/);
   assert.match(deploy, /PORTAAL_REMOTE_DIR/);
   assert.match(deploy, /PORTAAL_SSH_PORT/);
+  assert.match(deploy, /PORTAAL_NODE_BIN/);
   assert.match(deploy, /https:\/\/portaal\.honigfabriek\.nl\/healthz/);
   assert.match(deploy, /StrictHostKeyChecking=yes/);
   assert.match(deploy, /UserKnownHostsFile=/);
@@ -33,6 +35,7 @@ test('CD is handmatig, hoofdbranchgebonden en gebruikt gepinde SSH-hostsleutels'
   assert.match(acceptance, /refs\/heads\/main/);
   assert.match(acceptance, /secrets\.ACC_SSH_KEY/);
   assert.match(acceptance, /vars\.ACC_SSH_KNOWN_HOSTS/);
+  assert.match(acceptance, /vars\.ACC_NODE_BIN/);
   assert.match(acceptance, /no_open_round:[\s\S]*type: boolean/);
   assert.match(acceptance, /--confirm-no-open-round/);
   assert.match(acceptance, /concurrency:[\s\S]*cancel-in-progress: false/);
@@ -45,6 +48,7 @@ test('productie-CD vereist tag, exacte bevestiging en GitHub production-environm
   assert.match(production, /refs\/tags\/\$\{\{ inputs\.release_tag \}\}/);
   assert.match(production, /portaal\.honigfabriek\.nl/);
   assert.match(production, /secrets\.PROD_SSH_KEY/);
+  assert.match(production, /vars\.PROD_NODE_BIN/);
   assert.match(production, /BAS_PRODUCTION_GO: JA/);
   assert.match(production, /--allow-production/);
   assert.match(production, /no_open_round:[\s\S]*type: boolean/);
@@ -81,4 +85,14 @@ test('CloudLinux app-root blijft vast en backup staat in een siblingpad', async 
   assert.match(deploy, /REMOTE_BACKUP="\$REMOTE_DEPLOY_ROOT\/backups\/\$RELEASE_ID"/);
   assert.match(deploy, /\/home\/\$SSH_USER\/domains\//);
   assert.doesNotMatch(deploy, /Application root: \$REMOTE_DIR\/current/);
+});
+
+test('CloudLinux nodevenv wordt doelgebonden gevalideerd en vóór npm op PATH gezet', async () => {
+  const deploy = await readFile(deployPath, 'utf8');
+  assert.match(deploy, /NODE_BIN="\$\{NODE_BIN%\/\}"/);
+  assert.match(deploy, /\/home\/\$SSH_USER\/nodevenv/);
+  assert.match(deploy, /NODE_BIN_PREFIX=.*REMOTE_DIR/);
+  assert.match(deploy, /node_bin_real="\$\(CDPATH= cd -P/);
+  assert.match(deploy, /PATH="\$node_bin_real:\$PATH"/);
+  assert.match(deploy, /for command_name in rsync node npm tar sha256sum realpath/);
 });

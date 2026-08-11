@@ -19,6 +19,7 @@ npm run build:release --prefix app
 export ACCEPTATIE_SSH_HOST='<user>@<mijn.host-ssh-host>'
 export ACCEPTATIE_SSH_PORT='<door-Bas-bevestigde-poort>'
 export ACCEPTATIE_REMOTE_DIR='<absoluut-door-Bas-bevestigd-app-pad>'
+export ACCEPTATIE_NODE_BIN='<app-specifiek-nodevenv-bin-pad>'
 scripts/deploy.sh --target acceptatie --dry-run
 ```
 
@@ -28,12 +29,12 @@ Gebruik daarna het door CI bewaarde code-only artefact of de lokaal identiek geb
 scripts/deploy.sh --target acceptatie --confirm-no-open-round --artifact dist/alv-digitaal-app-v0.2.0.tgz
 ```
 
-Voer de echte deploy alleen uit nadat is gecontroleerd dat geen stemronde openstaat. Het script controleert de PII-gate, SHA-256 en server-side secretslocatie/rechten. Daarna maakt het buiten de CloudLinux app-root een getimestampte backup onder `<ACCEPTATIE_REMOTE_DIR>.deploy/backups/`, synchroniseert uitsluitend `src/` en de package-manifesten in-place, draait `npm ci --omit=dev`, triggert Passenger via `<ACCEPTATIE_REMOTE_DIR>/tmp/restart.txt` en vereist een HTTPS-healthcheck met werkende database. Een installatie- of healthfout herstelt de vorige code uit de backup en installeert de bijbehorende dependencies opnieuw. De app-root zelf wordt nooit verplaatst of door een `current`-symlink vervangen.
+Voer de echte deploy alleen uit nadat is gecontroleerd dat geen stemronde openstaat. Het script controleert de PII-gate, SHA-256 en server-side secretslocatie/rechten. Het valideert `ACCEPTATIE_NODE_BIN` als app-specifieke CloudLinux-nodevenv onder `/home/<ssh-user>/nodevenv/.../bin` en zet die vóór de remote commandocontrole, installatie en eventuele rollback op `PATH`. Daarna maakt het buiten de CloudLinux app-root een getimestampte backup onder `<ACCEPTATIE_REMOTE_DIR>.deploy/backups/`, synchroniseert uitsluitend `src/` en de package-manifesten in-place, draait `npm ci --omit=dev`, triggert Passenger via `<ACCEPTATIE_REMOTE_DIR>/tmp/restart.txt` en vereist een HTTPS-healthcheck met werkende database. Een installatie- of healthfout herstelt de vorige code uit de backup en installeert de bijbehorende dependencies opnieuw. De app-root zelf wordt nooit verplaatst of door een `current`-symlink vervangen.
 
 Na inrichting kan dezelfde acceptatiedeploy handmatig via GitHub Actions → **Deploy acceptatie**. Benodigde repository-/environmentconfig:
 
 - secret `ACC_SSH_KEY`;
-- variables `ACC_SSH_USER`, `ACC_SSH_HOST`, `ACC_SSH_PORT`, `ACC_REMOTE_DIR`, `ACC_SECRETS_FILE` en de vooraf buiten GitHub gecontroleerde hostkeyregel `ACC_SSH_KNOWN_HOSTS`;
+- variables `ACC_SSH_USER`, `ACC_SSH_HOST`, `ACC_SSH_PORT`, `ACC_REMOTE_DIR`, `ACC_NODE_BIN`, `ACC_SECRETS_FILE` en de vooraf buiten GitHub gecontroleerde hostkeyregel `ACC_SSH_KNOWN_HOSTS`; voor Node 20 op deze app is `ACC_NODE_BIN=/home/cn111993/nodevenv/domains/acceptatie.honigfabriek.nl/nodeapp/20/bin`;
 - workflow starten vanaf `main` (andere refs worden geweigerd) en het verplichte vak bevestigen dat geen stemronde openstaat.
 
 ## 3. Verificatie op A
@@ -46,4 +47,4 @@ Na inrichting kan dezelfde acceptatiedeploy handmatig via GitHub Actions → **D
 
 ## 4. Productie blijft dicht
 
-`portaal` is technisch voorbereid maar wordt geweigerd tenzij zowel `--allow-production` als `BAS_PRODUCTION_GO=JA` aanwezig zijn. De workflow **Deploy productie** vereist daarnaast een bestaande release-tag, exacte domeinbevestiging en het GitHub Environment `production`. Bas moet daar als required reviewer worden ingesteld. Dat is geen toestemming om nu naar productie te deployen; de latere A→P-poort en expliciete go van Bas blijven vereist.
+`portaal` is technisch voorbereid maar wordt geweigerd tenzij zowel `--allow-production` als `BAS_PRODUCTION_GO=JA` aanwezig zijn. De workflow **Deploy productie** vereist daarnaast een bestaande release-tag, exacte domeinbevestiging, een doelgebonden `PROD_NODE_BIN` en het GitHub Environment `production`. Bas moet daar als required reviewer worden ingesteld. Dat is geen toestemming om nu naar productie te deployen; de latere A→P-poort en expliciete go van Bas blijven vereist.

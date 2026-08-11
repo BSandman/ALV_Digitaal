@@ -18,6 +18,7 @@ De **wachtwoorden** staan uitsluitend in het server-side secrets-bestand per omg
 - `ACC_SSH_USER` = `cn111993`
 - `ACC_SSH_PORT` = `26`
 - `ACC_REMOTE_DIR` = `/home/cn111993/domains/acceptatie.honigfabriek.nl/nodeapp`
+- `ACC_NODE_BIN` = `/home/cn111993/nodevenv/domains/acceptatie.honigfabriek.nl/nodeapp/20/bin`
 - `ACC_SECRETS_FILE` = `/home/cn111993/secrets/alv-acceptatie.env`
 - `ACC_SSH_KNOWN_HOSTS` = uitvoer van `ssh-keyscan -p 26 217.180.14.63` (host-key-pinning)
 

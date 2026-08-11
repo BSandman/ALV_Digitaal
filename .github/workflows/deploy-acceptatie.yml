@@ -72,6 +72,7 @@ jobs:
           ACCEPTATIE_SSH_HOST: ${{ format('{0}@{1}', vars.ACC_SSH_USER, vars.ACC_SSH_HOST) }}
           ACCEPTATIE_SSH_PORT: ${{ vars.ACC_SSH_PORT }}
           ACCEPTATIE_REMOTE_DIR: ${{ vars.ACC_REMOTE_DIR }}
+          ACCEPTATIE_NODE_BIN: ${{ vars.ACC_NODE_BIN }}
           ACCEPTATIE_SECRETS_FILE: ${{ vars.ACC_SECRETS_FILE }}
           DEPLOY_COMMIT_SHA: ${{ github.sha }}
         run: |
