@@ -20,12 +20,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Callable, Mapping
 
 from lint_handoff import HandoffValidationError, parse_frontmatter
+from autorun_io import AutorunIOError, append_activity
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -63,14 +63,10 @@ Sender = Callable[[Mapping[str, str], Notification], None]
 
 
 def append_notifier_activity(state: str, outcome: str, path: Path = DEFAULT_ACTIVITY_LOG) -> None:
-    timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-    safe_state = " ".join(state.replace("·", "-").splitlines()).strip() or "ONBEKEND"
-    safe_outcome = " ".join(outcome.replace("·", "-").splitlines()).strip()
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8", newline="") as handle:
-            handle.write(f"{timestamp} · notifier · {safe_state} → {safe_state} · {safe_outcome}\n")
-    except OSError:
+        safe_state = state or "ONBEKEND"
+        append_activity("notifier", safe_state, safe_state, outcome, log_path=path)
+    except AutorunIOError:
         # Observability must never turn a successfully sent alert into a retry storm.
         pass
 

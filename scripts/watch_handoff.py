@@ -16,7 +16,6 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -26,6 +25,7 @@ from lint_handoff import (
     validate_file,
     validate_values,
 )
+from autorun_io import append_activity, utc_now
 
 
 ROLE_STATE = {
@@ -133,10 +133,6 @@ def _close_windows_job(handle) -> None:
     kernel32.CloseHandle(handle)
 
 
-def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-
-
 def run_git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", "-C", str(repo), *args],
@@ -217,21 +213,6 @@ def load_runner_command(role: str, environ: Mapping[str, str] | None = None) -> 
     if any("\x00" in part for part in command):
         raise AutorunError("runnercommando bevat een NUL-teken")
     return list(command)
-
-
-def append_activity(
-    role: str,
-    from_state: str,
-    to_state: str,
-    outcome: str,
-    *,
-    log_path: Path = ACTIVITY_LOG,
-) -> None:
-    safe = lambda value: " ".join(str(value).replace("·", "-").splitlines()).strip()
-    line = f"{utc_now()} · {safe(role)} · {safe(from_state)} → {safe(to_state)} · {safe(outcome)}\n"
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    with log_path.open("a", encoding="utf-8", newline="") as handle:
-        handle.write(line)
 
 
 def write_runtime_status(path: Path = RUNTIME_STATUS, **values: object) -> None:

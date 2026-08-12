@@ -420,6 +420,19 @@ class WatchHandoffAutorunTests(unittest.TestCase):
         self.assertEqual(len(lines), 1)
         self.assertIn("codex secret-line · READY → DONE · OK second", lines[0])
 
+    def test_failed_atomic_write_keeps_original_file_intact(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "handoff.md"
+            path.write_text("ORIGINEEL\n", encoding="utf-8")
+            with mock.patch.object(
+                watch_handoff.tempfile,
+                "NamedTemporaryFile",
+                side_effect=OSError("schijf vol"),
+            ):
+                with self.assertRaisesRegex(watch_handoff.AutorunError, "atomair"):
+                    watch_handoff._write_text_atomic(path, "NIEUW\n")
+            self.assertEqual(path.read_text(encoding="utf-8"), "ORIGINEEL\n")
+
 
 if __name__ == "__main__":
     unittest.main()
