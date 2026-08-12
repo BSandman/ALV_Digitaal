@@ -49,21 +49,38 @@ class LintHandoffTests(unittest.TestCase):
         lint_handoff.validate_values(values)
 
     def test_quoted_note_with_apostrophe_colon_and_padding_is_green(self) -> None:
-        text = VALID.replace('note: "Codex bouwt G1."', 'note:   "Codex\'s fase: 1 done"   ')
+        text = VALID.replace(
+            'note: "Codex bouwt G1."',
+            'note:   "Codex\'s status: OK - v0.1: gereed"   ',
+        )
         values = lint_handoff.parse_frontmatter(text)
         lint_handoff.validate_values(values)
-        self.assertEqual(values["note"], "Codex's fase: 1 done")
+        self.assertEqual(values["note"], "Codex's status: OK - v0.1: gereed")
+
+    def test_tabs_around_key_separator_are_green(self) -> None:
+        text = VALID.replace("state: DEV_IN_PROGRESS", "state\t:\tDEV_IN_PROGRESS")
+        values = lint_handoff.parse_frontmatter(text)
+        lint_handoff.validate_values(values)
 
     def test_iso_offsets_and_microseconds_are_green(self) -> None:
         for timestamp in (
             "2026-08-12T08:15:00+02:00",
             "2026-08-12T08:15:00.123456Z",
+            "2026-08-12T08:15:00.123+02:00",
+            "2026-08-12T08:15:00-05:00",
         ):
             with self.subTest(timestamp=timestamp):
                 values = lint_handoff.parse_frontmatter(
                     VALID.replace("2026-08-12T08:15:00Z", timestamp)
                 )
                 lint_handoff.validate_values(values)
+
+    def test_utf8_bom_and_mixed_newlines_are_green(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "handoff.md"
+            mixed = VALID.replace("\n", "\r\n", 4)
+            path.write_text(mixed, encoding="utf-8-sig")
+            lint_handoff.validate_file(path)
 
     def test_invented_state_is_red(self) -> None:
         self.assert_invalid(
@@ -82,6 +99,18 @@ class LintHandoffTests(unittest.TestCase):
 
     def test_owner_list_is_red(self) -> None:
         self.assert_invalid(VALID.replace("owner: codex", "owner: [codex, claude]"), "scalar")
+
+    def test_yaml_like_sprint_list_is_red(self) -> None:
+        self.assert_invalid(VALID.replace("sprint: 4", "sprint: [3, 4]"), "scalar")
+
+    def test_yaml_like_note_map_is_red(self) -> None:
+        self.assert_invalid(VALID.replace('note: "Codex bouwt G1."', "note: {key: value}"), "scalar")
+
+    def test_indented_key_is_red_with_controlled_error(self) -> None:
+        self.assert_invalid(
+            VALID.replace("state: DEV_IN_PROGRESS", "   state   :   DEV_IN_PROGRESS"),
+            "ongeldige frontmatterregel",
+        )
 
     def test_blocked_requires_bas_action(self) -> None:
         blocked = (

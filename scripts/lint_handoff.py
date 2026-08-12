@@ -137,7 +137,8 @@ def validate_values(values: dict[str, str]) -> None:
 
 def validate_file(path: Path) -> None:
     try:
-        text = path.read_text(encoding="utf-8")
+        # utf-8-sig accepts a Windows-authored BOM while behaving as UTF-8 otherwise.
+        text = path.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError) as exc:
         raise HandoffValidationError(f"kan {path} niet als UTF-8 lezen: {exc}") from exc
     validate_values(parse_frontmatter(text))
