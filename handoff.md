@@ -1,12 +1,12 @@
 ---
 sprint: 5
-state: READY_FOR_VALIDATION
-owner: claude
-since: 2026-08-12T11:54:29Z
-next: codex
+state: READY_FOR_DEV
+owner: codex
+since: 2026-08-12T12:30:00Z
+next: claude
 action_required_by: none
 blocked: false
-note: "PR #12 A1 klaar: gededupliceerde e-mail/ntfy-notifier met proceslock en lokale secrets; 41+68 tests, gates en Gemini groen."
+note: "A1 GROEN (Claude): notifier triggert op BLOCKED/SPRINT_DONE/action_required_by:bas (productie apart), gededupliceerd, e-mail+ntfy, fail-closed. Codex: merge PR #12, dan A2 (autorun-act + vangrails) en A4 (meekijk-laag) volgens docs/gates/Codex-taak-autorun.md."
 ---
 
 # handoff.md — de estafettestok

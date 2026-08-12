@@ -30,7 +30,8 @@ Headless mag geen blinde vlek worden; alle zicht via duurzame artefacten.
 
 - **`status.ps1` verrijken:** toon of de autorun draait/gepauzeerd is, de loop-teller/laatste-beurt-tijd, en de check-status van open PR's (`gh pr status`/`gh run list` indien beschikbaar) naast de bestaande handoff-state/branch/commits/progress-tail. Blijft één-commando + geschikt voor een `while`-lus.
 - **Autorun-activiteitenlog:** de watcher(s) + notifier appenden per beurt één regel (`tijd · rol · state → next · uitkomst`) aan een lokaal `autorun.log` (gitignored) — chronologisch spoor voor "wat gebeurde er vannacht".
-- **`AGENTS.md`-sectie "Meekijken":** kort overzicht — `status.ps1` (lokaal), GitHub (Actions/PR's/commits/handoff op main), de notifier (push bij uitzonderingen), en het activiteitenlog.
+- **Lokaal `status.html` (browser-dashboard):** een script (of `status.ps1 --html`) genereert een zelf-standig HTML-bestand met dezelfde info als de terminalversie (handoff-state/owner, autorun aan/gepauzeerd, laatste beurten uit `autorun.log`, open PR's + check-status via `gh`), meta-refresh voor auto-update. Lokaal, geen connector nodig — vervangt het "makkelijke dashboard"-gevoel. Gitignored.
+- **`AGENTS.md`-sectie "Meekijken":** kort overzicht — `status.ps1`/`status.html` (lokaal), GitHub (Actions/PR's/commits/handoff op main), de notifier (push bij uitzonderingen), en het activiteitenlog.
 
 ## Definition of done
 
