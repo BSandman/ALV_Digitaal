@@ -3,11 +3,11 @@ set -eu
 
 repo_root=$(git rev-parse --show-toplevel)
 
-if command -v python3 >/dev/null 2>&1; then
+if python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' >/dev/null 2>&1; then
   exec python3 "$repo_root/scripts/lint_handoff.py" "$repo_root/handoff.md"
-elif command -v python >/dev/null 2>&1; then
+elif python -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' >/dev/null 2>&1; then
   exec python "$repo_root/scripts/lint_handoff.py" "$repo_root/handoff.md"
-elif command -v py >/dev/null 2>&1; then
+elif py -3 -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' >/dev/null 2>&1; then
   exec py -3 "$repo_root/scripts/lint_handoff.py" "$repo_root/handoff.md"
 fi
 
