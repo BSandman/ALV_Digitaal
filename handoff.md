@@ -1,12 +1,12 @@
 ---
 sprint: 5
-state: READY_FOR_VALIDATION
-owner: claude
-since: 2026-08-12T15:14:21Z
-next: codex
+state: READY_FOR_INTEGRATION
+owner: mistral
+since: 2026-08-12T18:37:06Z
+next: claude
 action_required_by: none
 blocked: false
-note: "A3 klaar: lokale env-defaults + voorbeeldconfig + attended-first runbook; 65+68 tests en gates groen, autorun/deploy uit; valideer PR en plan begeleide droogloop."
+note: "A3 GROEN door Claude; Codex merget PR #14; Mistral begeleidt één attended droogloop met max-turns 1, autorun/overnight en deploy blijven uit."
 ---
 
 # handoff.md — de estafettestok
