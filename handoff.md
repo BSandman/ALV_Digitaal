@@ -1,12 +1,12 @@
 ---
-sprint: 5
-state: READY_FOR_INTEGRATION
-owner: mistral
-since: 2026-08-12T18:37:06Z
-next: claude
+sprint: 6
+state: DEV_IN_PROGRESS
+owner: codex
+since: 2026-08-12T22:39:00Z
+next: gemini
 action_required_by: none
 blocked: false
-note: "A3 GROEN door Claude; Codex merget PR #14; Mistral begeleidt één attended droogloop met max-turns 1, autorun/overnight en deploy blijven uit."
+note: "Sprint 6 gestart: Codex bouwt de drie rol-runners en levert concrete lokale autorunconfig; autorun, overnight en deploy blijven uit."
 ---
 
 # handoff.md — de estafettestok
