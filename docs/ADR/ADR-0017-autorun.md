@@ -30,6 +30,8 @@ De guardrails (G1 state-lint, G2 tail-context, G3 provisioning) staan. Nu de aut
 
 4. **Attended-first.** De autorun start **begeleid** (Bas kijkt mee, lage loop-cap) en gaat pas onbemand-overnight zodra een paar volledige cycli bewezen zijn. De kill-switch blijft altijd binnen handbereik.
 
+5. **Meekijk-laag (observability).** Headless verplaatst zicht naar **duurzame artefacten**, niet minder zicht: `status.ps1` (lokaal live-dashboard), GitHub (Actions/PR's/commits/`handoff.md` op main), de notifier (push bij uitzonderingen) en een chronologisch `autorun.log`. Dit is auditeerbaarder dan de vluchtige app-panelen.
+
 ## Overwogen alternatieven
 
 - **Elke agent pingt zelf.** Afgewezen: N agents op dezelfde state = spam. Eén notifier, exception-based.

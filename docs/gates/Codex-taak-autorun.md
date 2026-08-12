@@ -24,9 +24,17 @@
 - `autorun.toml` (of env) met per rol het runner-commando, de loop-cap-defaults en het notifier-kanaal.
 - Korte runbook-sectie in `AGENTS.md`: hoe start je de begeleide autorun (`watch_handoff.py --role <rol> --autorun`), hoe pauzeer/kill je 'm, en de attended-first-regel (ADR-0017 §4).
 
+## A4 — Meekijk-laag (observability)
+
+Headless mag geen blinde vlek worden; alle zicht via duurzame artefacten.
+
+- **`status.ps1` verrijken:** toon of de autorun draait/gepauzeerd is, de loop-teller/laatste-beurt-tijd, en de check-status van open PR's (`gh pr status`/`gh run list` indien beschikbaar) naast de bestaande handoff-state/branch/commits/progress-tail. Blijft één-commando + geschikt voor een `while`-lus.
+- **Autorun-activiteitenlog:** de watcher(s) + notifier appenden per beurt één regel (`tijd · rol · state → next · uitkomst`) aan een lokaal `autorun.log` (gitignored) — chronologisch spoor voor "wat gebeurde er vannacht".
+- **`AGENTS.md`-sectie "Meekijken":** kort overzicht — `status.ps1` (lokaal), GitHub (Actions/PR's/commits/handoff op main), de notifier (push bij uitzonderingen), en het activiteitenlog.
+
 ## Definition of done
 
-- A1/A2/A3 gebouwd, getest, door Claude gevalideerd tegen ADR-0017.
+- A1/A2/A3/A4 gebouwd, getest, door Claude gevalideerd tegen ADR-0017.
 - Een **begeleide** droogloop: de keten doorloopt minstens één volledige beurt-overgang autonoom, met de kill-switch aantoonbaar werkend en één notifier-bericht bij een `action_required_by: bas`-overgang.
 - Human deploy-gates aantoonbaar intact (de autorun zet `action_required_by: bas` i.p.v. zelf te deployen).
 

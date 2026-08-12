@@ -126,8 +126,8 @@ def validate_values(values: dict[str, str]) -> None:
     action_required_by = values["action_required_by"]
     if state == "BLOCKED" and action_required_by != "bas":
         raise HandoffValidationError("state BLOCKED vereist 'action_required_by: bas'")
-    if state != "BLOCKED" and action_required_by != "none":
-        raise HandoffValidationError("een niet-geblokkeerde state vereist 'action_required_by: none'")
+    if action_required_by not in {"none", "bas"}:
+        raise HandoffValidationError("'action_required_by' moet 'none' of 'bas' zijn")
 
     if values["next"] not in OWNERS | {"none"}:
         raise HandoffValidationError("'next' moet een bekende rol of 'none' zijn")
