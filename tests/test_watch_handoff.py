@@ -123,6 +123,14 @@ class WatchHandoffAutorunTests(unittest.TestCase):
         )
         self.assertEqual(command, ["local-runner", "--one-turn"])
 
+    def test_runner_json_preserves_windows_path_spaces_and_backslashes(self) -> None:
+        windows_path = r"C:\Program Files\Local Runner\runner.exe"
+        command = watch_handoff.load_runner_command(
+            "codex",
+            {"ALV_AUTORUN_CODEX_ARGV": json.dumps([windows_path, "--one-turn"])},
+        )
+        self.assertEqual(command, [windows_path, "--one-turn"])
+
     def test_missing_runner_and_local_gemini_are_rejected(self) -> None:
         with self.assertRaisesRegex(watch_handoff.AutorunError, "runner ontbreekt"):
             watch_handoff.load_runner_command("codex", {})
@@ -317,6 +325,34 @@ class WatchHandoffAutorunTests(unittest.TestCase):
                     poll_interval=0.05,
                 )
         self.assertLess(time.monotonic() - started, 5)
+
+    def test_runner_timeout_terminates_child_process_too(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            marker = repo / "child-survived.txt"
+            child = repo / "child.py"
+            parent = repo / "parent.py"
+            child.write_text(
+                "import time\nfrom pathlib import Path\ntime.sleep(1)\n"
+                f"Path({str(marker)!r}).write_text('survived', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            parent.write_text(
+                "import subprocess, sys, time\n"
+                f"subprocess.Popen([sys.executable, {str(child)!r}])\n"
+                "time.sleep(30)\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(watch_handoff.AutorunError, "wandklok"):
+                watch_handoff.act(
+                    [sys.executable, str(parent)],
+                    "context",
+                    repo=repo,
+                    timeout=0.2,
+                    poll_interval=0.05,
+                )
+            time.sleep(1.2)
+            self.assertFalse(marker.exists())
 
     def test_in_progress_turn_is_resumed_without_race_guard(self) -> None:
         in_progress = READY_HANDOFF.replace("READY_FOR_DEV", "DEV_IN_PROGRESS")

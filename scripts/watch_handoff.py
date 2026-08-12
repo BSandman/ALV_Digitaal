@@ -12,7 +12,6 @@ import argparse
 import json
 import os
 import signal
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -56,6 +55,82 @@ class AutorunError(RuntimeError):
 
 class AutorunPaused(AutorunError):
     """Raised when Bas activates the kill-switch during a runner turn."""
+
+
+def _create_windows_job(process: subprocess.Popen[str]):
+    """Put a Windows runner tree in a kill-on-close Job Object."""
+    if os.name != "nt":
+        return None
+    import ctypes
+    from ctypes import wintypes
+
+    class IO_COUNTERS(ctypes.Structure):
+        _fields_ = [
+            ("ReadOperationCount", ctypes.c_ulonglong),
+            ("WriteOperationCount", ctypes.c_ulonglong),
+            ("OtherOperationCount", ctypes.c_ulonglong),
+            ("ReadTransferCount", ctypes.c_ulonglong),
+            ("WriteTransferCount", ctypes.c_ulonglong),
+            ("OtherTransferCount", ctypes.c_ulonglong),
+        ]
+
+    class BASIC_LIMITS(ctypes.Structure):
+        _fields_ = [
+            ("PerProcessUserTimeLimit", ctypes.c_longlong),
+            ("PerJobUserTimeLimit", ctypes.c_longlong),
+            ("LimitFlags", wintypes.DWORD),
+            ("MinimumWorkingSetSize", ctypes.c_size_t),
+            ("MaximumWorkingSetSize", ctypes.c_size_t),
+            ("ActiveProcessLimit", wintypes.DWORD),
+            ("Affinity", ctypes.c_size_t),
+            ("PriorityClass", wintypes.DWORD),
+            ("SchedulingClass", wintypes.DWORD),
+        ]
+
+    class EXTENDED_LIMITS(ctypes.Structure):
+        _fields_ = [
+            ("BasicLimitInformation", BASIC_LIMITS),
+            ("IoInfo", IO_COUNTERS),
+            ("ProcessMemoryLimit", ctypes.c_size_t),
+            ("JobMemoryLimit", ctypes.c_size_t),
+            ("PeakProcessMemoryUsed", ctypes.c_size_t),
+            ("PeakJobMemoryUsed", ctypes.c_size_t),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+    kernel32.SetInformationJobObject.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_int,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+    ]
+    kernel32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+
+    handle = kernel32.CreateJobObjectW(None, None)
+    if not handle:
+        raise AutorunError("Windows Job Object kon niet worden gemaakt")
+    limits = EXTENDED_LIMITS()
+    limits.BasicLimitInformation.LimitFlags = 0x00002000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    if not kernel32.SetInformationJobObject(handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
+        kernel32.CloseHandle(handle)
+        raise AutorunError("Windows Job Object kon niet veilig worden begrensd")
+    if not kernel32.AssignProcessToJobObject(handle, wintypes.HANDLE(process._handle)):
+        kernel32.CloseHandle(handle)
+        raise AutorunError("runner kon niet aan Windows Job Object worden gekoppeld")
+    return handle
+
+
+def _close_windows_job(handle) -> None:
+    if handle is None:
+        return
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle(handle)
 
 
 def utc_now() -> str:
@@ -128,7 +203,6 @@ def load_runner_command(role: str, environ: Mapping[str, str] | None = None) -> 
     env = os.environ if environ is None else environ
     prefix = f"ALV_AUTORUN_{role.upper()}"
     argv_raw = env.get(f"{prefix}_ARGV", "").strip()
-    command_raw = env.get(f"{prefix}_COMMAND", "").strip()
     if argv_raw:
         try:
             command = json.loads(argv_raw)
@@ -138,17 +212,8 @@ def load_runner_command(role: str, environ: Mapping[str, str] | None = None) -> 
             isinstance(part, str) and part for part in command
         ):
             raise AutorunError(f"{prefix}_ARGV moet een niet-lege lijst strings zijn")
-    elif command_raw:
-        try:
-            command = shlex.split(command_raw, posix=os.name != "nt")
-        except ValueError as exc:
-            raise AutorunError(f"{prefix}_COMMAND bevat ongeldige quoting") from exc
-        if not command:
-            raise AutorunError(f"{prefix}_COMMAND mag niet leeg zijn")
     else:
-        raise AutorunError(
-            f"runner ontbreekt: zet lokaal {prefix}_ARGV (JSON-lijst) of {prefix}_COMMAND"
-        )
+        raise AutorunError(f"runner ontbreekt: zet lokaal {prefix}_ARGV als JSON-lijst")
     if any("\x00" in part for part in command):
         raise AutorunError("runnercommando bevat een NUL-teken")
     return list(command)
@@ -311,6 +376,7 @@ def act(
         raise AutorunError("runner kreeg geen resterende wandklok")
     deadline = time.monotonic() + timeout
     process: subprocess.Popen[str] | None = None
+    windows_job = None
     try:
         with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as context_file:
             context_file.write(context)
@@ -325,34 +391,41 @@ def act(
                     subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
                 ),
             )
+            windows_job = _create_windows_job(process)
             while process.poll() is None:
                 if pause_path is not None and pause_path.exists():
-                    _stop_process_tree(process)
+                    _stop_process_tree(process, windows_job)
+                    windows_job = None
                     raise AutorunPaused("kill-switch geactiveerd tijdens runner; beurt blijft hervatbaar")
                 if time.monotonic() >= deadline:
-                    _stop_process_tree(process)
+                    _stop_process_tree(process, windows_job)
+                    windows_job = None
                     raise AutorunError("runner overschreed de maximale wandklok")
                 time.sleep(min(poll_interval, max(0.01, deadline - time.monotonic())))
             return subprocess.CompletedProcess(list(command), process.returncode)
     except AutorunError:
+        if process is not None and process.poll() is None:
+            _stop_process_tree(process, windows_job)
+            windows_job = None
         raise
     except OSError as exc:
         if process is not None and process.poll() is None:
-            _stop_process_tree(process)
+            _stop_process_tree(process, windows_job)
+            windows_job = None
         raise AutorunError("runner kon niet worden gestart") from exc
+    finally:
+        # On a normal runner exit this also cleans up any leaked descendants.
+        _close_windows_job(windows_job)
 
 
-def _stop_process_tree(process: subprocess.Popen[str]) -> None:
+def _stop_process_tree(process: subprocess.Popen[str], windows_job=None) -> None:
     if process.poll() is not None:
+        _close_windows_job(windows_job)
         return
     try:
         if os.name == "nt":
-            subprocess.run(
-                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
+            _close_windows_job(windows_job)
+            windows_job = None
         else:
             os.killpg(process.pid, signal.SIGTERM)
         process.wait(timeout=2)
@@ -365,6 +438,8 @@ def _stop_process_tree(process: subprocess.Popen[str]) -> None:
             process.wait(timeout=1)
         except (OSError, subprocess.TimeoutExpired):
             pass
+    finally:
+        _close_windows_job(windows_job)
 
 
 def wait_for_race_guard(seconds: int, pause_path: Path) -> bool:
