@@ -50,6 +50,10 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 - 2026-08-12 · **MIJLPAAL — acceptatie LIVE.** Na een lange platform-debugsessie (SSH-key/passphrase, CloudLinux nodevenv-PATH, secrets-`.env`-contract: geen `NODE_ENV` + chmod 600, en de kern: LiteSpeed **lsnode `require()`t de entry** → `src/start.js` mocht geen top-level await hebben → PR #8) draait de backend nu op `acceptatie.honigfabriek.nl`: deploy groen, healthz groen. Alle CloudLinux-vondsten zitten als hardening in `deploy.sh`. Platform-proef (10.3 kern) binnen.
 - 2026-08-12 · Claude · Guardrails-pakket klaargezet voor de onbemande richting: **ADR-0015** + `docs/gates/Codex-taak-guardrails.md` (G1 state-lint, G2 tail-context, G3 infra-provisioning). ADR-0014 (basisdatamodel) gereserveerd, wacht op HonigParkeren-input.
 
+## Sprint 4 — Guardrails (loopt)
+
+- 2026-08-12 · Codex · **G1 state-lint op PR #9**: dependency-vrije platte-frontmattervalidator met één uitvoerbare state↔ownerdefinitie, verplichte sleutels, tijdzone, scalar- en blokkadesemantiek; aparte leidende CI-job op PR/main en lokale pre-commit hook met geteste Windows/Git-Bash/Linux-interpreterselectie. Gemini-randgevallen verwerkt (CRLF, BOM/mixed newline, quotes/dubbele punten, ISO-offsets/microseconden, leeg/whitespace, lijsten/maps). Bewijs: 21/21 Python-tests, actuele handoff + hook groen, 61/61 Node-regressies en GitHub gates + Gemini groen. → READY_FOR_VALIDATION (Claude).
+
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 
 **Doel:** T-omgeving draait, CI-gates groen. Zie `sprint.md`. **Uitkomst:** groen op alle poorten; gevalideerd.

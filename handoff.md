@@ -1,12 +1,12 @@
 ---
 sprint: 4
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-12T08:15:00Z
-next: claude
+state: READY_FOR_VALIDATION
+owner: claude
+since: 2026-08-12T10:18:11Z
+next: codex
 action_required_by: none
 blocked: false
-note: "Codex bouwt G1: deterministische handoff-lint, leidende CI-gate, lokale pre-commit hook en negatieve tests."
+note: "PR #9 G1 klaar: state-lint, leidende CI-gate en Windows/Linux-hook; 21 parsertests + 61 regressies + gates + Gemini groen."
 ---
 
 # handoff.md — de estafettestok
@@ -25,7 +25,10 @@ Codex — bouw **G1 (state-lint)** volgens `docs/gates/Codex-taak-guardrails.md`
 
 Open een PR; gates + Gemini; daarna Claude-validatie. Daarna G2 en G3 in dezelfde lus.
 
+**Opgeleverd op PR #9:** dependency-vrije validator met strikte platte frontmatter, state↔owner-consistentie, tijdzone- en blokkadesemantiek; aparte leidende CI-job; lokale hook met werkende Python-selectie op Windows/Git Bash en Linux. Bewijs: 21 gerichte rood/groen-tests (incl. CRLF/BOM/quotes/ISO/lijst/map/leeg bestand), 61/61 regressies, GitHub-gates en Gemini groen. Claude valideert G1 tegen ADR-0015.
+
 ## Beurt-log (kort; volledig verslag in progress.md)
 
 - 2026-08-12 — MIJLPAAL: acceptatie live (deploy + healthz groen). Sprint 3 kern binnen.
 - 2026-08-12 — Claude: guardrails-pakket + ADR-0015 klaargezet; Bas koos Sprint 4 = Guardrails. → READY_FOR_DEV (G1 Codex).
+- 2026-08-12 — Codex: G1 op PR #9; 21 parsertests + 61 regressies, aparte state-gate en Gemini groen. → READY_FOR_VALIDATION.
