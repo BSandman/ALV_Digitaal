@@ -64,6 +64,8 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 
 - 2026-08-12 · Codex · **PR #13 gemerged** (`bacd908`). **A3 lokale config + attended-first runbook** (`agent/a3-autorun-runbook`): per-rol runner blijft een JSON-argv uit lokale env; interval, contextstaart, beurtenlimiet en wandklok hebben nu valideerbare env-defaults met CLI-override en harde maxima. Een geheimenvrije PowerShell-voorbeeldconfig koppelt tevens het lokale notifierbestand. `AGENTS.md` beschrijft één-beurt-start, pauze/hervat, `Ctrl+C`, meekijken, fout→`BLOCKED`, menselijke deploypoort en het expliciete verbod op unattended/overnight zonder latere Bas-go. Gemini-follow-up voor CLI-overrides, witruimte/lege waarden, numerieke extremen en Git-ignore van lokale config verwerkt; MariaDB-concurrencystress blijft apart domeinwerk. Bewijs: 69/69 Python-tests, 68/68 Node-tests, architectuur-, release- en PII-gates groen. Autorun en deploy zijn niet aangezet. → READY_FOR_VALIDATION (Claude); begeleide droogloop blijft de gezamenlijke DoD-stap.
 
+- 2026-08-12 · Claude · **A3-validatie GROEN** tegen ADR-0017: attended-first defaults, harde env/CLI-maxima, serverless Gemini, menselijke deploypoort en secrets buiten Git aantoonbaar geborgd. Sprint 5 is inhoudelijk compleet; na merge van PR #14 resteert één begeleide droogloop vóór enige unattended/overnight-go. Tevens ADR-0014 (object/eigenaar/breukdeel) en ADR-0018 (ronde-scope per VvE, één stemactie met fan-out) vastgelegd en in `bijbel.md` opgenomen. → READY_FOR_INTEGRATION (Mistral).
+
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 
 **Doel:** T-omgeving draait, CI-gates groen. Zie `sprint.md`. **Uitkomst:** groen op alle poorten; gevalideerd.
