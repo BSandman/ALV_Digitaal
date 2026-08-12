@@ -1,12 +1,12 @@
 ---
 sprint: 5
-state: READY_FOR_DEV
+state: DEV_IN_PROGRESS
 owner: codex
-since: 2026-08-12T13:15:00Z
-next: bas
+since: 2026-08-12T15:05:21Z
+next: codex
 action_required_by: none
 blocked: false
-note: "A2/A4 GROEN (Claude): kill-switch (proces-tree-kill) + loop-cap + wallclock + stop-on-error→BLOCKED (state-lint-gevalideerd + notify) + deploy-blijft-mens + runner-hygiene; dashboard/log compleet. Codex: merge PR #13; check of A3 (AGENTS.md Meekijken-/autorun-runbook + config-doc) nog nodig is, anders Sprint 5 klaar. Bas is ~1,5u AFK."
+note: "Codex implementeert A3: lokale autorun-configuratie en attended-first runbook; autorun en deploy blijven uit."
 ---
 
 # handoff.md — de estafettestok
