@@ -58,6 +58,10 @@ jobs:
         shell: bash
         run: bash tests/deploy-in-place.integration.sh dist/alv-digitaal-app-v0.2.0.tgz
 
+      - name: Idempotente CloudLinux-provisioning
+        shell: bash
+        run: bash tests/provision-env.integration.sh
+
       - name: Gate B — diff, fixtures en release-artefact
         shell: bash
         run: |
