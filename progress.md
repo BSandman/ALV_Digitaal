@@ -53,6 +53,7 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 ## Sprint 4 — Guardrails (loopt)
 
 - 2026-08-12 · Codex · **G1 state-lint op PR #9**: dependency-vrije platte-frontmattervalidator met één uitvoerbare state↔ownerdefinitie, verplichte sleutels, tijdzone, scalar- en blokkadesemantiek; aparte leidende CI-job op PR/main en lokale pre-commit hook met geteste Windows/Git-Bash/Linux-interpreterselectie. Gemini-randgevallen verwerkt (CRLF, BOM/mixed newline, quotes/dubbele punten, ISO-offsets/microseconden, leeg/whitespace, lijsten/maps). Bewijs: 21/21 Python-tests, actuele handoff + hook groen, 61/61 Node-regressies en GitHub gates + Gemini groen. → READY_FOR_VALIDATION (Claude).
+- 2026-08-12 · Codex · **PR #9 gemerged** naar `main` (`43478af`). **G2 tail-context op PR #10**: watcher bouwt alleen bij een echte beurt volledige `handoff.md`/`sprint.md`/`bijbel.md` plus standaard de laatste 15 `progress.md`-regels; `--progress-tail N` is configureerbaar en ongeldige waarden falen gesloten. CI draait beide Python-guardrailsuites. Bewijs: 26/26 Python-tests, actuele handoff + CLI-contract groen, 61/61 Node-regressies en GitHub gates + Gemini groen. → READY_FOR_VALIDATION (Claude).
 
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 

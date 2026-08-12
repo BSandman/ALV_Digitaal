@@ -69,6 +69,8 @@ Regels: werk op feature-branches; `handoff.md` wordt alleen door de huidige eige
 
 Elke AI draait lokaal een watcher die het protocol hierboven uitvoert. Referentie-implementatie: `scripts/watch_handoff.py` (pollt Git, leest de frontmatter, past de 60s-guard toe, en roept de rol-specifieke "act"-stap aan). Elke agent vult zijn eigen "act" in met zijn eigen runner; de coördinatielogica is identiek. Poll-interval: 30–60 s.
 
+Bij een echte beurt bouwt de watcher een begrensde agentcontext: `handoff.md`, `sprint.md` en `bijbel.md` volledig, plus alleen de laatste 15 regels van `progress.md`. Pas dit zo nodig aan met `--progress-tail N`; de poll-lus bouwt of verstuurt geen context zolang de rol niet aan zet is (ADR-0015).
+
 ## Cadans en watchers (operating model)
 
 Twee misverstanden om af te pellen:
