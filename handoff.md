@@ -1,12 +1,12 @@
 ---
-sprint: 4
-state: READY_FOR_VALIDATION
-owner: claude
-since: 2026-08-12T10:54:26Z
-next: codex
+sprint: 5
+state: READY_FOR_DEV
+owner: codex
+since: 2026-08-12T12:30:00Z
+next: claude
 action_required_by: none
 blocked: false
-note: "PR #11 G3 klaar: idempotente SSH-provisioning, exact-8 secrets, Node 20/lsnode en productiepoort; 68+26 tests, Linux-integratie, gates en Gemini groen."
+note: "A1 GROEN (Claude): notifier triggert op BLOCKED/SPRINT_DONE/action_required_by:bas (productie apart), gededupliceerd, e-mail+ntfy, fail-closed. Codex: merge PR #12, dan A2 (autorun-act + vangrails) en A4 (meekijk-laag) volgens docs/gates/Codex-taak-autorun.md."
 ---
 
 # handoff.md — de estafettestok
@@ -15,20 +15,20 @@ note: "PR #11 G3 klaar: idempotente SSH-provisioning, exact-8 secrets, Node 20/l
 
 ## Huidige beurt
 
-**Sprint 4 — Guardrails, G3 (Codex).** G1 (state-lint) en G2 (tail-context) staan groen en gevalideerd. Nu de laatste: **G3 — idempotent infra-provisioning**.
+**Sprint 5 — Autorun, blok 1 Codex (A1 notifier).** Guardrails (G1/G2/G3) staan; nu de onbemande laag. Bas gaf "go for autorun". Ontwerp: **ADR-0017**.
 
-Codex — na merge van PR #10: bouw `scripts/provision_env.sh --target acceptatie|portaal` volgens `docs/gates/Codex-taak-guardrails.md` §G3 en ADR-0015:
-1. Idempotent via SSH: mappenstructuur, secrets-`.env` met **exact de toegestane sleutels** (`DEPLOY_TARGET, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, AUTH_PEPPER, TRUST_PROXY`), **geen `NODE_ENV`**, `chmod 600` als **laatste** stap; waarden uit lokale niet-gecommitte bron.
-2. Valideer nodevenv-pad/Node 20 + een lsnode require-test op de entry (ERR_REQUIRE_ASYNC_MODULE-regressie).
-3. Documenteer de niet-scriptbare DirectAdmin-stappen (of via DA-API).
+Codex — bouw **A1 (notifier)** volgens `docs/gates/Codex-taak-autorun.md` §A1:
+1. `scripts/notify_bas.py`: stuurt Bas **één** bericht per toestand-overgang bij `BLOCKED`, `action_required_by: bas`, `SPRINT_DONE`; gededupliceerd via een lokaal state-bestand.
+2. Kanaal pluggbaar: e-mail default + optioneel push; config uit een **lokaal, niet-gecommit** bestand (nooit in Git).
+3. Berichttekst = de handoff-`note` + state + directe aanwijzing (bv. "druk op Deploy acceptatie").
+4. Tests: overgang → precies één bericht; herhaalde poll op dezelfde state → niets.
 
-Open een PR; gates + Gemini; daarna Claude-validatie. Daarna is het guardrails-pakket compleet en kan het autorun-ontwerp.
+Open een PR; gates + Gemini; daarna Claude-validatie. Daarna A2 (autorun-`act()` + vangrails) en A3 (config/runbook).
 
-**Opgeleverd op PR #11:** G3 valideert een lokale genegeerde secretsbron met exact acht sleutels, normaliseert BOM/CRLF in een mode-600 tijdelijke bron, streamt afgeschermd via SSH, valideert remote opnieuw, bewaakt doel/app-root/nodevenv, vereist Node 20 en een succesvolle synchrone lsnode-`require()`-proef, en plaatst alleen geldige gewijzigde inhoud atomisch met `chmod 600` als laatste stap. Portaal heeft een dubbele Bas-poort; DirectAdmin-stappen staan in het runbook. Bewijs: 68 Node-tests, 26 Python-guardrailtests, Linux fake-SSH-integratie (groen/rood/idempotentie/rotatie), PII-gate en GitHub gates + Gemini groen. Claude valideert G3 tegen ADR-0015.
+**Opgeleverd op PR #12:** dependency-vrije notifier voor `BLOCKED`, `action_required_by: bas` en `SPRINT_DONE`; e-mail standaard en ntfy optioneel; state per overgang/kanaal atomisch en procesoverschrijdend vergrendeld; corrupte state faalt gesloten; lokale config en state blijven buiten Git. De state-lint ondersteunt nu de menselijke actiepoort buiten `BLOCKED`. Gemini-randgevallen voor parallelle aanroepen en inline configcommentaar zijn verwerkt. Bewijs: 41 Python-tests, 68 Node-tests, architectuur-/release-/PII-gates en twee GitHub/Gemini-runs groen. Claude valideert A1 tegen ADR-0017.
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
-- 2026-08-12 — MIJLPAAL: acceptatie live. Sprint 3 kern binnen.
-- 2026-08-12 — Codex: G1 (PR #9, gemerged `43478af`) + G2 (PR #10); state-lint + tail-context; tests + gates + Gemini groen.
-- 2026-08-12 — Claude: G1 en G2 gevalideerd GROEN. Auth-model vastgelegd (ADR-0016). → Codex merge PR #10, dan G3.
-- 2026-08-12 — Codex: PR #10 gemerged (`6c4e59f`); G3 op PR #11 met 68+26 tests, Linux-integratie, PII/state/gates/Gemini groen. → READY_FOR_VALIDATION.
+- 2026-08-12 — Codex: guardrails G1/G2/G3 gemerged (PR #9/#10/#11). Sprint 4 klaar.
+- 2026-08-12 — Claude: G3 gevalideerd GROEN; autorun ontworpen (ADR-0017 + taakpakket). Bas: go for autorun. → READY_FOR_DEV (A1 Codex).
+- 2026-08-12 — Codex: A1 op PR #12; e-mail/ntfy, dedup + proceslock, lokale config/state; 41+68 tests, gates en Gemini groen. → READY_FOR_VALIDATION.

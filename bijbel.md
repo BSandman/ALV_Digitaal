@@ -72,6 +72,7 @@ Geneste, **aan/uit-schakelbare** modules. Aanpak: modulaire monoliet in één re
 - ADR-0014 — (gereserveerd) Basisdatamodel: rechten autonoom, representatie-relatie i.p.v. persoon-bundeling, woning↔parkeer administratieve (ont)koppeling (1:0..n), TwinQ-CSV-bron — nog uit te schrijven
 - ADR-0015 — Pijplijn-guardrails: geen extra LLM-revisor; deterministische state-lint (CI-gate + hook), tail-context, idempotente infra-provisioning — prerequisites voor onbemande autorun
 - ADR-0016 — Auth-model: magic-link-als-QR (gebonden token) + toegangscode-fallback + optionele roteerbare PIN (opt-in, ingebakken); geen e-mail-OTP als live-drempel; welkomstbrief geeft codes+PIN uit
+- ADR-0017 — Autorun: watcher-act() start de rol-runner; vangrails (kill-switch, loop-cap, stop-on-error→BLOCKED, deploy blijft mens); één notifier (exception-based, gededupliceerd, e-mail+push); attended-first
 
 ## 10. Sleuteldocumenten
 

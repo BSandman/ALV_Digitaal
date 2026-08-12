@@ -120,6 +120,18 @@ class LintHandoffTests(unittest.TestCase):
         )
         self.assert_invalid(blocked, "action_required_by: bas")
 
+    def test_non_blocked_state_can_request_human_action(self) -> None:
+        values = lint_handoff.parse_frontmatter(
+            VALID.replace("action_required_by: none", "action_required_by: bas")
+        )
+        lint_handoff.validate_values(values)
+
+    def test_unknown_action_owner_is_red(self) -> None:
+        self.assert_invalid(
+            VALID.replace("action_required_by: none", "action_required_by: codex"),
+            "none.*bas",
+        )
+
     def test_state_owner_mismatch_is_red(self) -> None:
         self.assert_invalid(VALID.replace("owner: codex", "owner: claude"), "hoort bij owner")
 

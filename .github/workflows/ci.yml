@@ -21,8 +21,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Test handoff-guardrails en begrensde context
-        run: python -m unittest discover -s tests -p 'test_*handoff.py'
+      - name: Test Python-guardrails, begrensde context en notifier
+        run: python -m unittest discover -s tests -p 'test_*.py'
 
       - name: Valideer huidige handoff
         run: python scripts/lint_handoff.py handoff.md
