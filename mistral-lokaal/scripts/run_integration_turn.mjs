@@ -79,8 +79,9 @@ export function updateFrontmatter(text, updates) {
   ].join('\n') + body.replace(/^\r?\n?/, '\n');
 }
 
-export function progressLine(now, outcome) {
-  return `- ${now.slice(0, 10)} · Mistral · **Sprint 6 integratie ${outcome}.**`;
+export function progressLine(sprint, now, outcome) {
+  if (!/^\d+$/.test(String(sprint))) throw new Error('handoff-sprint moet numeriek zijn');
+  return `- ${now.slice(0, 10)} · Mistral · **Sprint ${sprint} integratie ${outcome}.**`;
 }
 
 function parseArgs(argv) {
@@ -214,7 +215,10 @@ export function execute(options) {
   }
 
   if (options.deployRequired) {
-    appendProgress(repo, progressLine(now, 'gepauzeerd: menselijke deploy-go vereist; niets gedeployed'));
+    appendProgress(
+      repo,
+      progressLine(handoff.sprint, now, 'gepauzeerd: menselijke deploy-go vereist; niets gedeployed'),
+    );
     updateHandoff(repo, now, {
       state: 'BLOCKED',
       owner: 'bas',
@@ -229,7 +233,14 @@ export function execute(options) {
 
   for (const command of integrationPlan()) run(repo, command);
 
-  appendProgress(repo, progressLine(now, 'groen: Python-, app-, architectuur-, release- en PII-gates geslaagd; niet gedeployed'));
+  appendProgress(
+    repo,
+    progressLine(
+      handoff.sprint,
+      now,
+      'groen: Python-, app-, architectuur-, release- en PII-gates geslaagd; niet gedeployed',
+    ),
+  );
   updateHandoff(repo, now, {
     state: 'SPRINT_DONE',
     owner: 'claude',

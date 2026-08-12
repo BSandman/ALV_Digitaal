@@ -35,7 +35,7 @@ function git(repo, ...args) {
   return result.stdout.trim();
 }
 
-function createFixture({ deploySentinel = false } = {}) {
+function createFixture({ deploySentinel = false, sprint = '6' } = {}) {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'alv-integration-runner-'));
   const repo = path.join(parent, 'repo');
   const remote = path.join(parent, 'remote.git');
@@ -52,7 +52,7 @@ function createFixture({ deploySentinel = false } = {}) {
     path.join(repo, 'handoff.md'),
     [
       '---',
-      'sprint: 6',
+      `sprint: ${sprint}`,
       'state: READY_FOR_INTEGRATION',
       'owner: mistral',
       'since: 2026-08-13T07:00:00Z',
@@ -219,7 +219,20 @@ test('frontmatter- en progressuitvoer zijn deterministisch bij gelijke input', (
   ].join('\n');
   const updates = { state: 'SPRINT_DONE', owner: 'claude', since: FIXED_NOW, note: 'klaar' };
   assert.equal(updateFrontmatter(original, updates), updateFrontmatter(original, updates));
-  assert.equal(progressLine(FIXED_NOW, 'groen'), progressLine(FIXED_NOW, 'groen'));
+  assert.equal(progressLine('7', FIXED_NOW, 'groen'), progressLine('7', FIXED_NOW, 'groen'));
+});
+
+test('progressregel leest het sprintnummer uit de actuele handoff', () => {
+  const fixture = createFixture({ sprint: '7' });
+  try {
+    const result = runRunner(fixture.repo);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const progress = fs.readFileSync(path.join(fixture.repo, 'progress.md'), 'utf8');
+    assert.match(progress, /Sprint 7 integratie groen/);
+    assert.doesNotMatch(progress, /Sprint 6 integratie/);
+  } finally {
+    fs.rmSync(fixture.parent, { recursive: true, force: true });
+  }
 });
 
 test('twee volledige runs met dezelfde context en tijd leveren dezelfde bestanden', () => {
