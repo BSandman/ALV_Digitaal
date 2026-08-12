@@ -150,7 +150,7 @@ if ($Html) {
 <html lang="nl"><head><meta charset="utf-8"><meta http-equiv="refresh" content="$RefreshSeconds">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>ALV Digitaal - autorunstatus</title>
 <style>
-body{font-family:Segoe UI,Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px}main{max-width:1100px;margin:auto}h1{margin-top:0}section{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px;margin:14px 0}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:7px;border-bottom:1px solid #334155}th{width:190px;color:#94a3b8}pre{white-space:pre-wrap;word-break:break-word}.groen{color:#4ade80}.rood{color:#fb7185}.loopt{color:#facc15}.muted{color:#94a3b8}a{color:#7dd3fc}
+body{font-family:Segoe UI,Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px}main{max-width:70rem;margin:auto}h1{margin-top:0}section{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px;margin:14px 0}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:7px;border-bottom:1px solid #334155}th{width:190px;color:#94a3b8}pre{white-space:pre-wrap;word-break:break-word}.groen{color:#4ade80}.rood{color:#fb7185}.loopt{color:#facc15}.muted{color:#94a3b8}a{color:#7dd3fc}
 </style></head><body><main>
 <h1>ALV Digitaal - autorunstatus</h1><p class="muted">Gegenereerd: $(Html-E $generated) - vernieuwt elke $RefreshSeconds seconden</p>
 <section><h2>Handoff</h2><table>$handoffRows</table></section>
