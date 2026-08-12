@@ -154,14 +154,20 @@ test('geweigerde push faalt non-zero met een integere hervatbare baton', () => {
 
 test('stdin boven 512 KiB wordt geweigerd voordat de repo wordt aangeraakt', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'alv-integration-context-'));
+  const repo = path.join(directory, 'repo');
+  const contextFile = path.join(directory, 'oversized.context');
+  fs.mkdirSync(repo);
+  fs.writeFileSync(contextFile, Buffer.alloc(512 * 1024 + 1, 65));
+  const contextHandle = fs.openSync(contextFile, 'r');
   try {
-    const result = run(process.execPath, [RUNNER, '--stdin', '--repo', directory], {
-      input: Buffer.alloc(512 * 1024 + 1, 65),
+    const result = run(process.execPath, [RUNNER, '--stdin', '--repo', repo], {
+      stdio: [contextHandle, 'pipe', 'pipe'],
     });
     assert.equal(result.status, 1);
     assert.match(result.stderr, /stdin-context overschrijdt de runnerlimiet/);
-    assert.deepEqual(fs.readdirSync(directory), []);
+    assert.deepEqual(fs.readdirSync(repo), []);
   } finally {
+    fs.closeSync(contextHandle);
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
