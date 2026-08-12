@@ -49,10 +49,14 @@ DEFAULT_MAX_TURNS = 3
 DEFAULT_MAX_WALLCLOCK = 1800
 
 AUTORUN_DEFAULT_ENV = {
-    "interval": ("ALV_AUTORUN_INTERVAL_SECONDS", 45),
-    "progress_tail": ("ALV_AUTORUN_PROGRESS_TAIL", DEFAULT_PROGRESS_TAIL),
-    "max_turns": ("ALV_AUTORUN_MAX_TURNS", DEFAULT_MAX_TURNS),
-    "max_wallclock": ("ALV_AUTORUN_MAX_WALLCLOCK_SECONDS", DEFAULT_MAX_WALLCLOCK),
+    "interval": ("ALV_AUTORUN_INTERVAL_SECONDS", 45, 3600),
+    "progress_tail": ("ALV_AUTORUN_PROGRESS_TAIL", DEFAULT_PROGRESS_TAIL, 500),
+    "max_turns": ("ALV_AUTORUN_MAX_TURNS", DEFAULT_MAX_TURNS, 20),
+    "max_wallclock": (
+        "ALV_AUTORUN_MAX_WALLCLOCK_SECONDS",
+        DEFAULT_MAX_WALLCLOCK,
+        4 * 60 * 60,
+    ),
 }
 
 
@@ -70,19 +74,24 @@ def load_autorun_defaults(
     """Load positive numeric defaults from the local environment."""
     env = os.environ if environ is None else environ
     defaults: dict[str, int] = {}
-    for setting, (name, fallback) in AUTORUN_DEFAULT_ENV.items():
+    for setting, (name, fallback, maximum) in AUTORUN_DEFAULT_ENV.items():
         raw = env.get(name, "").strip()
         if not raw:
             defaults[setting] = fallback
             continue
-        try:
-            value = int(raw)
-        except ValueError as exc:
-            raise AutorunError(f"{name} moet een positief geheel getal zijn") from exc
-        if value < 1:
-            raise AutorunError(f"{name} moet minimaal 1 zijn")
+        if not raw.isascii() or not raw.isdigit():
+            raise AutorunError(f"{name} moet uitsluitend cijfers bevatten")
+        value = int(raw)
+        validate_numeric_bound(name, value, maximum)
         defaults[setting] = value
     return defaults
+
+
+def validate_numeric_bound(name: str, value: int, maximum: int) -> None:
+    if value < 1:
+        raise AutorunError(f"{name} moet minimaal 1 zijn")
+    if value > maximum:
+        raise AutorunError(f"{name} mag maximaal {maximum} zijn")
 
 
 def _create_windows_job(process: subprocess.Popen[str]):
@@ -749,14 +758,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--once", action="store_true", help="voer één poll uit en stop")
     args = parser.parse_args(argv)
-    if args.interval < 1:
-        parser.error("--interval moet minimaal 1 zijn")
-    if args.progress_tail < 1:
-        parser.error("--progress-tail moet minimaal 1 zijn")
-    if args.max_turns < 1:
-        parser.error("--max-turns moet minimaal 1 zijn")
-    if args.max_wallclock < 1:
-        parser.error("--max-wallclock moet minimaal 1 seconde zijn")
+    cli_bounds = {
+        "--interval": (args.interval, AUTORUN_DEFAULT_ENV["interval"][2]),
+        "--progress-tail": (
+            args.progress_tail,
+            AUTORUN_DEFAULT_ENV["progress_tail"][2],
+        ),
+        "--max-turns": (args.max_turns, AUTORUN_DEFAULT_ENV["max_turns"][2]),
+        "--max-wallclock": (
+            args.max_wallclock,
+            AUTORUN_DEFAULT_ENV["max_wallclock"][2],
+        ),
+    }
+    for name, (value, maximum) in cli_bounds.items():
+        try:
+            validate_numeric_bound(name, value, maximum)
+        except AutorunError as exc:
+            parser.error(str(exc))
 
     try:
         command = load_runner_command(args.role) if args.autorun else None

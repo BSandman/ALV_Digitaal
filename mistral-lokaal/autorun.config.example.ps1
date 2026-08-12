@@ -9,6 +9,7 @@
 # $env:ALV_AUTORUN_MISTRAL_ARGV = '["PAD-NAAR-MISTRAL-RUNNER", "EEN-BEURT-OPTIE"]'
 
 # Veilige attended-first defaults. CLI-opties mogen deze waarden per sessie overschrijven.
+# Harde maxima: 20 beurten, 14.400 s wandklok, 3.600 s interval en 500 progress-regels.
 $env:ALV_AUTORUN_MAX_TURNS = '1'
 $env:ALV_AUTORUN_MAX_WALLCLOCK_SECONDS = '900'
 $env:ALV_AUTORUN_INTERVAL_SECONDS = '45'
