@@ -1,12 +1,12 @@
 ---
 sprint: 5
-state: READY_FOR_VALIDATION
-owner: claude
-since: 2026-08-12T12:58:07Z
-next: codex
+state: READY_FOR_DEV
+owner: codex
+since: 2026-08-12T13:15:00Z
+next: bas
 action_required_by: none
 blocked: false
-note: "PR #13 A2/A4 klaar: opt-in autorun met kill-switch/caps/foutpoort en lokaal dashboard/log; 61+68 tests, gates en Gemini groen."
+note: "A2/A4 GROEN (Claude): kill-switch (proces-tree-kill) + loop-cap + wallclock + stop-on-error→BLOCKED (state-lint-gevalideerd + notify) + deploy-blijft-mens + runner-hygiene; dashboard/log compleet. Codex: merge PR #13; check of A3 (AGENTS.md Meekijken-/autorun-runbook + config-doc) nog nodig is, anders Sprint 5 klaar. Bas is ~1,5u AFK."
 ---
 
 # handoff.md — de estafettestok
