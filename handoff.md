@@ -1,12 +1,12 @@
 ---
 sprint: 5
-state: READY_FOR_DEV
+state: DEV_IN_PROGRESS
 owner: codex
-since: 2026-08-12T12:30:00Z
+since: 2026-08-12T12:18:00Z
 next: claude
 action_required_by: none
 blocked: false
-note: "A1 GROEN (Claude): notifier triggert op BLOCKED/SPRINT_DONE/action_required_by:bas (productie apart), gededupliceerd, e-mail+ntfy, fail-closed. Codex: merge PR #12, dan A2 (autorun-act + vangrails) en A4 (meekijk-laag) volgens docs/gates/Codex-taak-autorun.md."
+note: "PR #12 gemerged; Codex bouwt A2 autorun-vangrails en A4 meekijklaag volgens ADR-0017 en het taakpakket."
 ---
 
 # handoff.md — de estafettestok
