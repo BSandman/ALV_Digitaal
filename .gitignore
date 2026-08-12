@@ -32,6 +32,11 @@ dist/
 coverage/
 *.log
 
+# Lokale autorun-runtime en meekijkdashboard (ADR-0017)
+autorun.paused
+autorun-status.json
+status.html
+
 # Lokale GitHub Actions deploy-keypair (privé naar Secret, publiek naar DirectAdmin)
 platform_alv_digitaal
 platform_alv_digitaal.pub

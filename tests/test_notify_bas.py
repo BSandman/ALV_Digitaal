@@ -311,6 +311,35 @@ class NotifyBasTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
 
+    def test_cli_activity_log_records_dry_run_without_secret_values(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            handoff, state_file = self.paths(
+                directory,
+                handoff_text(state="BLOCKED", action_required_by="bas"),
+            )
+            config = Path(directory) / "notifier.env"
+            activity = Path(directory) / "autorun.log"
+            config.write_text("NOTIFIER_CHANNELS=email\n", encoding="utf-8")
+            exit_code = notify_bas.main(
+                [
+                    "--handoff",
+                    str(handoff),
+                    "--config",
+                    str(config),
+                    "--state-file",
+                    str(state_file),
+                    "--activity-log",
+                    str(activity),
+                    "--dry-run",
+                ]
+            )
+
+            logged = activity.read_text(encoding="utf-8")
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("notifier · BLOCKED → BLOCKED · DRY-RUN", logged)
+        self.assertNotIn("NOTIFIER_CHANNELS", logged)
+
 
 if __name__ == "__main__":
     unittest.main()

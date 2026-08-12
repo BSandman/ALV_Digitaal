@@ -87,6 +87,13 @@ Regels om te voorkomen dat je op een koud window wacht:
 
 Activeren = per agent-omgeving `python scripts/watch_handoff.py --role <rol>` starten aan het begin van diens blok (Gemini niet — die is de Action). Begin semi-handmatig/gescheduled; zet continue watchers pas aan als een paar volledige cycli bewezen zijn.
 
+## Meekijken
+
+- `powershell -ExecutionPolicy Bypass -File scripts/status.ps1` toont lokaal de baton, autorun/pauze, loop-teller, recente activiteit, Git-status en open PR-checks. Herhaal het commando in een korte `while`-lus voor live terminalzicht.
+- `powershell -ExecutionPolicy Bypass -File scripts/status.ps1 -Html -Watch` schrijft en ververst het lokale, git-genegeerde `status.html`; open dit in de browser voor hetzelfde overzicht. `Ctrl+C` stopt alleen het verversen.
+- Elke autorun-beurt en notifieractie schrijft één veilige chronologische regel naar het lokale, git-genegeerde `autorun.log`. Runneruitvoer en secrets komen daar niet in.
+- GitHub blijft de duurzame bron voor Actions, PR's, commits en `handoff.md`; de notifier meldt uitsluitend uitzonderingen. Een `autorun.paused`-bestand in de reporoot pauzeert alle lokale watchers direct.
+
 ## Eigenaarschap van de waarheid
 
 `README.md` (de ingang) en `bijbel.md` (de waarheid) worden **uitsluitend door Claude (Architect)** gewijzigd. Zo is er één schrijver op de gedeelde werkelijkheid en ontstaat geen drift. Elke andere rol — nu Codex/Gemini/Mistral, later bv. DeepSeek — die een wijziging in README of bijbel nodig heeft, meldt dat via de `handoff.md`-`note` (of `state: BLOCKED`); Claude verwerkt het. Elke nieuwe agent leest de README minimaal één keer als nulpunt.
