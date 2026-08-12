@@ -116,6 +116,70 @@ class WatchHandoffAutorunTests(unittest.TestCase):
         stdout = "0\t0\n" if args[:3] == ("rev-list", "--left-right", "--count") else ""
         return subprocess.CompletedProcess(["git", *args], 0, stdout=stdout, stderr="")
 
+    def test_local_environment_can_set_bounded_defaults(self) -> None:
+        defaults = watch_handoff.load_autorun_defaults(
+            {
+                "ALV_AUTORUN_INTERVAL_SECONDS": "30",
+                "ALV_AUTORUN_PROGRESS_TAIL": "12",
+                "ALV_AUTORUN_MAX_TURNS": "1",
+                "ALV_AUTORUN_MAX_WALLCLOCK_SECONDS": "900",
+            }
+        )
+        self.assertEqual(
+            defaults,
+            {
+                "interval": 30,
+                "progress_tail": 12,
+                "max_turns": 1,
+                "max_wallclock": 900,
+            },
+        )
+
+    def test_invalid_environment_default_is_rejected(self) -> None:
+        with self.assertRaisesRegex(watch_handoff.AutorunError, "minimaal 1"):
+            watch_handoff.load_autorun_defaults({"ALV_AUTORUN_MAX_TURNS": "0"})
+        with self.assertRaisesRegex(watch_handoff.AutorunError, "uitsluitend cijfers"):
+            watch_handoff.load_autorun_defaults(
+                {"ALV_AUTORUN_MAX_WALLCLOCK_SECONDS": "kwartier"}
+            )
+
+    def test_environment_defaults_strip_whitespace_and_empty_uses_fallback(self) -> None:
+        defaults = watch_handoff.load_autorun_defaults(
+            {
+                "ALV_AUTORUN_INTERVAL_SECONDS": "  45  ",
+                "ALV_AUTORUN_MAX_TURNS": "",
+            }
+        )
+        self.assertEqual(defaults["interval"], 45)
+        self.assertEqual(defaults["max_turns"], watch_handoff.DEFAULT_MAX_TURNS)
+
+    def test_signed_and_extreme_environment_defaults_are_rejected(self) -> None:
+        with self.assertRaisesRegex(watch_handoff.AutorunError, "uitsluitend cijfers"):
+            watch_handoff.load_autorun_defaults({"ALV_AUTORUN_MAX_TURNS": "+10"})
+        with self.assertRaisesRegex(watch_handoff.AutorunError, "maximaal"):
+            watch_handoff.load_autorun_defaults(
+                {"ALV_AUTORUN_MAX_WALLCLOCK_SECONDS": "999999999999"}
+            )
+
+    def test_cli_value_overrides_environment_default(self) -> None:
+        with (
+            mock.patch.dict(
+                watch_handoff.os.environ,
+                {"ALV_AUTORUN_MAX_TURNS": "1"},
+                clear=True,
+            ),
+            mock.patch.object(
+                watch_handoff, "load_runner_command", return_value=["runner"]
+            ),
+            mock.patch.object(watch_handoff, "run_session", return_value=0) as run_session,
+        ):
+            exit_code = watch_handoff.main(
+                ["--role", "codex", "--autorun", "--max-turns", "5", "--once"]
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(run_session.call_args.kwargs["max_turns"], 5)
+
     def test_runner_command_prefers_json_argv_and_never_hardcodes_role_cli(self) -> None:
         command = watch_handoff.load_runner_command(
             "codex",

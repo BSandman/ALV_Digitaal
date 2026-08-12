@@ -69,10 +69,11 @@ Geneste, **aan/uit-schakelbare** modules. Aanpak: modulaire monoliet in één re
 - ADR-0011 — In-app stemkeuze: alleen Voor/Tegen (twee knoppen); onthouding (afgeleid) en blanco (fysiek formulier) alleen als resultaat
 - ADR-0012 — Secrets-locatie: configbestand buiten de webroot (chmod 600) per omgeving, via niet-geheime `SECRETS_FILE`; nooit in Git/artefact/.htaccess
 - ADR-0013 — CD-automatisering: acceptatie via handmatige `workflow_dispatch`; productie achter GitHub Environment + verplichte approval (Bas); SSH via deploy-key in Secrets. Agent-autorun = aparte track
-- ADR-0014 — (gereserveerd) Basisdatamodel: rechten autonoom, representatie-relatie i.p.v. persoon-bundeling, woning↔parkeer administratieve (ont)koppeling (1:0..n), TwinQ-CSV-bron — nog uit te schrijven
+- ADR-0014 — Basisdatamodel: object (woning/plek) = anker, 1:1 breukdeel (= GBO-aandeel) en 1:1 eigenaarstitel; eigenaar mag meerdere objecten houden, elk apart gestemd (nooit samenvoegen); PG↔TF/NB administratief gekoppeld (1:0..n, gewichtloos); bron = TwinQ (`owners.js`)
 - ADR-0015 — Pijplijn-guardrails: geen extra LLM-revisor; deterministische state-lint (CI-gate + hook), tail-context, idempotente infra-provisioning — prerequisites voor onbemande autorun
 - ADR-0016 — Auth-model: magic-link-als-QR (gebonden token) + toegangscode-fallback + optionele roteerbare PIN (opt-in, ingebakken); geen e-mail-OTP als live-drempel; welkomstbrief geeft codes+PIN uit
 - ADR-0017 — Autorun: watcher-act() start de rol-runner; vangrails (kill-switch, loop-cap, stop-on-error→BLOCKED, deploy blijft mens); één notifier (exception-based, gededupliceerd, e-mail+push); attended-first
+- ADR-0018 — Stemronde-scope per VvE + één stemactie per eigenaar: ronde-scope = deelnemende splitsingen; stemgerechtigd bij ≥1 in-scope recht; één Voor/Tegen-keuze gefan-out naar al zijn in-scope rechten (eigen breukdeel, per VvE geteld), niet splitsbaar; quorum/2⁄3 per betrokken VvE; geen acclamatie
 
 ## 10. Sleuteldocumenten
 

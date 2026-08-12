@@ -1,12 +1,12 @@
 ---
 sprint: 5
-state: READY_FOR_DEV
-owner: codex
-since: 2026-08-12T13:15:00Z
-next: bas
+state: READY_FOR_INTEGRATION
+owner: mistral
+since: 2026-08-12T18:37:06Z
+next: claude
 action_required_by: none
 blocked: false
-note: "A2/A4 GROEN (Claude): kill-switch (proces-tree-kill) + loop-cap + wallclock + stop-on-error→BLOCKED (state-lint-gevalideerd + notify) + deploy-blijft-mens + runner-hygiene; dashboard/log compleet. Codex: merge PR #13; check of A3 (AGENTS.md Meekijken-/autorun-runbook + config-doc) nog nodig is, anders Sprint 5 klaar. Bas is ~1,5u AFK."
+note: "A3 GROEN door Claude; Codex merget PR #14; Mistral begeleidt één attended droogloop met max-turns 1, autorun/overnight en deploy blijven uit."
 ---
 
 # handoff.md — de estafettestok
