@@ -210,6 +210,9 @@ chmod 600 "$temp_file"
 REMOTE_PREPARE
 
 cleanup_remote_temp() {
+  if [[ -n "${LOCAL_STREAM_FILE:-}" ]]; then
+    rm -f "$LOCAL_STREAM_FILE"
+  fi
   ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- "$REMOTE_TEMP" "$REMOTE_SECRETS_FILE" <<'REMOTE_CLEANUP' >/dev/null 2>&1 || true
 set -eu
 temp_file="$1"
@@ -220,6 +223,15 @@ REMOTE_CLEANUP
 trap cleanup_remote_temp EXIT HUP INT TERM
 
 echo ">> 2. Secretsbron afgeschermd streamen en remote opnieuw valideren"
+LOCAL_STREAM_FILE="$(mktemp)"
+chmod 600 "$LOCAL_STREAM_FILE"
+node --input-type=commonjs --eval '
+  const fs = require("node:fs");
+  const source = fs.readFileSync(process.argv[1], "utf8")
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n/g, "\n");
+  process.stdout.write(source);
+' "$SECRETS_SOURCE" > "$LOCAL_STREAM_FILE"
 ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -c '
   set -eu
   temp_file="$1"
@@ -228,7 +240,7 @@ ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -c '
   test -f "$temp_file" && test ! -L "$temp_file"
   cat > "$temp_file"
   chmod 600 "$temp_file"
-' sh "$REMOTE_TEMP" "$REMOTE_SECRETS_FILE" < "$SECRETS_SOURCE"
+' sh "$REMOTE_TEMP" "$REMOTE_SECRETS_FILE" < "$LOCAL_STREAM_FILE"
 
 ssh "${SSH_OPTIONS[@]}" "$SSH_HOST" sh -s -- \
   "$REMOTE_DIR" "$REMOTE_SECRETS_FILE" "$REMOTE_TEMP" "$TARGET" "$NODE_BIN" <<'REMOTE_FINALIZE'
@@ -323,4 +335,5 @@ echo ">> PROVISIONING GROEN: target=$target secrets=$result Node=20 lsnode=requi
 REMOTE_FINALIZE
 
 trap - EXIT HUP INT TERM
+rm -f "$LOCAL_STREAM_FILE"
 echo ">> G3 GROEN: $TARGET is idempotent ingericht; DirectAdmin-controles staan in docs/gates/provisioning-runbook.md."

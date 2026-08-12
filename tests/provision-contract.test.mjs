@@ -59,6 +59,12 @@ test('validator accepteert exact de acht doelgebonden sleutels', async () => {
   assert.match(result.stdout, /exact 8 sleutels/);
 });
 
+test('validator accepteert een Windows-bron met UTF-8 BOM en CRLF', async () => {
+  const windowsSource = `\ufeff${validSecrets().replaceAll('\n', '\r\n')}`;
+  const result = await validate(windowsSource);
+  assert.equal(result.status, 0, result.stderr);
+});
+
 test('validator weigert NODE_ENV en andere extra sleutels', async () => {
   const result = await validate(`${validSecrets()}NODE_ENV=production\n`);
   assert.equal(result.status, 1);

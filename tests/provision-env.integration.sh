@@ -99,6 +99,13 @@ EOF
 }
 
 write_source 'fictief-eerste-wachtwoord'
+windows_source="$(mktemp)"
+{
+  printf '\357\273\277'
+  awk '{ printf "%s\r\n", $0 }' "$SOURCE_FILE"
+} > "$windows_source"
+mv "$windows_source" "$SOURCE_FILE"
+chmod 600 "$SOURCE_FILE"
 export PATH="$FAKE_BIN:$PATH"
 export FAKE_SSH_STATE="$SSH_STATE"
 export FAKE_NODE_STATE="$NODE_STATE"
@@ -153,7 +160,9 @@ set -e
 mv "$REMOTE_DIR/src/start.js.afwezig" "$REMOTE_DIR/src/start.js"
 
 "$PROJECT_ROOT/scripts/provision_env.sh" --target acceptatie
-cmp -s "$SOURCE_FILE" "$SECRETS_FILE"
+! LC_ALL=C grep -q $'\r' "$SECRETS_FILE"
+first_bytes="$(od -An -tx1 -N3 "$SECRETS_FILE" | tr -d ' \n')"
+[[ "$first_bytes" != "efbbbf" ]] || { echo "BOM is niet genormaliseerd." >&2; exit 1; }
 [[ "$(stat -c '%a' "$SECRETS_FILE")" == "600" ]]
 grep -q -- '--input-type=commonjs' "$NODE_STATE"
 first_mtime="$(stat -c '%Y' "$SECRETS_FILE")"
