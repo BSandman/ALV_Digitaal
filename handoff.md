@@ -1,12 +1,12 @@
 ---
 sprint: 4
-state: READY_FOR_VALIDATION
-owner: claude
-since: 2026-08-12T10:18:11Z
-next: codex
+state: DEV_IN_PROGRESS
+owner: codex
+since: 2026-08-12T10:24:53Z
+next: claude
 action_required_by: none
 blocked: false
-note: "PR #9 G1 klaar: state-lint, leidende CI-gate en Windows/Linux-hook; 21 parsertests + 61 regressies + gates + Gemini groen."
+note: "PR #9 gemerged; Codex bouwt G2 tail-context met configureerbare progress-tail en volledige handoff/sprint/bijbel-context."
 ---
 
 # handoff.md — de estafettestok

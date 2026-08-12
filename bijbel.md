@@ -71,6 +71,7 @@ Geneste, **aan/uit-schakelbare** modules. Aanpak: modulaire monoliet in één re
 - ADR-0013 — CD-automatisering: acceptatie via handmatige `workflow_dispatch`; productie achter GitHub Environment + verplichte approval (Bas); SSH via deploy-key in Secrets. Agent-autorun = aparte track
 - ADR-0014 — (gereserveerd) Basisdatamodel: rechten autonoom, representatie-relatie i.p.v. persoon-bundeling, woning↔parkeer administratieve (ont)koppeling (1:0..n), TwinQ-CSV-bron — nog uit te schrijven
 - ADR-0015 — Pijplijn-guardrails: geen extra LLM-revisor; deterministische state-lint (CI-gate + hook), tail-context, idempotente infra-provisioning — prerequisites voor onbemande autorun
+- ADR-0016 — Auth-model: magic-link-als-QR (gebonden token) + toegangscode-fallback + optionele roteerbare PIN (opt-in, ingebakken); geen e-mail-OTP als live-drempel; welkomstbrief geeft codes+PIN uit
 
 ## 10. Sleuteldocumenten
 
