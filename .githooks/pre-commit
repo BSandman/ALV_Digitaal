@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+
+if python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' >/dev/null 2>&1; then
+  exec python3 "$repo_root/scripts/lint_handoff.py" "$repo_root/handoff.md"
+elif python -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' >/dev/null 2>&1; then
+  exec python "$repo_root/scripts/lint_handoff.py" "$repo_root/handoff.md"
+elif py -3 -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' >/dev/null 2>&1; then
+  exec py -3 "$repo_root/scripts/lint_handoff.py" "$repo_root/handoff.md"
+fi
+
+echo "Handoff-gate: ROOD — Python 3 is niet beschikbaar." >&2
+exit 1

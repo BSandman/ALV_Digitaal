@@ -1,36 +1,27 @@
-# sprint.md — Sprint 3: Acceptatie (10.3 A-domein)
+# sprint.md — Sprint 4: Guardrails (prerequisites voor onbemande autorun)
 
-**Doel:** de gevalideerde backend (main, v0.2.0) draaiend krijgen op **`acceptatie.honigfabriek.nl`** — het echte mijn.host-platform bewijzen (Passenger, MariaDB 11.8.8, secrets buiten webroot) vóór de frontend erop komt. Detailopdracht: `docs/gates/Codex-Mistral-taak-10.3_A-domein.md`. Besluiten: ADR-0002/0003/0004/0005/0012.
+**Doel:** de deterministische vangrails bouwen zodat de pijplijn straks **onbemand** kan draaien zonder dat een foute agent-beurt de gedeelde waarheid corrumpeert of wegloopt. Besluit: **ADR-0015**. Detailspec: **`docs/gates/Codex-taak-guardrails.md`**.
 
-## Cadans — blokken
+## Cadans — per sub-taak
 
 | Blok | Rol | Watcher | Inhoud |
 |---|---|---|---|
-| 0 | **Codex** (klein) | `--role codex` | Eerst: docs-commit van de losse architect-docs (ADR-0012 e.d.) naar `main` |
-| 1 | **Codex** (dev/infra) | `--role codex` | `deploy.sh` (non-interactief) + app-config voor acceptatie (DB-coords, `SECRETS_FILE`/ADR-0012, healthz, sql_mode, `X-Forwarded-For`) **+ CD-workflow `deploy-acceptatie.yml` (workflow_dispatch, ADR-0013)** + productie-workflow achter Environment-approval; PR |
+| 1 | **Codex** (dev) | `--role codex` | **G1** state-lint (CI-gate leidend + pre-commit hook); PR |
 | 2 | *auto* | — | CI-gates + Gemini-review |
-| 3 | **Claude** (validatie) | `--role claude` | Deploy-config tegen ADR-0002/0003/0005/0012; herstelprocedure als harde eis |
-| 4 | **Mistral + Bas** | `--role mistral` | C2 met de echte export → A-data; deploy naar acceptatie; testronde end-to-end; PII schoon; geoefend herstel |
+| 3 | **Claude** (validatie) | `--role claude` | Toets G1 tegen ADR-0015 + de statemachine |
+| — | herhaal | | daarna **G2** (tail-context) en **G3** (infra-provisioning), elk dezelfde lus |
 
-## Bas — handmatige infra (parallel, DirectAdmin/SSH)
+## Scope
 
-- DirectAdmin **Node.js-app** op `acceptatie` aanmaken (Node 20, app-root, startup-file) — pas koppelen als de code klaar is om te deployen.
-- **Secrets-`.env`** op de server: `/home/cn111993/secrets/alv-acceptatie.env` (`chmod 600`), met DB-wachtwoord (`cn111993_acceptatie`), credential-pepper, SMTP. Zet in de DirectAdmin-env alleen `SECRETS_FILE` naar dat pad (ADR-0012).
-- **SSH-toegang** bevestigen voor `deploy.sh` (host/pad).
-- De **echte eigenaars-export** lokaal in `mistral-lokaal/secure/owners.real.json` zetten zodat C2 kan draaien (blijft lokaal, ADR-0005).
+- **G1 — State-lint (hoogste prio, de harde vangrail):** deterministische validatie van `handoff.md`-frontmatter tegen de statemachine (toegestane `state`/`owner`, verplichte sleutels, één owner, `BLOCKED ⇒ action_required_by: bas`). CI-gate die niet te omzeilen is, plus een lokale pre-commit hook voor zelfcorrectie.
+- **G2 — Tail-context:** de watcher voedt de agent `handoff.md`+`sprint.md` volledig + alleen de laatste ~15 regels van `progress.md`. Bijbel blijft heel.
+- **G3 — Idempotente infra-provisioning:** `provision_env.sh --target acceptatie|portaal` (secrets-`.env` met toegestane sleutels, geen `NODE_ENV`, `chmod 600` als laatste stap; nodevenv/Node-20-validatie; lsnode require-test). Voorkomt de drift van de vorige sprint.
 
 ## Definition of done
 
-- `acceptatie.honigfabriek.nl` draait de backend op de eigen DB, met **gepseudonimiseerde** data (C2).
-- Een **stemronde end-to-end** doorlopen (via API): quorum vaststellen, ronde openen/sluiten, auto-onthouding, uitslag — op het echte platform.
-- Secrets uit een `.env` buiten de webroot via `SECRETS_FILE`; geen secrets/PII in Git of artefact.
-- **Geoefend** export + herstel op A (een niet-geoefend herstel bestaat niet).
-- `deploy.sh` deployt reproduceerbaar naar acceptatie; productiepad (`portaal`) staat achter een expliciete vlag + latere Bas-go.
-
-## Open te verifiëren (spike / mijn.host-support)
-
-Passenger cold start + doorgifte van `SECRETS_FILE` aan het Node-proces; entry-process- en MySQL-connectielimieten op `.starter` (v0.1.0 §13). Geen aannames; vastleggen in een ADR/notitie.
+- G1, G2, G3 gebouwd, getest en door Claude groen gevalideerd; CI-gate G1 faalt aantoonbaar op een verzonnen state/ontbrekende sleutel.
+- Daarna kan het **autorun-ontwerp** (onbemande watcher die de agent écht start, met signaal-lijn naar Bas) worden opgepakt.
 
 ## Buiten scope
 
-Productie-deploy naar `portaal` (aparte A→P-poort + Bas-go) · de frontend (Sprint 4) · een echte proefvergadering met mensen (vereist de frontend).
+Het autorun-ontwerp zelf (aparte ronde ná de guardrails) · het basisdatamodel/ADR-0014 + C2-data (aparte track, wacht op HonigParkeren) · de end-to-end testronde op acceptatie.

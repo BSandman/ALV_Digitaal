@@ -9,6 +9,24 @@ permissions:
   contents: read
 
 jobs:
+  handoff-lint:
+    name: Handoff state guardrail
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test rode en groene handoff-scenario's
+        run: python -m unittest discover -s tests -p 'test_lint_handoff.py'
+
+      - name: Valideer huidige handoff
+        run: python scripts/lint_handoff.py handoff.md
+
   gates:
     runs-on: ubuntu-latest
     steps:
