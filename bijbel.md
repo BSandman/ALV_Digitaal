@@ -74,6 +74,7 @@ Geneste, **aan/uit-schakelbare** modules. Aanpak: modulaire monoliet in één re
 - ADR-0016 — Auth-model: magic-link-als-QR (gebonden token) + toegangscode-fallback + optionele roteerbare PIN (opt-in, ingebakken); geen e-mail-OTP als live-drempel; welkomstbrief geeft codes+PIN uit
 - ADR-0017 — Autorun: watcher-act() start de rol-runner; vangrails (kill-switch, loop-cap, stop-on-error→BLOCKED, deploy blijft mens); één notifier (exception-based, gededupliceerd, e-mail+push); attended-first
 - ADR-0018 — Stemronde-scope per VvE + één stemactie per eigenaar: ronde-scope = deelnemende splitsingen; stemgerechtigd bij ≥1 in-scope recht; één Voor/Tegen-keuze gefan-out naar al zijn in-scope rechten (eigen breukdeel, per VvE geteld), niet splitsbaar; quorum/2⁄3 per betrokken VvE; geen acclamatie
+- ADR-0019 — Rol-runners voor autorun: contract (stdin-context → één beurt → volgende READY, commit+push, schoon/in-sync, exit 0, nooit deploy). Codex=`codex exec -`, Claude=Claude Code headless (validatiebeurt), Mistral=deterministisch Node-integrator-script (Ollama alleen voor bestaande naamstap); Gemini geen lokale runner
 
 ## 10. Sleuteldocumenten
 
