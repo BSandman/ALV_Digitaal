@@ -6,7 +6,7 @@ since: 2026-08-12T12:18:00Z
 next: claude
 action_required_by: none
 blocked: false
-note: "PR #12 gemerged; Codex bouwt A2 autorun-vangrails en A4 meekijklaag volgens ADR-0017 en het taakpakket."
+note: "PR #12 gemerged; Codex bouwt A2 autorun-vangrails en A4 meekijklaag volgens ADR-0017/taakpakket."
 ---
 
 # handoff.md — de estafettestok

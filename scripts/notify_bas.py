@@ -20,6 +20,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Callable, Mapping
@@ -31,6 +32,7 @@ REPO = Path(__file__).resolve().parents[1]
 DEFAULT_HANDOFF = REPO / "handoff.md"
 DEFAULT_CONFIG = REPO / "mistral-lokaal" / "secure" / "notifier.env"
 DEFAULT_STATE = REPO / "mistral-lokaal" / "secure" / "notifier-state.json"
+DEFAULT_ACTIVITY_LOG = REPO / "autorun.log"
 TRIGGER_STATES = {"BLOCKED", "SPRINT_DONE"}
 REQUIRED_HANDOFF_KEYS = {"state", "since", "action_required_by", "note"}
 ALLOWED_CHANNELS = {"email", "ntfy"}
@@ -58,6 +60,19 @@ class NotifyResult:
 
 
 Sender = Callable[[Mapping[str, str], Notification], None]
+
+
+def append_notifier_activity(state: str, outcome: str, path: Path = DEFAULT_ACTIVITY_LOG) -> None:
+    timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    safe_state = " ".join(state.replace("·", "-").splitlines()).strip() or "ONBEKEND"
+    safe_outcome = " ".join(outcome.replace("·", "-").splitlines()).strip()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8", newline="") as handle:
+            handle.write(f"{timestamp} · notifier · {safe_state} → {safe_state} · {safe_outcome}\n")
+    except OSError:
+        # Observability must never turn a successfully sent alert into a retry storm.
+        pass
 
 
 def read_handoff(path: Path) -> dict[str, str]:
@@ -406,8 +421,10 @@ def main(argv: list[str] | None = None) -> int:
         help="lokaal deduplicatiestate-pad (of ALV_NOTIFIER_STATE)",
     )
     parser.add_argument("--dry-run", action="store_true", help="toon bericht zonder verzending of statewijziging")
+    parser.add_argument("--activity-log", type=Path, default=DEFAULT_ACTIVITY_LOG)
     args = parser.parse_args(argv)
 
+    values: dict[str, str] = {}
     try:
         values = read_handoff(args.handoff)
         if notification_for(values) is None:
@@ -420,16 +437,22 @@ def main(argv: list[str] | None = None) -> int:
                 dry_run=args.dry_run,
             )
     except NotifierError as exc:
+        append_notifier_activity(values.get("state", "ONBEKEND"), "FOUT", args.activity_log)
         print(f"notifier: FOUT — {exc}", file=sys.stderr)
         return 1
 
     if not result.triggered:
         print("notifier: geen uitzonderingssituatie")
     elif result.duplicate:
+        append_notifier_activity(values["state"], "DEDUP — niets verzonden", args.activity_log)
         print("notifier: overgang al gemeld")
     elif args.dry_run:
+        append_notifier_activity(values["state"], "DRY-RUN — niets verzonden", args.activity_log)
         print("notifier: dry-run — niets verzonden of opgeslagen")
     else:
+        append_notifier_activity(
+            values["state"], f"VERZONDEN via {','.join(result.sent_channels)}", args.activity_log
+        )
         print(f"notifier: verzonden via {', '.join(result.sent_channels)}")
     return 0
 
