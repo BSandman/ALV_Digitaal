@@ -2,11 +2,11 @@
 sprint: 4
 state: READY_FOR_VALIDATION
 owner: claude
-since: 2026-08-12T10:28:41Z
+since: 2026-08-12T10:54:26Z
 next: codex
 action_required_by: none
 blocked: false
-note: "PR #10 G2 klaar: volledige handoff/sprint/bijbel + standaard laatste 15 progressregels, configureerbaar; 26+61 tests en gates/Gemini groen."
+note: "PR #11 G3 klaar: idempotente SSH-provisioning, exact-8 secrets, Node 20/lsnode en productiepoort; 68+26 tests, Linux-integratie, gates en Gemini groen."
 ---
 
 # handoff.md — de estafettestok
@@ -15,23 +15,20 @@ note: "PR #10 G2 klaar: volledige handoff/sprint/bijbel + standaard laatste 15 p
 
 ## Huidige beurt
 
-**Sprint 4 — Guardrails, blok 1 Codex (G1).** Acceptatie is live (Sprint 3 kern binnen); nu de vangrails richting onbemand. Bas koos het guardrails-pakket.
+**Sprint 4 — Guardrails, G3 (Codex).** G1 (state-lint) en G2 (tail-context) staan groen en gevalideerd. Nu de laatste: **G3 — idempotent infra-provisioning**.
 
-Codex — bouw **G1 (state-lint)** volgens `docs/gates/Codex-taak-guardrails.md` §G1 en ADR-0015:
-1. Validator-script (dependency-vrij) dat `handoff.md`-frontmatter toetst: `state`/`owner` uit de toegestane sets, verplichte sleutels, één owner, `BLOCKED ⇒ action_required_by: bas`, correcte afsluiting.
-2. **CI-gate (leidend)** in `ci.yml` op PR + push naar `main`.
-3. **Lokale pre-commit hook** (`.githooks/`) voor snelle zelfcorrectie.
-4. Tests: geldige handoff groen; verzonnen state / ontbrekende sleutel / twee owners rood.
+Codex — na merge van PR #10: bouw `scripts/provision_env.sh --target acceptatie|portaal` volgens `docs/gates/Codex-taak-guardrails.md` §G3 en ADR-0015:
+1. Idempotent via SSH: mappenstructuur, secrets-`.env` met **exact de toegestane sleutels** (`DEPLOY_TARGET, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, AUTH_PEPPER, TRUST_PROXY`), **geen `NODE_ENV`**, `chmod 600` als **laatste** stap; waarden uit lokale niet-gecommitte bron.
+2. Valideer nodevenv-pad/Node 20 + een lsnode require-test op de entry (ERR_REQUIRE_ASYNC_MODULE-regressie).
+3. Documenteer de niet-scriptbare DirectAdmin-stappen (of via DA-API).
 
-Open een PR; gates + Gemini; daarna Claude-validatie. Daarna G2 en G3 in dezelfde lus.
+Open een PR; gates + Gemini; daarna Claude-validatie. Daarna is het guardrails-pakket compleet en kan het autorun-ontwerp.
 
-**Opgeleverd op PR #9:** dependency-vrije validator met strikte platte frontmatter, state↔owner-consistentie, tijdzone- en blokkadesemantiek; aparte leidende CI-job; lokale hook met werkende Python-selectie op Windows/Git Bash en Linux. Bewijs: 21 gerichte rood/groen-tests (incl. CRLF/BOM/quotes/ISO/lijst/map/leeg bestand), 61/61 regressies, GitHub-gates en Gemini groen. Claude valideert G1 tegen ADR-0015.
-
-**Opgeleverd op PR #10:** G2 bouwt alleen bij een echte beurt een begrensde context met volledige `handoff.md`, `sprint.md` en `bijbel.md`, plus standaard de laatste 15 regels van `progress.md`; instelbaar via `--progress-tail`. Bewijs: 26 Python-guardrailtests, 61/61 regressies en GitHub-gates + Gemini groen. Claude valideert G2 tegen ADR-0015.
+**Opgeleverd op PR #11:** G3 valideert een lokale genegeerde secretsbron met exact acht sleutels, normaliseert BOM/CRLF in een mode-600 tijdelijke bron, streamt afgeschermd via SSH, valideert remote opnieuw, bewaakt doel/app-root/nodevenv, vereist Node 20 en een succesvolle synchrone lsnode-`require()`-proef, en plaatst alleen geldige gewijzigde inhoud atomisch met `chmod 600` als laatste stap. Portaal heeft een dubbele Bas-poort; DirectAdmin-stappen staan in het runbook. Bewijs: 68 Node-tests, 26 Python-guardrailtests, Linux fake-SSH-integratie (groen/rood/idempotentie/rotatie), PII-gate en GitHub gates + Gemini groen. Claude valideert G3 tegen ADR-0015.
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
-- 2026-08-12 — MIJLPAAL: acceptatie live (deploy + healthz groen). Sprint 3 kern binnen.
-- 2026-08-12 — Claude: guardrails-pakket + ADR-0015 klaargezet; Bas koos Sprint 4 = Guardrails. → READY_FOR_DEV (G1 Codex).
-- 2026-08-12 — Codex: G1 op PR #9; 21 parsertests + 61 regressies, aparte state-gate en Gemini groen. → READY_FOR_VALIDATION.
-- 2026-08-12 — Codex: PR #9 gemerged (`43478af`); G2 op PR #10 met begrensde, configureerbare context; 26+61 tests en gates/Gemini groen. → READY_FOR_VALIDATION.
+- 2026-08-12 — MIJLPAAL: acceptatie live. Sprint 3 kern binnen.
+- 2026-08-12 — Codex: G1 (PR #9, gemerged `43478af`) + G2 (PR #10); state-lint + tail-context; tests + gates + Gemini groen.
+- 2026-08-12 — Claude: G1 en G2 gevalideerd GROEN. Auth-model vastgelegd (ADR-0016). → Codex merge PR #10, dan G3.
+- 2026-08-12 — Codex: PR #10 gemerged (`6c4e59f`); G3 op PR #11 met 68+26 tests, Linux-integratie, PII/state/gates/Gemini groen. → READY_FOR_VALIDATION.
