@@ -9,6 +9,7 @@ toe en roept dan de rol-specifieke act()-stap aan. Zie AGENTS.md voor het protoc
 Gebruik:
     python scripts/watch_handoff.py --role codex
     python scripts/watch_handoff.py --role gemini  --interval 45
+    python scripts/watch_handoff.py --role codex --progress-tail 25
 """
 
 import argparse
@@ -27,7 +28,11 @@ ROLE_STATE = {
 
 REPO = Path(__file__).resolve().parents[1]
 HANDOFF = REPO / "handoff.md"
+SPRINT = REPO / "sprint.md"
+PROGRESS = REPO / "progress.md"
+BIJBEL = REPO / "bijbel.md"
 RACE_GUARD_SECONDS = 60
+DEFAULT_PROGRESS_TAIL = 15
 
 
 def git(*args):
@@ -37,7 +42,7 @@ def git(*args):
 
 def read_frontmatter():
     """Leest de YAML-achtige frontmatter (key: value) uit handoff.md."""
-    text = HANDOFF.read_text(encoding="utf-8")
+    text = HANDOFF.read_text(encoding="utf-8-sig")
     if not text.startswith("---"):
         return {}
     block = text.split("---", 2)[1]
@@ -54,7 +59,34 @@ def my_turn(fm, role):
     return fm.get("state") == ready and fm.get("owner") == role
 
 
-def act(role, fm):
+def tail_text(path, line_count):
+    """Return at most the last line_count logical lines, preserving text content."""
+    if line_count < 1:
+        raise ValueError("progress-tail moet minimaal 1 zijn")
+    lines = path.read_text(encoding="utf-8-sig").splitlines()
+    return "\n".join(lines[-line_count:])
+
+
+def build_context(progress_tail=DEFAULT_PROGRESS_TAIL, repo=REPO):
+    """Build the bounded context handed to a role runner for an actual turn."""
+    paths = {
+        "handoff.md": repo / "handoff.md",
+        "sprint.md": repo / "sprint.md",
+        "bijbel.md": repo / "bijbel.md",
+    }
+    sections = []
+    for name, path in paths.items():
+        content = path.read_text(encoding="utf-8-sig").rstrip("\r\n")
+        sections.append(f"===== {name} (volledig) =====\n{content}")
+
+    progress = tail_text(repo / "progress.md", progress_tail)
+    sections.append(
+        f"===== progress.md (laatste {progress_tail} regels) =====\n{progress}"
+    )
+    return "\n\n".join(sections) + "\n"
+
+
+def act(role, fm, context):
     """
     ROL-SPECIFIEK. Vul hier de eigen runner in (bouwen/testen/valideren/integreren).
     Deze referentie print alleen wat er zou gebeuren. De agent vervangt dit door
@@ -62,6 +94,7 @@ def act(role, fm):
     + schrijft een regel in progress.md (zie AGENTS.md stap 5-6).
     """
     print(f"[{role}] AAN ZET — state={fm.get('state')} note={fm.get('note')!r}")
+    print(context, end="")
     print(f"[{role}] >>> voer hier de rol-taak uit, werk handoff.md + progress.md bij, commit + push.")
 
 
@@ -69,7 +102,15 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--role", required=True, choices=list(ROLE_STATE))
     p.add_argument("--interval", type=int, default=45, help="poll-interval in seconden")
+    p.add_argument(
+        "--progress-tail",
+        type=int,
+        default=DEFAULT_PROGRESS_TAIL,
+        help="aantal laatste regels van progress.md in de agentcontext (standaard: 15)",
+    )
     args = p.parse_args()
+    if args.progress_tail < 1:
+        p.error("--progress-tail moet minimaal 1 zijn")
     role = args.role
 
     print(f"watcher gestart — rol={role}, repo={REPO}")
@@ -86,7 +127,7 @@ def main():
             git("pull", "--quiet", "--ff-only")
             fm = read_frontmatter()
             if my_turn(fm, role):  # nog steeds mijn beurt na de guard?
-                act(role, fm)
+                act(role, fm, build_context(args.progress_tail))
             else:
                 print(f"[{role}] beurt gewijzigd tijdens guard — afgebroken.")
         time.sleep(args.interval)
