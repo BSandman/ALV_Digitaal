@@ -23,6 +23,8 @@ mistral-lokaal/out/
 Thumbs.db
 .vscode/
 .idea/
+__pycache__/
+*.py[cod]
 
 # Docker/loadtest-output
 loadtest-results/
