@@ -8,12 +8,14 @@ live outside Git by default under ``mistral-lokaal/secure``.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import smtplib
 import ssl
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -94,12 +96,31 @@ def parse_env_file(path: Path) -> dict[str, str]:
             raise NotifierError(f"ongeldige confignaam op regel {line_number}")
         if key in config:
             raise NotifierError(f"dubbele confignaam: {key}")
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
-            value = value[1:-1]
-        elif value[:1] in {'"', "'"} or value[-1:] in {'"', "'"}:
-            raise NotifierError(f"niet-afgesloten quote op configregel {line_number}")
+        value = _parse_env_value(value, line_number)
         config[key] = value
     return config
+
+
+def _parse_env_value(value: str, line_number: int) -> str:
+    if value[:1] in {'"', "'"}:
+        quote = value[0]
+        closing = value.find(quote, 1)
+        if closing < 0:
+            raise NotifierError(f"niet-afgesloten quote op configregel {line_number}")
+        remainder = value[closing + 1 :].strip()
+        if remainder and not remainder.startswith("#"):
+            raise NotifierError(f"onverwachte tekst na quote op configregel {line_number}")
+        value = value[1:closing]
+    else:
+        if value[-1:] in {'"', "'"}:
+            raise NotifierError(f"onverwachte afsluitende quote op configregel {line_number}")
+        for index, character in enumerate(value):
+            if character == "#" and index > 0 and value[index - 1].isspace():
+                value = value[:index].rstrip()
+                break
+    if "\x00" in value:
+        raise NotifierError(f"NUL-teken in configwaarde op regel {line_number}")
+    return value
 
 
 def configured_channels(config: Mapping[str, str]) -> tuple[str, ...]:
@@ -233,6 +254,55 @@ def load_delivery_state(path: Path) -> dict[str, object]:
     return value
 
 
+@contextlib.contextmanager
+def delivery_lock(path: Path, *, timeout: float = 30.0, stale_after: float = 120.0):
+    """Serialize load/send/save across watcher and hook processes."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = Path(f"{path}.lock")
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            try:
+                age = time.time() - lock_path.stat().st_mtime
+            except FileNotFoundError:
+                continue
+            if age > stale_after:
+                try:
+                    lock_path.unlink()
+                except FileNotFoundError:
+                    pass
+                continue
+            if time.monotonic() >= deadline:
+                raise NotifierError("notifier-state is nog door een ander proces vergrendeld")
+            time.sleep(0.05)
+            continue
+        except OSError as exc:
+            raise NotifierError("notifier-state kon niet worden vergrendeld") from exc
+        else:
+            try:
+                with os.fdopen(descriptor, "w", encoding="ascii") as handle:
+                    handle.write(f"pid={os.getpid()}\n")
+                os.chmod(lock_path, 0o600)
+            except OSError:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+                lock_path.unlink(missing_ok=True)
+                raise NotifierError("notifier-lock kon niet veilig worden vastgelegd")
+            break
+
+    try:
+        yield
+    finally:
+        try:
+            lock_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def save_delivery_state(path: Path, notification: Notification, sent_channels: set[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -277,29 +347,30 @@ def notify_values(
         return NotifyResult(triggered=False)
 
     channels = configured_channels(config)
-    state = load_delivery_state(state_path)
-    same_transition = state.get("state") == notification.state and state.get("since") == notification.since
-    sent = set(state.get("sent_channels", [])) if same_transition else set()
-    pending = tuple(channel for channel in channels if channel not in sent)
-    if not pending:
-        return NotifyResult(triggered=True, duplicate=True)
-    if dry_run:
-        print(notification.subject)
-        print(notification.body, end="")
-        return NotifyResult(triggered=True)
+    with delivery_lock(state_path):
+        state = load_delivery_state(state_path)
+        same_transition = state.get("state") == notification.state and state.get("since") == notification.since
+        sent = set(state.get("sent_channels", [])) if same_transition else set()
+        pending = tuple(channel for channel in channels if channel not in sent)
+        if not pending:
+            return NotifyResult(triggered=True, duplicate=True)
+        if dry_run:
+            print(notification.subject)
+            print(notification.body, end="")
+            return NotifyResult(triggered=True)
 
-    available_senders = senders or {"email": send_email, "ntfy": send_ntfy}
-    delivered: list[str] = []
-    for channel in pending:
-        sender = available_senders.get(channel)
-        if sender is None:
-            raise NotifierError(f"geen afzender beschikbaar voor kanaal: {channel}")
-        sender(config, notification)
-        sent.add(channel)
-        delivered.append(channel)
-        # Persist per channel so a later channel failure cannot duplicate a success.
-        save_delivery_state(state_path, notification, sent)
-    return NotifyResult(triggered=True, sent_channels=tuple(delivered))
+        available_senders = senders or {"email": send_email, "ntfy": send_ntfy}
+        delivered: list[str] = []
+        for channel in pending:
+            sender = available_senders.get(channel)
+            if sender is None:
+                raise NotifierError(f"geen afzender beschikbaar voor kanaal: {channel}")
+            sender(config, notification)
+            sent.add(channel)
+            delivered.append(channel)
+            # Persist per channel so a later channel failure cannot duplicate a success.
+            save_delivery_state(state_path, notification, sent)
+        return NotifyResult(triggered=True, sent_channels=tuple(delivered))
 
 
 def notify_once(

@@ -4,7 +4,10 @@ import importlib.util
 import json
 import sys
 import tempfile
+import threading
+import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest import mock
 
@@ -202,6 +205,50 @@ class NotifyBasTests(unittest.TestCase):
 
         self.assertEqual(config["NOTIFIER_CHANNELS"], "email,ntfy")
         self.assertEqual(config["SMTP_PORT"], "587")
+
+    def test_config_parser_strips_unquoted_comments_and_preserves_quoted_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "notifier.env"
+            path.write_text(
+                "SMTP_PORT = 587 # lokale poort\n"
+                "SMTP_PASSWORD=\"P#ssword\" # blijft lokaal\n"
+                "NTFY_TOPIC=topic#onderdeel\n",
+                encoding="utf-8",
+            )
+
+            config = notify_bas.parse_env_file(path)
+
+        self.assertEqual(config["SMTP_PORT"], "587")
+        self.assertEqual(config["SMTP_PASSWORD"], "P#ssword")
+        self.assertEqual(config["NTFY_TOPIC"], "topic#onderdeel")
+
+    def test_concurrent_process_equivalents_send_one_message(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            handoff, state_file = self.paths(
+                directory,
+                handoff_text(state="BLOCKED", action_required_by="bas"),
+            )
+            delivered = []
+            barrier = threading.Barrier(2)
+
+            def fake_sender(config, notification):
+                delivered.append(notification.since)
+                time.sleep(0.1)
+
+            def run_once():
+                barrier.wait()
+                return notify_bas.notify_once(
+                    handoff,
+                    {"NOTIFIER_CHANNELS": "email"},
+                    state_file,
+                    senders={"email": fake_sender},
+                )
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(pool.map(lambda unused: run_once(), range(2)))
+
+            self.assertEqual(delivered, ["2026-08-12T12:00:00Z"])
+            self.assertEqual(sum(result.duplicate for result in results), 1)
 
     @mock.patch.object(notify_bas.smtplib, "SMTP")
     def test_email_adapter_uses_starttls_and_authentication(self, smtp_factory) -> None:
