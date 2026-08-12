@@ -3,10 +3,16 @@
 # De map secure/ wordt niet door Git gevolgd. Zet hier nooit tokens of wachtwoorden.
 
 # Runnercommando's zijn JSON-arrays: elk argument blijft hierdoor exact gescheiden.
-# Controleer het commando eerst handmatig; haal pas daarna het commentaarteken weg.
-# $env:ALV_AUTORUN_CODEX_ARGV = '["codex", "exec", "-"]'
-# $env:ALV_AUTORUN_CLAUDE_ARGV = '["PAD-NAAR-CLAUDE-RUNNER", "EEN-BEURT-OPTIE"]'
-# $env:ALV_AUTORUN_MISTRAL_ARGV = '["PAD-NAAR-MISTRAL-RUNNER", "EEN-BEURT-OPTIE"]'
+# Codex krijgt een schrijfbare workspace, geen vragen, geen blijvende sessie en alleen
+# netwerktoegang binnen die sandbox voor de verplichte Git-push.
+$env:ALV_AUTORUN_CODEX_ARGV = '["codex","exec","--sandbox","workspace-write","--ask-for-approval","never","--ephemeral","--config","sandbox_workspace_write.network_access=true","-"]'
+
+# Claude draait headless met een expliciete toolset. dontAsk weigert al het overige
+# in plaats van tijdens een onbemande beurt een vraag te stellen.
+$env:ALV_AUTORUN_CLAUDE_ARGV = '["claude","--print","--input-format","text","--output-format","text","--permission-mode","dontAsk","--tools","Read,Glob,Grep,Edit,Write,Bash","--allowedTools","Read,Glob,Grep,Edit,Write,Bash(git *),Bash(gh *),Bash(npm *),Bash(node *),Bash(python *)","--max-turns","20","--no-session-persistence"]'
+
+# Mistral gebruikt geen agent-LLM voor control-flow: deze Node-runner is deterministisch.
+$env:ALV_AUTORUN_MISTRAL_ARGV = '["node","mistral-lokaal/scripts/run_integration_turn.mjs","--stdin"]'
 
 # Veilige attended-first defaults. CLI-opties mogen deze waarden per sessie overschrijven.
 # Harde maxima: 20 beurten, 14.400 s wandklok, 3.600 s interval en 500 progress-regels.

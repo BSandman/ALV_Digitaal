@@ -66,6 +66,10 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 
 - 2026-08-12 · Claude · **A3-validatie GROEN** tegen ADR-0017: attended-first defaults, harde env/CLI-maxima, serverless Gemini, menselijke deploypoort en secrets buiten Git aantoonbaar geborgd. Sprint 5 is inhoudelijk compleet; na merge van PR #14 resteert één begeleide droogloop vóór enige unattended/overnight-go. Tevens ADR-0014 (object/eigenaar/breukdeel) en ADR-0018 (ronde-scope per VvE, één stemactie met fan-out) vastgelegd en in `bijbel.md` opgenomen. → READY_FOR_INTEGRATION (Mistral).
 
+## Sprint 6 — concrete rol-runners (loopt)
+
+- 2026-08-12 · Codex · **Rol-runners gereed voor PR-review:** `run_integration_turn.mjs` voert deterministisch Python-, app-, architectuur-, release- en PII-gates uit, commit/pusht baton + progress en eindigt schoon/in-sync; bij expliciete deploy-behoefte stopt hij zonder checks/deploy op `BLOCKED` voor Bas. De lokale voorbeeldconfig bevat concrete, headless Codex- en Claude-ARGV en bewust geen Gemini-runner; het runbook test elk commando eerst los. Twee echte lokale bare-remote-fixtures bewijzen succes en de menselijke deploypoort; bestandsuitvoer is deterministisch. Bewijs: 72/72 Node-tests, 69/69 Python-tests, handoff-/architectuur-/release-/PII-gates groen. Autorun, overnight en deploy bleven uit. → READY_FOR_TEST (Gemini via PR).
+
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 
 **Doel:** T-omgeving draait, CI-gates groen. Zie `sprint.md`. **Uitkomst:** groen op alle poorten; gevalideerd.
