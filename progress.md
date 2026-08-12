@@ -69,6 +69,7 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 ## Sprint 6 — concrete rol-runners (loopt)
 
 - 2026-08-12 · Codex · **Rol-runners gereed voor PR-review:** `run_integration_turn.mjs` voert deterministisch Python-, app-, architectuur-, release- en PII-gates uit, commit/pusht baton + progress en eindigt schoon/in-sync; bij expliciete deploy-behoefte stopt hij zonder checks/deploy op `BLOCKED` voor Bas. De lokale voorbeeldconfig bevat concrete, headless Codex- en Claude-ARGV en bewust geen Gemini-runner; het runbook test elk commando eerst los. Twee echte lokale bare-remote-fixtures bewijzen succes en de menselijke deploypoort; bestandsuitvoer is deterministisch. Bewijs: 72/72 Node-tests, 69/69 Python-tests, handoff-/architectuur-/release-/PII-gates groen. Autorun, overnight en deploy bleven uit. → READY_FOR_TEST (Gemini via PR).
+- 2026-08-12 · Codex · **Gemini-follow-up PR #15 verwerkt:** atomisch schrijven herprobeert tijdelijke Windows-locks met unieke tempnamen; sync-output wordt fail-closed geparseerd. Nieuwe fixtures bewijzen geweigerde-push→non-zero met integere hervatbare baton, stdin >512 KiB vóór repo-aanraking geweigerd, tab/spatie-robustheid en identieke uitvoer van twee volledige runs. Live-MariaDB-stress is als afzonderlijk domeinwerk geclassificeerd. Bewijs: 77/77 Node-tests en alle lokale gates groen; deploy/autorun bleven uit.
 
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 

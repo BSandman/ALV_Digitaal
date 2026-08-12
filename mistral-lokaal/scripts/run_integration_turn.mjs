@@ -9,6 +9,8 @@ import { pathToFileURL } from 'node:url';
 const READY = 'READY_FOR_INTEGRATION';
 const IN_PROGRESS = 'INTEGRATION_IN_PROGRESS';
 const MAX_CONTEXT_BYTES = 512 * 1024;
+const ATOMIC_RENAME_ATTEMPTS = 6;
+let tempSequence = 0;
 
 export function integrationPlan(platform = process.platform) {
   const npm = platform === 'win32'
@@ -118,18 +120,48 @@ function git(repo, ...args) {
   return run(repo, ['git', ...args], { capture: true }).stdout.trim();
 }
 
-function ensureCleanAndSynced(repo) {
-  if (git(repo, 'status', '--porcelain')) throw new Error('working tree is niet schoon');
-  const counts = git(repo, 'rev-list', '--left-right', '--count', 'HEAD...@{u}')
-    .replaceAll('\t', ' ')
-    .split(/\s+/);
-  if (counts.join(' ') !== '0 0') throw new Error('lokale branch en upstream zijn niet in sync');
+export function parseSyncCounts(output) {
+  const counts = output.trim().split(/\s+/);
+  if (counts.length !== 2 || !counts.every((value) => /^\d+$/.test(value))) {
+    throw new Error('git rev-list gaf geen twee geldige tellers terug');
+  }
+  return counts.map(Number);
 }
 
-function writeAtomic(file, content) {
-  const temp = `${file}.runner-${process.pid}.tmp`;
+function ensureCleanAndSynced(repo) {
+  if (git(repo, 'status', '--porcelain')) throw new Error('working tree is niet schoon');
+  const counts = parseSyncCounts(git(repo, 'rev-list', '--left-right', '--count', 'HEAD...@{u}'));
+  if (counts[0] !== 0 || counts[1] !== 0) {
+    throw new Error('lokale branch en upstream zijn niet in sync');
+  }
+}
+
+function waitSync(milliseconds) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+}
+
+export function writeAtomic(
+  file,
+  content,
+  { renameFile = fs.renameSync, wait = waitSync } = {},
+) {
+  tempSequence += 1;
+  const temp = `${file}.runner-${process.pid}-${tempSequence}.tmp`;
   fs.writeFileSync(temp, content, 'utf8');
-  fs.renameSync(temp, file);
+  try {
+    for (let attempt = 1; attempt <= ATOMIC_RENAME_ATTEMPTS; attempt += 1) {
+      try {
+        renameFile(temp, file);
+        return;
+      } catch (error) {
+        const retryable = ['EACCES', 'EBUSY', 'EPERM'].includes(error?.code);
+        if (!retryable || attempt === ATOMIC_RENAME_ATTEMPTS) throw error;
+        wait(attempt * 20);
+      }
+    }
+  } finally {
+    if (fs.existsSync(temp)) fs.rmSync(temp, { force: true });
+  }
 }
 
 function updateHandoff(repo, now, updates) {

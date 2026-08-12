@@ -9,8 +9,10 @@ import { fileURLToPath } from 'node:url';
 import {
   integrationPlan,
   parseFrontmatter,
+  parseSyncCounts,
   progressLine,
   updateFrontmatter,
+  writeAtomic,
 } from '../mistral-lokaal/scripts/run_integration_turn.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -130,6 +132,69 @@ test('deploy-behoefte stopt bij Bas en roept geen integratie- of deploypad aan',
   }
 });
 
+test('geweigerde push faalt non-zero met een integere hervatbare baton', () => {
+  const fixture = createFixture();
+  try {
+    git(fixture.repo, 'remote', 'set-url', '--push', 'origin', path.join(fixture.parent, 'ontbreekt.git'));
+    const result = runRunner(fixture.repo);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /git push faalde/);
+    const handoff = parseFrontmatter(fs.readFileSync(path.join(fixture.repo, 'handoff.md'), 'utf8'));
+    assert.equal(handoff.state, 'INTEGRATION_IN_PROGRESS');
+    assert.equal(handoff.owner, 'mistral');
+    assert.equal(git(fixture.repo, 'status', '--porcelain'), '');
+    assert.equal(
+      fs.readdirSync(fixture.repo).some((name) => name.includes('.runner-') && name.endsWith('.tmp')),
+      false,
+    );
+  } finally {
+    fs.rmSync(fixture.parent, { recursive: true, force: true });
+  }
+});
+
+test('stdin boven 512 KiB wordt geweigerd voordat de repo wordt aangeraakt', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'alv-integration-context-'));
+  try {
+    const result = run(process.execPath, [RUNNER, '--stdin', '--repo', directory], {
+      input: Buffer.alloc(512 * 1024 + 1, 65),
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /stdin-context overschrijdt de runnerlimiet/);
+    assert.deepEqual(fs.readdirSync(directory), []);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('Git-sync-tellers accepteren tabs en willekeurige witruimte fail-closed', () => {
+  assert.deepEqual(parseSyncCounts('0\t0\n'), [0, 0]);
+  assert.deepEqual(parseSyncCounts('  12    3  '), [12, 3]);
+  assert.throws(() => parseSyncCounts('0'), /geen twee geldige tellers/);
+  assert.throws(() => parseSyncCounts('nul 0'), /geen twee geldige tellers/);
+});
+
+test('atomisch schrijven herprobeert tijdelijke Windows-locks en ruimt tempbestanden op', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'alv-integration-atomic-'));
+  const file = path.join(directory, 'handoff.md');
+  fs.writeFileSync(file, 'oud\n');
+  let attempts = 0;
+  try {
+    writeAtomic(file, 'nieuw\n', {
+      renameFile(source, target) {
+        attempts += 1;
+        if (attempts < 3) throw Object.assign(new Error('locked'), { code: 'EPERM' });
+        fs.renameSync(source, target);
+      },
+      wait() {},
+    });
+    assert.equal(attempts, 3);
+    assert.equal(fs.readFileSync(file, 'utf8'), 'nieuw\n');
+    assert.equal(fs.readdirSync(directory).some((name) => name.includes('.runner-')), false);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('frontmatter- en progressuitvoer zijn deterministisch bij gelijke input', () => {
   const original = [
     '---',
@@ -149,6 +214,28 @@ test('frontmatter- en progressuitvoer zijn deterministisch bij gelijke input', (
   const updates = { state: 'SPRINT_DONE', owner: 'claude', since: FIXED_NOW, note: 'klaar' };
   assert.equal(updateFrontmatter(original, updates), updateFrontmatter(original, updates));
   assert.equal(progressLine(FIXED_NOW, 'groen'), progressLine(FIXED_NOW, 'groen'));
+});
+
+test('twee volledige runs met dezelfde context en tijd leveren dezelfde bestanden', () => {
+  const first = createFixture();
+  const second = createFixture();
+  try {
+    const firstResult = runRunner(first.repo);
+    const secondResult = runRunner(second.repo);
+    assert.equal(firstResult.status, 0, firstResult.stderr || firstResult.stdout);
+    assert.equal(secondResult.status, 0, secondResult.stderr || secondResult.stdout);
+    assert.equal(
+      fs.readFileSync(path.join(first.repo, 'handoff.md'), 'utf8'),
+      fs.readFileSync(path.join(second.repo, 'handoff.md'), 'utf8'),
+    );
+    assert.equal(
+      fs.readFileSync(path.join(first.repo, 'progress.md'), 'utf8'),
+      fs.readFileSync(path.join(second.repo, 'progress.md'), 'utf8'),
+    );
+  } finally {
+    fs.rmSync(first.parent, { recursive: true, force: true });
+    fs.rmSync(second.parent, { recursive: true, force: true });
+  }
 });
 
 test('voorbeeldconfig bevat alleen concrete lokale runners en geen Gemini-runner', () => {
