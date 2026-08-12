@@ -69,6 +69,8 @@ Geneste, **aan/uit-schakelbare** modules. Aanpak: modulaire monoliet in één re
 - ADR-0011 — In-app stemkeuze: alleen Voor/Tegen (twee knoppen); onthouding (afgeleid) en blanco (fysiek formulier) alleen als resultaat
 - ADR-0012 — Secrets-locatie: configbestand buiten de webroot (chmod 600) per omgeving, via niet-geheime `SECRETS_FILE`; nooit in Git/artefact/.htaccess
 - ADR-0013 — CD-automatisering: acceptatie via handmatige `workflow_dispatch`; productie achter GitHub Environment + verplichte approval (Bas); SSH via deploy-key in Secrets. Agent-autorun = aparte track
+- ADR-0014 — (gereserveerd) Basisdatamodel: rechten autonoom, representatie-relatie i.p.v. persoon-bundeling, woning↔parkeer administratieve (ont)koppeling (1:0..n), TwinQ-CSV-bron — nog uit te schrijven
+- ADR-0015 — Pijplijn-guardrails: geen extra LLM-revisor; deterministische state-lint (CI-gate + hook), tail-context, idempotente infra-provisioning — prerequisites voor onbemande autorun
 
 ## 10. Sleuteldocumenten
 
