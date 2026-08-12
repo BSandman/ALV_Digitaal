@@ -116,6 +116,33 @@ class WatchHandoffAutorunTests(unittest.TestCase):
         stdout = "0\t0\n" if args[:3] == ("rev-list", "--left-right", "--count") else ""
         return subprocess.CompletedProcess(["git", *args], 0, stdout=stdout, stderr="")
 
+    def test_local_environment_can_set_bounded_defaults(self) -> None:
+        defaults = watch_handoff.load_autorun_defaults(
+            {
+                "ALV_AUTORUN_INTERVAL_SECONDS": "30",
+                "ALV_AUTORUN_PROGRESS_TAIL": "12",
+                "ALV_AUTORUN_MAX_TURNS": "1",
+                "ALV_AUTORUN_MAX_WALLCLOCK_SECONDS": "900",
+            }
+        )
+        self.assertEqual(
+            defaults,
+            {
+                "interval": 30,
+                "progress_tail": 12,
+                "max_turns": 1,
+                "max_wallclock": 900,
+            },
+        )
+
+    def test_invalid_environment_default_is_rejected(self) -> None:
+        with self.assertRaisesRegex(watch_handoff.AutorunError, "minimaal 1"):
+            watch_handoff.load_autorun_defaults({"ALV_AUTORUN_MAX_TURNS": "0"})
+        with self.assertRaisesRegex(watch_handoff.AutorunError, "positief geheel getal"):
+            watch_handoff.load_autorun_defaults(
+                {"ALV_AUTORUN_MAX_WALLCLOCK_SECONDS": "kwartier"}
+            )
+
     def test_runner_command_prefers_json_argv_and_never_hardcodes_role_cli(self) -> None:
         command = watch_handoff.load_runner_command(
             "codex",

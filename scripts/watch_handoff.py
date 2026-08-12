@@ -48,6 +48,13 @@ DEFAULT_PROGRESS_TAIL = 15
 DEFAULT_MAX_TURNS = 3
 DEFAULT_MAX_WALLCLOCK = 1800
 
+AUTORUN_DEFAULT_ENV = {
+    "interval": ("ALV_AUTORUN_INTERVAL_SECONDS", 45),
+    "progress_tail": ("ALV_AUTORUN_PROGRESS_TAIL", DEFAULT_PROGRESS_TAIL),
+    "max_turns": ("ALV_AUTORUN_MAX_TURNS", DEFAULT_MAX_TURNS),
+    "max_wallclock": ("ALV_AUTORUN_MAX_WALLCLOCK_SECONDS", DEFAULT_MAX_WALLCLOCK),
+}
+
 
 class AutorunError(RuntimeError):
     """Raised when an autorun guardrail refuses to continue."""
@@ -55,6 +62,27 @@ class AutorunError(RuntimeError):
 
 class AutorunPaused(AutorunError):
     """Raised when Bas activates the kill-switch during a runner turn."""
+
+
+def load_autorun_defaults(
+    environ: Mapping[str, str] | None = None,
+) -> dict[str, int]:
+    """Load positive numeric defaults from the local environment."""
+    env = os.environ if environ is None else environ
+    defaults: dict[str, int] = {}
+    for setting, (name, fallback) in AUTORUN_DEFAULT_ENV.items():
+        raw = env.get(name, "").strip()
+        if not raw:
+            defaults[setting] = fallback
+            continue
+        try:
+            value = int(raw)
+        except ValueError as exc:
+            raise AutorunError(f"{name} moet een positief geheel getal zijn") from exc
+        if value < 1:
+            raise AutorunError(f"{name} moet minimaal 1 zijn")
+        defaults[setting] = value
+    return defaults
 
 
 def _create_windows_job(process: subprocess.Popen[str]):
@@ -689,17 +717,36 @@ def run_session(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    try:
+        defaults = load_autorun_defaults()
+    except AutorunError as exc:
+        parser.error(str(exc))
     parser.add_argument("--role", required=True, choices=list(ROLE_STATE))
-    parser.add_argument("--interval", type=int, default=45, help="poll-interval in seconden")
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=defaults["interval"],
+        help="poll-interval in seconden (of ALV_AUTORUN_INTERVAL_SECONDS)",
+    )
     parser.add_argument(
         "--progress-tail",
         type=int,
-        default=DEFAULT_PROGRESS_TAIL,
-        help="aantal laatste regels van progress.md in agentcontext (standaard: 15)",
+        default=defaults["progress_tail"],
+        help="aantal progress-regels in context (of ALV_AUTORUN_PROGRESS_TAIL)",
     )
     parser.add_argument("--autorun", action="store_true", help="start geconfigureerde rol-runner")
-    parser.add_argument("--max-turns", type=int, default=DEFAULT_MAX_TURNS)
-    parser.add_argument("--max-wallclock", type=int, default=DEFAULT_MAX_WALLCLOCK, help="sessielimiet in seconden")
+    parser.add_argument(
+        "--max-turns",
+        type=int,
+        default=defaults["max_turns"],
+        help="beurtenlimiet (of ALV_AUTORUN_MAX_TURNS)",
+    )
+    parser.add_argument(
+        "--max-wallclock",
+        type=int,
+        default=defaults["max_wallclock"],
+        help="sessielimiet in seconden (of ALV_AUTORUN_MAX_WALLCLOCK_SECONDS)",
+    )
     parser.add_argument("--once", action="store_true", help="voer één poll uit en stop")
     args = parser.parse_args(argv)
     if args.interval < 1:

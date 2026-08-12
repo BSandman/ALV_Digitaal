@@ -87,6 +87,15 @@ Regels om te voorkomen dat je op een koud window wacht:
 
 Activeren = per agent-omgeving `python scripts/watch_handoff.py --role <rol>` starten aan het begin van diens blok (Gemini niet — die is de Action). Begin semi-handmatig/gescheduled; zet continue watchers pas aan als een paar volledige cycli bewezen zijn.
 
+### Begeleide autorun
+
+1. Kopieer `mistral-lokaal/autorun.config.example.ps1` lokaal naar `mistral-lokaal/secure/autorun.config.ps1`, vul alleen het runnercommando van de betreffende rol in en laad de instellingen met `. .\mistral-lokaal\secure\autorun.config.ps1`. Geheimen en lokale paden blijven zo buiten Git. Gemini krijgt nooit een lokale runner.
+2. Test het runnercommando eerst rechtstreeks. Start daarna **attended-first**, met Bas achter het scherm en maximaal één beurt: `python scripts/watch_handoff.py --role <rol> --autorun --max-turns 1`. CLI-opties overschrijven de lokale defaults.
+3. Pauzeer alle watchers direct met `New-Item autorun.paused -ItemType File -Force`; dit breekt ook een actieve runner-procesboom af. Hervat pas bewust met `Remove-Item -LiteralPath .\autorun.paused`. `Ctrl+C` stopt de huidige watcher en zijn runner-procesboom.
+4. Kijk mee via `scripts/status.ps1` of `status.html`. Bij een runner-/statefout zet de watcher de baton op `BLOCKED`, meldt Bas en stopt zonder retry. Autorun mag nooit deployen; `action_required_by: bas` blijft een menselijke poort.
+
+Onbemand of overnight draaien blijft uit totdat meerdere begeleide cycli inclusief kill-switch en notifier aantoonbaar groen zijn en Bas dit afzonderlijk activeert.
+
 ## Meekijken
 
 - `powershell -ExecutionPolicy Bypass -File scripts/status.ps1` toont lokaal de baton, autorun/pauze, loop-teller, recente activiteit, Git-status en open PR-checks. Herhaal het commando in een korte `while`-lus voor live terminalzicht.

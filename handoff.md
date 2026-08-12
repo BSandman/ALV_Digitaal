@@ -1,12 +1,12 @@
 ---
 sprint: 5
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-12T15:05:21Z
+state: READY_FOR_VALIDATION
+owner: claude
+since: 2026-08-12T15:14:21Z
 next: codex
 action_required_by: none
 blocked: false
-note: "Codex implementeert A3: lokale autorun-configuratie en attended-first runbook; autorun en deploy blijven uit."
+note: "A3 klaar: lokale env-defaults + voorbeeldconfig + attended-first runbook; 65+68 tests en gates groen, autorun/deploy uit; valideer PR en plan begeleide droogloop."
 ---
 
 # handoff.md — de estafettestok
