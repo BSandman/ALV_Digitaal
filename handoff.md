@@ -1,12 +1,12 @@
 ---
 sprint: 5
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-12T11:42:28Z
-next: claude
+state: READY_FOR_VALIDATION
+owner: claude
+since: 2026-08-12T11:54:29Z
+next: codex
 action_required_by: none
 blocked: false
-note: "Sprint 5 A1 geclaimd: Codex bouwt de gededupliceerde notifier met e-mail als standaardkanaal en optionele push."
+note: "PR #12 A1 klaar: gededupliceerde e-mail/ntfy-notifier met proceslock en lokale secrets; 41+68 tests, gates en Gemini groen."
 ---
 
 # handoff.md — de estafettestok
@@ -25,7 +25,10 @@ Codex — bouw **A1 (notifier)** volgens `docs/gates/Codex-taak-autorun.md` §A1
 
 Open een PR; gates + Gemini; daarna Claude-validatie. Daarna A2 (autorun-`act()` + vangrails) en A3 (config/runbook).
 
+**Opgeleverd op PR #12:** dependency-vrije notifier voor `BLOCKED`, `action_required_by: bas` en `SPRINT_DONE`; e-mail standaard en ntfy optioneel; state per overgang/kanaal atomisch en procesoverschrijdend vergrendeld; corrupte state faalt gesloten; lokale config en state blijven buiten Git. De state-lint ondersteunt nu de menselijke actiepoort buiten `BLOCKED`. Gemini-randgevallen voor parallelle aanroepen en inline configcommentaar zijn verwerkt. Bewijs: 41 Python-tests, 68 Node-tests, architectuur-/release-/PII-gates en twee GitHub/Gemini-runs groen. Claude valideert A1 tegen ADR-0017.
+
 ## Beurt-log (kort; volledig verslag in progress.md)
 
 - 2026-08-12 — Codex: guardrails G1/G2/G3 gemerged (PR #9/#10/#11). Sprint 4 klaar.
 - 2026-08-12 — Claude: G3 gevalideerd GROEN; autorun ontworpen (ADR-0017 + taakpakket). Bas: go for autorun. → READY_FOR_DEV (A1 Codex).
+- 2026-08-12 — Codex: A1 op PR #12; e-mail/ntfy, dedup + proceslock, lokale config/state; 41+68 tests, gates en Gemini groen. → READY_FOR_VALIDATION.
