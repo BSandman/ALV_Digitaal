@@ -1,6 +1,6 @@
 # ADR-0009 — Quorummodel: vergadering-breed, eenmalig, presentie-gebaseerd
 
-**Status:** geaccepteerd
+**Status:** VERVANGEN door [[ADR-0021]] (12 augustus 2026) — presentie telt nu monotoon en quorum wordt per ronde vastgesteld. De kernregel "grondslag = presentie, niet uitgebrachte stemmen" blijft gelden.
 **Datum:** 11 augustus 2026
 **Beslisser:** Bas (domein/juridisch); vastgelegd door Claude (Architect & Validator)
 **Context-links:** [[ADR-0002]] (atomair sluiten), [[ADR-0006]] (stemprocedure, voorzitter stelt vast), [[ADR-0008]] (exacte rekenkunde), validatie `docs/gates/Claude-validatie-sprint2.md`
