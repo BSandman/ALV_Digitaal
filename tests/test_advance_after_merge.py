@@ -76,6 +76,26 @@ class AdvanceAfterMergeTests(unittest.TestCase):
             self.assertIn("reeds voorbij", reason)
             self.assertEqual(path.read_bytes(), before)
 
+    def test_blocked_and_ready_for_dev_are_valid_but_non_transferable_noops(self) -> None:
+        variants = [
+            READY.replace("READY_FOR_TEST", "READY_FOR_DEV").replace(
+                "owner: gemini", "owner: codex"
+            ),
+            READY.replace("READY_FOR_TEST", "BLOCKED")
+            .replace("owner: gemini", "owner: bas")
+            .replace("action_required_by: none", "action_required_by: bas")
+            .replace("blocked: false", "blocked: true"),
+        ]
+        for text in variants:
+            with self.subTest(state=lint_handoff.parse_frontmatter(text)["state"]):
+                with tempfile.TemporaryDirectory() as directory:
+                    path = self.make_handoff(directory, text)
+                    before = path.read_bytes()
+                    changed, reason = advance.advance_handoff(path, gate_green=True)
+                    self.assertFalse(changed)
+                    self.assertIn("niet overdraagbaar", reason)
+                    self.assertEqual(path.read_bytes(), before)
+
     def test_unknown_or_invalid_state_is_noop_without_mutation(self) -> None:
         text = READY.replace("READY_FOR_TEST", "GOKWERK")
         with tempfile.TemporaryDirectory() as directory:
@@ -86,6 +106,17 @@ class AdvanceAfterMergeTests(unittest.TestCase):
             self.assertIn("ongeldige handoff", reason)
             self.assertEqual(path.read_bytes(), before)
 
+    def test_empty_and_corrupt_handoff_are_noops_without_mutation(self) -> None:
+        for text in ("", "geen frontmatter\n", "---\nstate: READY_FOR_TEST\n"):
+            with self.subTest(text=text):
+                with tempfile.TemporaryDirectory() as directory:
+                    path = self.make_handoff(directory, text)
+                    before = path.read_bytes()
+                    changed, reason = advance.advance_handoff(path, gate_green=True)
+                    self.assertFalse(changed)
+                    self.assertIn("ongeldige handoff", reason)
+                    self.assertEqual(path.read_bytes(), before)
+
     def test_owner_mismatch_is_noop_without_mutation(self) -> None:
         text = READY.replace("owner: gemini", "owner: codex")
         with tempfile.TemporaryDirectory() as directory:
@@ -94,6 +125,14 @@ class AdvanceAfterMergeTests(unittest.TestCase):
             changed, _ = advance.advance_handoff(path, gate_green=True)
             self.assertFalse(changed)
             self.assertEqual(path.read_bytes(), before)
+
+    def test_render_sanitizes_quotes_and_newlines_in_note(self) -> None:
+        values = lint_handoff.parse_frontmatter(READY)
+        values["note"] = 'Regel "één"\nregel twee'
+        rendered = advance._render_frontmatter(READY, values)
+        parsed = lint_handoff.parse_frontmatter(rendered)
+        lint_handoff.validate_values(parsed)
+        self.assertEqual(parsed["note"], "Regel 'één' regel twee")
 
 
 if __name__ == "__main__":

@@ -71,6 +71,15 @@ class CheckPipelinePrTests(unittest.TestCase):
         spoofed["statusCheckRollup"][0]["workflowName"] = "Onverwachte workflow"
         self.assertEqual(self.evaluate(spoofed).decision, "noop")
 
+    def test_retried_check_with_conflicting_result_is_fail_closed(self) -> None:
+        payload = green_pr()
+        retried = dict(payload["statusCheckRollup"][0])
+        retried["conclusion"] = "FAILURE"
+        payload["statusCheckRollup"].append(retried)
+        result = self.evaluate(payload)
+        self.assertEqual(result.decision, "noop")
+        self.assertIn("check niet groen", result.reason)
+
     def test_review_request_draft_wrong_repo_and_wrong_base_are_noop(self) -> None:
         mutations = [
             ("reviewDecision", "CHANGES_REQUESTED"),
@@ -89,6 +98,10 @@ class CheckPipelinePrTests(unittest.TestCase):
         active_request = green_pr()
         active_request["latestReviews"] = [{"state": "CHANGES_REQUESTED"}]
         self.assertEqual(self.evaluate(active_request).decision, "noop")
+
+        dismissed_request = green_pr()
+        dismissed_request["latestReviews"] = [{"state": "DISMISSED"}]
+        self.assertEqual(self.evaluate(dismissed_request).decision, "merge")
 
     def test_unknown_mergeability_or_malformed_payload_is_noop(self) -> None:
         payload = green_pr()
