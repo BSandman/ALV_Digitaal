@@ -23,8 +23,10 @@ test('auto-advance is default-uit en heeft begrensde triggers plus concurrency',
 test('workflow gebruikt vertrouwde main-code en exacte gecontroleerde head', () => {
   assert.match(WORKFLOW, /ref: main/);
   assert.match(WORKFLOW, /MERGEABLE.*UNKNOWN|UNKNOWN.*MERGEABLE/s);
-  assert.match(WORKFLOW, /check_pipeline_pr\.py/);
+  assert.equal((WORKFLOW.match(/check_pipeline_pr\.py/g) ?? []).length, 2);
+  assert.match(WORKFLOW, /Herbevestig gates en reviews direct voor merge/);
   assert.match(WORKFLOW, /gh pr merge[\s\S]*--squash --match-head-commit/);
+  assert.match(WORKFLOW, /if: success\(\).*steps\.recheck\.outputs\.decision == 'merge'/);
   assert.match(WORKFLOW, /advance_after_merge\.py[\s\S]*--gate-green/);
   assert.match(WORKFLOW, /git push origin HEAD:main/);
   assert.doesNotMatch(WORKFLOW, /(?:--force|reset --hard|deploy|production)/i);

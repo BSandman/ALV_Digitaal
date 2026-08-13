@@ -86,30 +86,50 @@ jobs:
           REASON: ${{ steps.evaluate.outputs.reason }}
         run: echo "Auto-advance deed niets — $REASON" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Squash-merge exact de gecontroleerde head
+      - name: Herbevestig gates en reviews direct voor merge
         if: steps.evaluate.outputs.decision == 'merge'
+        id: recheck
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}
-          HEAD_SHA: ${{ steps.evaluate.outputs.head_sha }}
+        run: |
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --json state,isDraft,mergeable,baseRefName,headRefName,headRefOid,headRepository,headRepositoryOwner,labels,reviewDecision,latestReviews,statusCheckRollup \
+            > "$RUNNER_TEMP/pipeline-pr-recheck.json"
+          python scripts/check_pipeline_pr.py "$RUNNER_TEMP/pipeline-pr-recheck.json" \
+            --repository "$GITHUB_REPOSITORY" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Leg gewijzigde mergevoorwaarden vast
+        if: steps.evaluate.outputs.decision == 'merge' && steps.recheck.outputs.decision != 'merge'
+        env:
+          REASON: ${{ steps.recheck.outputs.reason }}
+        run: echo "Mergevoorwaarden veranderden; fail-safe no-op — $REASON" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Squash-merge exact de gecontroleerde head
+        if: success() && steps.evaluate.outputs.decision == 'merge' && steps.recheck.outputs.decision == 'merge'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.recheck.outputs.head_sha }}
         run: |
           gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --squash --match-head-commit "$HEAD_SHA"
 
       - name: Ververs main na merge of hersteltrigger
-        if: steps.evaluate.outputs.decision == 'merge' || steps.evaluate.outputs.decision == 'advance'
+        if: success() && ((steps.evaluate.outputs.decision == 'merge' && steps.recheck.outputs.decision == 'merge') || steps.evaluate.outputs.decision == 'advance')
         run: |
           git fetch origin main
           git checkout --detach origin/main
 
       - name: Zet uitsluitend de baton idempotent door
-        if: steps.evaluate.outputs.decision == 'merge' || steps.evaluate.outputs.decision == 'advance'
+        if: success() && ((steps.evaluate.outputs.decision == 'merge' && steps.recheck.outputs.decision == 'merge') || steps.evaluate.outputs.decision == 'advance')
         id: baton
         run: |
           python scripts/advance_after_merge.py --handoff handoff.md --gate-green
           python scripts/lint_handoff.py handoff.md
 
       - name: Commit en push alleen een echte batontransitie
-        if: steps.evaluate.outputs.decision == 'merge' || steps.evaluate.outputs.decision == 'advance'
+        if: success() && ((steps.evaluate.outputs.decision == 'merge' && steps.recheck.outputs.decision == 'merge') || steps.evaluate.outputs.decision == 'advance')
         run: |
           if git diff --quiet -- handoff.md; then
             echo "Baton reeds voorbij; idempotente no-op." >> "$GITHUB_STEP_SUMMARY"
