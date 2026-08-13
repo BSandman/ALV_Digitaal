@@ -44,6 +44,7 @@ Mistral-runbook `docs/Mistral_Lokaal_setup_runbook_v1.0.0.md` · bron-ontwerp `E
 ALV_Digitaal/
   README.md                                   >>> DE INGANG — begin hier
   bijbel.md                                   de waarheid (architectuur, besluiten)
+  file_structure.md                           projectbreed structuur- + opruimbeleid (skelet)
   AGENTS.md                                   spelregels: statemachine, handoff, git
   sprint.md                                   wat we NU doen
   handoff.md                                  wie aan zet is (baton; alleen owner schrijft)
@@ -121,6 +122,12 @@ Node-versie op `.starter` (mijn.host adviseert 19/20), het Passenger-proces-/col
 bewaartermijnen + DPIA-notitie (Bas/juridisch), en de secrets-locatie op productie.
 **Bevestigd:** DB = MariaDB 11.8.8 (lokale UNIX-socket); scaffold gepind op `mariadb:11.8`.
 Zie voorstel §8 en ADR-0003.
+
+## Structuur
+
+Dit project volgt **`file_structure.md`** — het projectbrede skelet (root schoon, `README` = ingang, `bijbel.md` = waarheid, `docs/ADR/` = besluiten, archief eerst zippen dan oude zips weg). **Afwijkingen voor dit projecttype** (§7): een multi-AI tool-project, dus met een extra coördinatielaag (`AGENTS.md`, `docs/gates/`, `handoff.md`/`sprint.md`/`progress.md`) en `infra/` voor de Docker dev/test/CI-omgeving. De private deploy-key (`alv_acc_deploy`) staat gitignored buiten het versiebeheer.
+
+De serverless PR-gate staat in `.github/workflows/pipeline-autoadvance.yml`. Repovariabele `PIPELINE_AUTOMERGE` is fail-safe standaard uit; alleen Bas zet haar na validatie tijdelijk `on` voor een begeleide pipelinecyclus. Dit automatiseert uitsluitend merge + batonoverdracht en nooit deploy/productie (ADR-0023).
 
 ## Versiebeheer
 

@@ -1,12 +1,12 @@
 ---
-sprint: 6
+sprint: 7
 state: READY_FOR_TEST
 owner: gemini
-since: 2026-08-12T22:49:02Z
-next: claude
+since: 2026-08-13T22:56:41Z
+next: gemini
 action_required_by: none
 blocked: false
-note: "Sprint 6 rol-runners staan op PR: contractfixtures en alle lokale gates zijn groen; Gemini reviewt, deploy en autorun blijven uit."
+note: "Sprint 7 auto-advance is gereed voor PR-review; alle lokale gates zijn groen en PIPELINE_AUTOMERGE blijft uit."
 ---
 
 # handoff.md — de estafettestok
@@ -15,9 +15,9 @@ note: "Sprint 6 rol-runners staan op PR: contractfixtures en alle lokale gates z
 
 ## Huidige beurt
 
-**Sprint 6 — concrete rol-runners voor begeleide autorun.** Ontwerp: **ADR-0019**; taak: `docs/gates/Codex-taak-rol-runners.md`.
+**Sprint 7 — PR-gate auto-advance.** Ontwerp: **ADR-0023**; taak: `docs/gates/Codex-taak-pr-auto-advance.md`.
 
-**Opgeleverd op deze PR:** een deterministische Mistral-integratierunner met vaste Python-/app-/PII-gates, geldige baton/progress-commits en push; een menselijke `BLOCKED`-poort zodra deploy nodig is; concrete headless ARGV voor Codex en Claude; bijgewerkt attended-first runbook en Sprint 6-plan. Gecontroleerde repo-fixtures bewijzen schoon/in-sync, determinisme en geen deploy; Gemini blijft lokaal verboden. Bewijs: 72 Node-tests, 69 Python-tests, architectuur-, release-, handoff- en PII-gates groen. Autorun, overnight en deploy zijn niet aangezet. Gemini reviewt de PR; daarna Claude-validatie tegen ADR-0019/0017.
+**Opgeleverd op deze branch:** een fail-safe GitHub Action die uitsluitend bij `PIPELINE_AUTOMERGE=on`, een interne pipelinebranch/label, de drie vereiste checks uit hun verwachte workflows, geen wijzigingsverzoek en een mergeklare PR mag squash-mergen — direct vóór de merge opnieuw beoordeeld en gebonden aan exact de gecontroleerde head-SHA. Eén vaste repositorybrede concurrencygroep serialiseert alle merge- en batonwrites naar `main`. Daarna zet een apart, idempotent en dependency-vrij script alleen `READY_FOR_TEST/gemini` door naar `READY_FOR_VALIDATION/claude`; elke vervolgstap vereist expliciet succes van de mergeketen. Onbekende, ongeldige, incomplete of reeds verwerkte staten zijn no-op; een handmatige hersteltrigger kan na een geslaagde merge uitsluitend de baton alsnog doorzetten. Bewijs: 82 Node-tests, 86 Python-tests, YAML-, handoff-, architectuur-, release- en PII-gates groen. `PIPELINE_AUTOMERGE` bestaat nog niet en is dus fail-safe uit; deploy/productie worden niet geraakt.
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
@@ -27,3 +27,8 @@ note: "Sprint 6 rol-runners staan op PR: contractfixtures en alle lokale gates z
 - 2026-08-12 — Claude: A1 validatie GROEN; Codex merge PR #12 en bouw A2/A4.
 - 2026-08-12 — Codex: PR #12 gemerged; A2/A4 op PR #13 met opt-in runner, kill-switch/caps/foutpoort en lokale meekijklaag; 61+68 tests, gates en Gemini groen. → READY_FOR_VALIDATION.
 - 2026-08-12 — Codex: Sprint 6 rol-runners gebouwd; deterministische Mistral-integratie + menselijke deploypoort, concrete Codex-/Claude-ARGV en fixturecontracttests; 72+69 tests en alle lokale gates groen. → READY_FOR_TEST.
+- 2026-08-13 — Codex: PR #15 gemerged; Sprint 7 geclaimd op `agent/sprint-7-pr-auto-advance`; kill-switch blijft uit. → DEV_IN_PROGRESS.
+- 2026-08-13 — Codex: auto-advance gebouwd met vertrouwde-main-evaluatie, exacte check/workflowbinding, head-SHA-binding, idempotente batontransitie en hersteltrigger; 82+80 tests en alle lokale gates groen. → READY_FOR_TEST.
+- 2026-08-13 — Codex: Gemini-passfollow-up dekt conflicterende retried checks, dismissed/actieve wijzigingsreviews, fork-identiteit, BLOCKED/READY_FOR_DEV, lege/corrupte handoff en notesanitisatie; fail-closed gedrag bevestigd. → READY_FOR_TEST.
+- 2026-08-13 — Codex: finale TOCTOU-hardening herleest en herevalueert gates/reviews direct voor merge; mergefout of gewijzigde voorwaarde blokkeert expliciet iedere batonstap. → READY_FOR_TEST.
+- 2026-08-14 — Codex: alle `main`-writes repositorybreed geserialiseerd; lange checklijst en UTF-8-BOM/CRLF-transitie als regressietests toegevoegd. 82+86 tests en lokale gates groen. → READY_FOR_TEST.

@@ -1,0 +1,142 @@
+name: Pipeline PR auto-advance
+
+on:
+  workflow_run:
+    workflows:
+      - T-run architecture and privacy gates
+      - Gemini Lead Tester Review
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Reeds gecontroleerde pipeline-PR voor idempotent herstel"
+        required: true
+        type: number
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+concurrency:
+  group: pipeline-autoadvance-main-push
+  cancel-in-progress: false
+
+jobs:
+  auto-advance:
+    if: vars.PIPELINE_AUTOMERGE == 'on'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout uitsluitend vertrouwde main-code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Bepaal gekoppelde PR
+        id: resolve
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PR: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            PR_NUMBER="$INPUT_PR"
+          else
+            PR_NUMBER=$(jq -r '.workflow_run.pull_requests[0].number // empty' "$GITHUB_EVENT_PATH")
+          fi
+          if [[ ! "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "Geen eenduidige gekoppelde PR; fail-safe no-op." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "eligible=true" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Lees actuele PR-metadata en checks
+        if: steps.resolve.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}
+        run: |
+          for attempt in 1 2 3 4; do
+            gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+              --json state,isDraft,mergeable,baseRefName,headRefName,headRefOid,headRepository,headRepositoryOwner,labels,reviewDecision,latestReviews,statusCheckRollup \
+              > "$RUNNER_TEMP/pipeline-pr.json"
+            STATE=$(jq -r '.state' "$RUNNER_TEMP/pipeline-pr.json")
+            MERGEABLE=$(jq -r '.mergeable' "$RUNNER_TEMP/pipeline-pr.json")
+            if [[ "$STATE" == "MERGED" || "$MERGEABLE" != "UNKNOWN" ]]; then
+              break
+            fi
+            sleep $((attempt * 3))
+          done
+
+      - name: Evalueer alle fail-safe mergevoorwaarden
+        if: steps.resolve.outputs.eligible == 'true'
+        id: evaluate
+        run: |
+          python scripts/check_pipeline_pr.py "$RUNNER_TEMP/pipeline-pr.json" \
+            --repository "$GITHUB_REPOSITORY" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Leg no-opreden vast
+        if: steps.resolve.outputs.eligible == 'true' && steps.evaluate.outputs.decision == 'noop'
+        env:
+          REASON: ${{ steps.evaluate.outputs.reason }}
+        run: echo "Auto-advance deed niets — $REASON" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Herbevestig gates en reviews direct voor merge
+        if: steps.evaluate.outputs.decision == 'merge'
+        id: recheck
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}
+        run: |
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --json state,isDraft,mergeable,baseRefName,headRefName,headRefOid,headRepository,headRepositoryOwner,labels,reviewDecision,latestReviews,statusCheckRollup \
+            > "$RUNNER_TEMP/pipeline-pr-recheck.json"
+          python scripts/check_pipeline_pr.py "$RUNNER_TEMP/pipeline-pr-recheck.json" \
+            --repository "$GITHUB_REPOSITORY" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Leg gewijzigde mergevoorwaarden vast
+        if: steps.evaluate.outputs.decision == 'merge' && steps.recheck.outputs.decision != 'merge'
+        env:
+          REASON: ${{ steps.recheck.outputs.reason }}
+        run: echo "Mergevoorwaarden veranderden; fail-safe no-op — $REASON" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Squash-merge exact de gecontroleerde head
+        if: success() && steps.evaluate.outputs.decision == 'merge' && steps.recheck.outputs.decision == 'merge'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.recheck.outputs.head_sha }}
+        run: |
+          gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --squash --match-head-commit "$HEAD_SHA"
+
+      - name: Ververs main na merge of hersteltrigger
+        if: success() && ((steps.evaluate.outputs.decision == 'merge' && steps.recheck.outputs.decision == 'merge') || steps.evaluate.outputs.decision == 'advance')
+        run: |
+          git fetch origin main
+          git checkout --detach origin/main
+
+      - name: Zet uitsluitend de baton idempotent door
+        if: success() && ((steps.evaluate.outputs.decision == 'merge' && steps.recheck.outputs.decision == 'merge') || steps.evaluate.outputs.decision == 'advance')
+        id: baton
+        run: |
+          python scripts/advance_after_merge.py --handoff handoff.md --gate-green
+          python scripts/lint_handoff.py handoff.md
+
+      - name: Commit en push alleen een echte batontransitie
+        if: success() && ((steps.evaluate.outputs.decision == 'merge' && steps.recheck.outputs.decision == 'merge') || steps.evaluate.outputs.decision == 'advance')
+        run: |
+          if git diff --quiet -- handoff.md; then
+            echo "Baton reeds voorbij; idempotente no-op." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]"
+          git add -- handoff.md
+          git commit -m "chore: advance green PR to validation"
+          git push origin HEAD:main
