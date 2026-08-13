@@ -1,12 +1,12 @@
 ---
 sprint: 7
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-13T22:47:34Z
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-13T22:56:41Z
 next: gemini
 action_required_by: none
 blocked: false
-note: "Sprint 7 gestart: Codex bouwt de fail-safe PR-gate auto-advance; kill-switch blijft uit en deploy blijft menselijk."
+note: "Sprint 7 auto-advance is gereed voor PR-review; alle lokale gates zijn groen en PIPELINE_AUTOMERGE blijft uit."
 ---
 
 # handoff.md — de estafettestok
@@ -17,7 +17,7 @@ note: "Sprint 7 gestart: Codex bouwt de fail-safe PR-gate auto-advance; kill-swi
 
 **Sprint 7 — PR-gate auto-advance.** Ontwerp: **ADR-0023**; taak: `docs/gates/Codex-taak-pr-auto-advance.md`.
 
-Codex bouwt een fail-safe GitHub Action die uitsluitend bij `PIPELINE_AUTOMERGE=on`, een pipelinebranch/label, alle vereiste groene checks, geen wijzigingsverzoek en een mergeklare PR mag squash-mergen. Daarna zet een apart, idempotent en dependency-vrij script `READY_FOR_TEST` door naar `READY_FOR_VALIDATION`. Bij twijfel gebeurt niets; deploy en productie worden nooit geraakt. De switch blijft tijdens bouw en review uit.
+**Opgeleverd op deze branch:** een fail-safe GitHub Action die uitsluitend bij `PIPELINE_AUTOMERGE=on`, een interne pipelinebranch/label, de drie vereiste checks uit hun verwachte workflows, geen wijzigingsverzoek en een mergeklare PR mag squash-mergen — gebonden aan exact de gecontroleerde head-SHA. Daarna zet een apart, idempotent en dependency-vrij script alleen `READY_FOR_TEST/gemini` door naar `READY_FOR_VALIDATION/claude`. Onbekende, ongeldige, incomplete of reeds verwerkte staten zijn no-op; een handmatige hersteltrigger kan na een geslaagde merge uitsluitend de baton alsnog doorzetten. Bewijs: 82 Node-tests, 80 Python-tests, YAML-, handoff-, architectuur-, release- en PII-gates groen. `PIPELINE_AUTOMERGE` bestaat nog niet en is dus fail-safe uit; deploy/productie worden niet geraakt.
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
@@ -28,3 +28,4 @@ Codex bouwt een fail-safe GitHub Action die uitsluitend bij `PIPELINE_AUTOMERGE=
 - 2026-08-12 — Codex: PR #12 gemerged; A2/A4 op PR #13 met opt-in runner, kill-switch/caps/foutpoort en lokale meekijklaag; 61+68 tests, gates en Gemini groen. → READY_FOR_VALIDATION.
 - 2026-08-12 — Codex: Sprint 6 rol-runners gebouwd; deterministische Mistral-integratie + menselijke deploypoort, concrete Codex-/Claude-ARGV en fixturecontracttests; 72+69 tests en alle lokale gates groen. → READY_FOR_TEST.
 - 2026-08-13 — Codex: PR #15 gemerged; Sprint 7 geclaimd op `agent/sprint-7-pr-auto-advance`; kill-switch blijft uit. → DEV_IN_PROGRESS.
+- 2026-08-13 — Codex: auto-advance gebouwd met vertrouwde-main-evaluatie, exacte check/workflowbinding, head-SHA-binding, idempotente batontransitie en hersteltrigger; 82+80 tests en alle lokale gates groen. → READY_FOR_TEST.
