@@ -80,6 +80,20 @@ class CheckPipelinePrTests(unittest.TestCase):
         self.assertEqual(result.decision, "noop")
         self.assertIn("check niet groen", result.reason)
 
+    def test_required_checks_after_many_unrelated_checks_are_evaluated(self) -> None:
+        payload = green_pr()
+        required = payload["statusCheckRollup"]
+        payload["statusCheckRollup"] = [
+            {
+                "name": f"irrelevant-{index:03d}",
+                "workflowName": "Andere workflow",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+            }
+            for index in range(125)
+        ] + required
+        self.assertEqual(self.evaluate(payload).decision, "merge")
+
     def test_review_request_draft_wrong_repo_and_wrong_base_are_noop(self) -> None:
         mutations = [
             ("reviewDecision", "CHANGES_REQUESTED"),

@@ -19,7 +19,7 @@ permissions:
   checks: read
 
 concurrency:
-  group: pipeline-autoadvance-${{ github.event.workflow_run.head_sha || inputs.pr_number }}
+  group: pipeline-autoadvance-main-push
   cancel-in-progress: false
 
 jobs:

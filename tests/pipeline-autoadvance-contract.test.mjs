@@ -17,6 +17,7 @@ test('auto-advance is default-uit en heeft begrensde triggers plus concurrency',
   assert.match(WORKFLOW, /workflow_run:/);
   assert.match(WORKFLOW, /workflow_dispatch:/);
   assert.match(WORKFLOW, /if: vars\.PIPELINE_AUTOMERGE == 'on'/);
+  assert.match(WORKFLOW, /group: pipeline-autoadvance-main-push/);
   assert.match(WORKFLOW, /concurrency:[\s\S]*cancel-in-progress: false/);
 });
 

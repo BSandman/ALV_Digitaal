@@ -134,6 +134,21 @@ class AdvanceAfterMergeTests(unittest.TestCase):
         lint_handoff.validate_values(parsed)
         self.assertEqual(parsed["note"], "Regel 'één' regel twee")
 
+    def test_utf8_bom_and_crlf_are_normalized_on_advance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "handoff.md"
+            path.write_bytes(b"\xef\xbb\xbf" + READY.replace("\n", "\r\n").encode("utf-8"))
+            changed, reason = advance.advance_handoff(
+                path, gate_green=True, now="2026-08-14T08:00:00Z"
+            )
+            self.assertTrue(changed, reason)
+            result = path.read_bytes()
+            self.assertFalse(result.startswith(b"\xef\xbb\xbf"))
+            self.assertNotIn(b"\r\n", result)
+            lint_handoff.validate_values(
+                lint_handoff.parse_frontmatter(result.decode("utf-8"))
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
