@@ -64,7 +64,7 @@ Geneste, **aan/uit-schakelbare** modules. Aanpak: modulaire monoliet in één re
 - ADR-0006 — Bewaartermijnen + datamodel + stemvaststelling
 - ADR-0007 — Repo-scope (ALV_Digitaal = eigen repo) + coördinatie-topologie
 - ADR-0008 — Domeinregels: multi-VvE-stemrechten (PG + TF/NB, nooit samenvoegen), machtiging vervalt bij login, exacte rekenkunde
-- ADR-0009 — Quorummodel: vergadering-breed, éénmalig door voorzitter vastgesteld, grondslag aanwezigen + machtigingen, bevroren; geen herberekening per ronde
+- ADR-0009 — Quorummodel (VERVANGEN door ADR-0021): was vergadering-breed/bevroren; kernregel "grondslag = presentie, niet uitgebrachte stemmen" blijft
 - ADR-0010 — Stemregistratie: niet/te laat gestemd = onthouding (geauditeerd), gelijk aan blanco stemformulier; blanco+onthouding niet-beslissend
 - ADR-0011 — In-app stemkeuze: alleen Voor/Tegen (twee knoppen); onthouding (afgeleid) en blanco (fysiek formulier) alleen als resultaat
 - ADR-0012 — Secrets-locatie: configbestand buiten de webroot (chmod 600) per omgeving, via niet-geheime `SECRETS_FILE`; nooit in Git/artefact/.htaccess
@@ -74,6 +74,10 @@ Geneste, **aan/uit-schakelbare** modules. Aanpak: modulaire monoliet in één re
 - ADR-0016 — Auth-model: magic-link-als-QR (gebonden token) + toegangscode-fallback + optionele roteerbare PIN (opt-in, ingebakken); geen e-mail-OTP als live-drempel; welkomstbrief geeft codes+PIN uit
 - ADR-0017 — Autorun: watcher-act() start de rol-runner; vangrails (kill-switch, loop-cap, stop-on-error→BLOCKED, deploy blijft mens); één notifier (exception-based, gededupliceerd, e-mail+push); attended-first
 - ADR-0018 — Stemronde-scope per VvE + één stemactie per eigenaar: ronde-scope = deelnemende splitsingen; stemgerechtigd bij ≥1 in-scope recht; één Voor/Tegen-keuze gefan-out naar al zijn in-scope rechten (eigen breukdeel, per VvE geteld), niet splitsbaar; quorum/2⁄3 per betrokken VvE; geen acclamatie
+- ADR-0019 — Rol-runners voor autorun: contract (stdin-context → één beurt → volgende READY, commit+push, schoon/in-sync, exit 0, nooit deploy). Codex=`codex exec -`, Claude=Claude Code headless (validatiebeurt), Mistral=deterministisch Node-integrator-script (Ollama alleen voor bestaande naamstap); Gemini geen lokale runner
+- ADR-0020 — Login-identiteit: stemmer = eigenaar (niet bewoner); één eigenaarstitel = één credential = één magic-link naar één primaire e-mail (default eerst-genoemde bij 2; code-fallback bij 0); datakwaliteitspoort bij setup; sub-accounts/bewonerfuncties = fase-later platform
+- ADR-0021 — Presentie & quorum (supersedes ADR-0009): presentie = login, telt monotoon (vertrek verlaagt quorum niet, uitloggen gelogd); quorum per ronde bij admin-activatie; stemknop alleen voor wie op activatiemoment is ingelogd (laatkomer pas volgende ronde); present-niet-gestemd/vertrokken = onthouding
+- ADR-0022 — Machtiging & stemformulier: twee stromen op één genummerd formulier; gemachtigde krijgt eigen QR/magic-link (naam+e-mail, ≥1 dag vooraf), eigenaarslink blijft actief; eigenaar-login vernietigt machtiging óf stemformulier onherstelbaar (breidt ADR-0008 uit); digitale intake + gemachtigde-UX geparkeerd
 
 ## 10. Sleuteldocumenten
 
