@@ -127,6 +127,8 @@ Zie voorstel §8 en ADR-0003.
 
 Dit project volgt **`file_structure.md`** — het projectbrede skelet (root schoon, `README` = ingang, `bijbel.md` = waarheid, `docs/ADR/` = besluiten, archief eerst zippen dan oude zips weg). **Afwijkingen voor dit projecttype** (§7): een multi-AI tool-project, dus met een extra coördinatielaag (`AGENTS.md`, `docs/gates/`, `handoff.md`/`sprint.md`/`progress.md`) en `infra/` voor de Docker dev/test/CI-omgeving. De private deploy-key (`alv_acc_deploy`) staat gitignored buiten het versiebeheer.
 
+De serverless PR-gate staat in `.github/workflows/pipeline-autoadvance.yml`. Repovariabele `PIPELINE_AUTOMERGE` is fail-safe standaard uit; alleen Bas zet haar na validatie tijdelijk `on` voor een begeleide pipelinecyclus. Dit automatiseert uitsluitend merge + batonoverdracht en nooit deploy/productie (ADR-0023).
+
 ## Versiebeheer
 
 `vX.y.z` — X major, y minor, z patch. Documenten dragen de versie in de bestandsnaam;

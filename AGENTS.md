@@ -98,6 +98,8 @@ Activeren = per agent-omgeving `python scripts/watch_handoff.py --role <rol>` st
 4. Pauzeer alle watchers direct met `New-Item autorun.paused -ItemType File -Force`; dit breekt ook een actieve runner-procesboom af. Hervat pas bewust met `Remove-Item -LiteralPath .\autorun.paused`. `Ctrl+C` stopt de huidige watcher en zijn runner-procesboom.
 5. Kijk mee via `scripts/status.ps1` of `status.html`. Bij een runner-/statefout zet de watcher de baton op `BLOCKED`, meldt Bas en stopt zonder retry. Autorun mag nooit deployen; `action_required_by: bas` blijft een menselijke poort.
 
+De PR-gate kan na afzonderlijke validatie attended worden getest met de GitHub Actions-repovariabele `PIPELINE_AUTOMERGE=on`; ontbrekend of iedere andere waarde betekent **uit**. Alleen `agent/*`-branches (of een expliciet `pipeline`-label) naar `main` komen in aanmerking. De Action vereist de handoff-gate, CI-gates en Gemini-review groen, weigert drafts/forks/conflicten/wijzigingsverzoeken, squash-merget exact de gecontroleerde head en zet alleen `READY_FOR_TEST` door naar `READY_FOR_VALIDATION`. Zet de variabele direct weer `off` om automatisch mergen te pauzeren. Onbemand vereist zowel deze switch `on` als de drie lokale rolwatchers; geen van beide verleent deployrechten.
+
 Onbemand of overnight draaien blijft uit totdat meerdere begeleide cycli inclusief kill-switch en notifier aantoonbaar groen zijn en Bas dit afzonderlijk activeert.
 
 ## Meekijken
