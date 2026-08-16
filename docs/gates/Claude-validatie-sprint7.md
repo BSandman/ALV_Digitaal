@@ -1,6 +1,6 @@
 # Claude-validatie — Sprint 7 (PR-gate auto-advance)
 
-**Uitkomst:** GROEN (architect-review; formele validatie zodra de baton bij Claude is). Getoetst tegen ADR-0023 en ADR-0017.
+**Uitkomst:** GROEN (architect-review; formele validatie zodra de baton bij Claude is). Getoetst tegen ADR-0023/ADR-0017.
 **Datum:** 13 augustus 2026 — Claude (Validator).
 
 ## Wat is getoetst
@@ -30,6 +30,6 @@ Tests aanwezig: `tests/test_advance_after_merge.py`, `tests/test_check_pipeline_
 
 ## Conclusie
 
-Voldoet aan ADR-0023 en ADR-0017; de implementatie overtreft de spec in strengheid (fork-weigering, TOCTOU-recheck, match-head-commit, workflow-binding). Geen blokkerende bevindingen.
+Voldoet aan ADR-0023/ADR-0017; de implementatie overtreft de spec in strengheid (fork-weigering, TOCTOU-recheck, match-head-commit, workflow-binding). Geen blokkerende bevindingen.
 
 **Bootstrap-nuance:** deze PR (die de auto-advance tóevoegt) advanced zichzelf niet — `PIPELINE_AUTOMERGE` staat uit, dus hij wordt **handmatig** gemerged, net als Sprint 6. Daarna: attended proef met de switch aan op een volgende pipeline-PR, en dan pas onbemand.
