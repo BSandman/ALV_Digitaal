@@ -1,12 +1,12 @@
 ---
 sprint: 9
-state: BLOCKED
-owner: bas
-since: 2026-08-16T17:33:04Z
-next: claude
-action_required_by: bas
-blocked: true
-note: "Autorun claude gestopt: runner eindigde met exitcode 1; zie autorun.log."
+state: READY_FOR_VALIDATION
+owner: claude
+since: 2026-08-16T17:50:00Z
+next: mistral
+action_required_by: none
+blocked: false
+note: "Hervat validatie na Claude re-auth (langlevend token gezet)."
 ---
 
 # handoff.md — de estafettestok
