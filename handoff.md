@@ -1,12 +1,12 @@
 ---
-sprint: 8
-state: READY_FOR_TEST
-owner: gemini
-since: 2026-08-16T12:31:17Z
-next: gemini
+sprint: 9
+state: READY_FOR_DEV
+owner: codex
+since: 2026-08-16T16:04:17Z
+next: codex
 action_required_by: none
 blocked: false
-note: "Sprint 8 formele Gemini-approval is gereed voor PR-review; alle lokale gates zijn groen en PIPELINE_AUTOMERGE blijft uit."
+note: "Sprint 9: corrigeer autorun.config.example.ps1 naar werkende Codex v0.147-ARGV."
 ---
 
 # handoff.md — de estafettestok
