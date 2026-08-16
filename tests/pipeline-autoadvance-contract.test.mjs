@@ -43,7 +43,8 @@ test('evaluator vereist de twee CI-poorten en Gemini-review expliciet', () => {
   }
   assert.match(EVALUATOR, /CHANGES_REQUESTED/);
   assert.match(EVALUATOR, /APPROVED/);
-  assert.match(EVALUATOR, /github-actions\[bot\]/);
+  assert.match(EVALUATOR, /EXPECTED_REVIEWER = "github-actions"/);
+  assert.match(EVALUATOR, /endswith\(bot_suffix\)/);
   assert.match(EVALUATOR, /head_ref\.startswith\("agent\/"\)/);
   assert.match(EVALUATOR, /"pipeline" not in labels/);
 });

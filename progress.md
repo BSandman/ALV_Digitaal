@@ -81,6 +81,7 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 ## Sprint 8 — formele Gemini-approval (loopt)
 
 - 2026-08-16 · Codex · **PR #16 stond reeds gemerged op `main`; Sprint 8 groen+approved gereed voor PR-review:** Gemini sluit af met één exact, machine-leesbaar verdict en plaatst een aan de PR-head gebonden formele review; ontbrekend, ambigu of niet-finaal verdict wordt veilig `REQUEST_CHANGES`. De auto-advance eist naast de drie verwachte groene checks een expliciete `APPROVED`-review van `github-actions[bot]`; andere auteurs en ongeldige metadata blijven no-op. Het attended-runbook noemt de vereiste GitHub-instelling voor bot-approvals. Bewijs: 83/83 Node-tests, 91/91 Python-tests, workflow-YAML, handoff-, architectuur-, release- en PII-gates groen; één bekende Windows Job Object-timingrace was bij gerichte en volledige herhaling groen. `PIPELINE_AUTOMERGE` bleef uit; geen deploy/productie. → READY_FOR_TEST (Gemini via PR).
+- 2026-08-16 · Codex · **PR #17 echte bot-approvalfollow-up:** GitHub rapporteert dezelfde Actions-bot via GraphQL als `github-actions` en elders als `github-actions[bot]`. De evaluator stript daarom uitsluitend een optionele terminale `[bot]`-suffix en vergelijkt daarna met `github-actions`; beide vormen mergen bij verder groene gates, iedere andere auteur blijft fail-closed `noop`. Bewijs: 83/83 Node-tests en 92/92 Python-tests groen. Geen ADR-wijziging; `PIPELINE_AUTOMERGE` bleef uit. → READY_FOR_TEST.
 
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 

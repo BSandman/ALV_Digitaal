@@ -16,7 +16,7 @@ REQUIRED_CHECKS = {
     "gates": "T-run architecture and privacy gates",
     "review": "Gemini Lead Tester Review",
 }
-EXPECTED_REVIEWER = "github-actions[bot]"
+EXPECTED_REVIEWER = "github-actions"
 
 
 @dataclass(frozen=True)
@@ -41,6 +41,15 @@ def _review_author(review: Mapping[str, Any]) -> str:
     if not isinstance(author, Mapping):
         return ""
     return str(author.get("login", ""))
+
+
+def _normalize_reviewer_login(login: str) -> str:
+    """Normalize GitHub's GraphQL and REST spellings for bot logins."""
+    normalized = login.casefold()
+    bot_suffix = "[bot]"
+    if normalized.endswith(bot_suffix):
+        normalized = normalized[: -len(bot_suffix)]
+    return normalized
 
 
 def evaluate_pr(pr: Mapping[str, Any], *, repository: str) -> Evaluation:
@@ -83,7 +92,7 @@ def evaluate_pr(pr: Mapping[str, Any], *, repository: str) -> Evaluation:
     if not any(
         isinstance(review, Mapping)
         and review.get("state") == "APPROVED"
-        and _review_author(review).casefold() == EXPECTED_REVIEWER.casefold()
+        and _normalize_reviewer_login(_review_author(review)) == EXPECTED_REVIEWER
         for review in latest_reviews
     ):
         return Evaluation("noop", "expliciete Gemini-goedkeuring ontbreekt", head_sha)

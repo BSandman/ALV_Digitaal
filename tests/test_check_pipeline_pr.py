@@ -141,6 +141,13 @@ class CheckPipelinePrTests(unittest.TestCase):
         invalid_reviews["latestReviews"] = None
         self.assertEqual(self.evaluate(invalid_reviews).decision, "noop")
 
+    def test_expected_gemini_reviewer_accepts_both_github_login_forms(self) -> None:
+        for login in ("github-actions", "github-actions[bot]"):
+            with self.subTest(login=login):
+                payload = green_pr()
+                payload["latestReviews"][0]["author"]["login"] = login
+                self.assertEqual(self.evaluate(payload).decision, "merge")
+
     def test_unknown_mergeability_or_malformed_payload_is_noop(self) -> None:
         payload = green_pr()
         payload["mergeable"] = "UNKNOWN"
