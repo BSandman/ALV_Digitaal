@@ -1,12 +1,12 @@
 ---
 sprint: 9
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-16T16:05:09Z
-next: codex
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-16T16:08:16Z
+next: gemini
 action_required_by: none
 blocked: false
-note: "Sprint 9: Codex corrigeert de attended-autorun-ARGV voor Codex CLI v0.147."
+note: "Sprint 9 Codex v0.147-ARGV is gecorrigeerd en lokaal groen; gereed voor Gemini-review."
 ---
 
 # handoff.md — de estafettestok

@@ -259,11 +259,22 @@ test('twee volledige runs met dezelfde context en tijd leveren dezelfde bestande
 
 test('voorbeeldconfig bevat alleen concrete lokale runners en geen Gemini-runner', () => {
   const config = fs.readFileSync(path.join(ROOT, 'mistral-lokaal', 'autorun.config.example.ps1'), 'utf8');
+  const codexArgvMatch = config.match(/ALV_AUTORUN_CODEX_ARGV\s*=\s*'([^']+)'/);
   assert.match(config, /ALV_AUTORUN_CODEX_ARGV\s*=/);
   assert.match(config, /ALV_AUTORUN_CLAUDE_ARGV\s*=/);
   assert.match(config, /ALV_AUTORUN_MISTRAL_ARGV\s*=/);
   assert.doesNotMatch(config, /ALV_AUTORUN_GEMINI_ARGV/);
-  assert.match(config, /--ask-for-approval.*never/);
+  assert.ok(codexArgvMatch);
+  assert.deepEqual(JSON.parse(codexArgvMatch[1]), [
+    'codex',
+    'exec',
+    '--sandbox',
+    'workspace-write',
+    '--ephemeral',
+    '--config',
+    'sandbox_workspace_write.network_access=true',
+    '-',
+  ]);
   assert.match(config, /--permission-mode.*dontAsk/);
   assert.match(config, /run_integration_turn\.mjs.*--stdin/);
 });
