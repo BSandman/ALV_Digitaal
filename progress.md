@@ -115,3 +115,5 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 ## Sprint 0 — Architectuur (afgerond, samengevat)
 
 Architectuurvoorstel v0.2.0 met vier-AI-gatemodel, ADR-0001..0003 (Docker-alleen-dev/test, zes shared-hosting-regels, MariaDB 11.8.8 bevestigd), Docker-scaffold en deploy-scriptvoorzet. Basis voor de OTAP-opzet.
+
+- 2026-08-16 · Mistral · **Sprint 9 integratie groen: Python-, app-, architectuur-, release- en PII-gates geslaagd; niet gedeployed.**
