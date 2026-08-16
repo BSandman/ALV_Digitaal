@@ -1,12 +1,12 @@
 ---
 sprint: 9
-state: READY_FOR_INTEGRATION
+state: INTEGRATION_IN_PROGRESS
 owner: mistral
-since: 2026-08-16T18:58:00Z
-next: mistral
+since: 2026-08-16T18:59:58Z
+next: claude
 action_required_by: none
 blocked: false
-note: "PR#19 (Codex v0.147 argv-fix) gevalideerd tegen ADR-0017/0023: 94/94 py-tests groen, 82/83 node-tests groen (1 falen is lokale tar/git-bash padquirk, geen coderegressie)."
+note: "Mistral voert de vaste integratiecontroles uit; deploy blijft uit."
 ---
 
 # handoff.md — de estafettestok
