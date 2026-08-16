@@ -5,7 +5,7 @@
 # Runnercommando's zijn JSON-arrays: elk argument blijft hierdoor exact gescheiden.
 # Codex krijgt een schrijfbare workspace, geen vragen, geen blijvende sessie en alleen
 # netwerktoegang binnen die sandbox voor de verplichte Git-push.
-$env:ALV_AUTORUN_CODEX_ARGV = '["codex","exec","--sandbox","workspace-write","--ask-for-approval","never","--ephemeral","--config","sandbox_workspace_write.network_access=true","-"]'
+$env:ALV_AUTORUN_CODEX_ARGV = '["codex","exec","--sandbox","workspace-write","--ephemeral","--config","sandbox_workspace_write.network_access=true","-"]'
 
 # Claude draait headless met een expliciete toolset. dontAsk weigert al het overige
 # in plaats van tijdens een onbemande beurt een vraag te stellen.

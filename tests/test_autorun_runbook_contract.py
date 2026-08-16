@@ -18,8 +18,10 @@ class AutorunRunbookContractTests(unittest.TestCase):
             "attended-first",
             "action_required_by: bas",
             "Onbemand of overnight draaien blijft uit",
+            "--config sandbox_workspace_write.network_access=true",
         ):
             self.assertIn(required, agents)
+        self.assertNotIn("--ask-for-approval", agents)
 
     def test_example_config_documents_runners_caps_and_notifier(self) -> None:
         example = (

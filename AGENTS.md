@@ -91,7 +91,7 @@ Activeren = per agent-omgeving `python scripts/watch_handoff.py --role <rol>` st
 
 1. Kopieer `mistral-lokaal/autorun.config.example.ps1` lokaal naar `mistral-lokaal/secure/autorun.config.ps1` en laad de instellingen met `. .\mistral-lokaal\secure\autorun.config.ps1`. Pas alleen een lokaal pad aan als het programma niet via `PATH` vindbaar is. Geheimen en lokale paden blijven zo buiten Git. Gemini krijgt nooit een lokale runner.
 2. Controleer en test ieder runnercommando eerst **los** in dezelfde PowerShell-sessie:
-   - Codex: `Get-Command codex`; daarna `'Lees stdin, wijzig niets en antwoord alleen RUNNER_OK.' | codex exec --sandbox workspace-write --ask-for-approval never --ephemeral --config sandbox_workspace_write.network_access=true -`.
+   - Codex: `Get-Command codex`; daarna `'Lees stdin, wijzig niets en antwoord alleen RUNNER_OK.' | codex exec --sandbox workspace-write --ephemeral --config sandbox_workspace_write.network_access=true -`.
    - Claude: `Get-Command claude`; daarna `'Lees stdin, wijzig niets en antwoord alleen RUNNER_OK.' | claude --print --input-format text --output-format text --permission-mode dontAsk --tools Read --allowedTools Read --max-turns 1 --no-session-persistence`.
    - Mistral: `node mistral-lokaal/scripts/run_integration_turn.mjs --help`. Start de echte integratiebeurt alleen via de watcher; de runner claimt en commit de baton.
 3. Start daarna **attended-first**, met Bas achter het scherm en maximaal één beurt: `python scripts/watch_handoff.py --role <rol> --autorun --max-turns 1`. CLI-opties overschrijven de lokale defaults. De eerste echte beurt per rol moet eindigen met een schone working tree en `HEAD...@{u}` = `0 0`.

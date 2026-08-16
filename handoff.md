@@ -1,12 +1,12 @@
 ---
 sprint: 9
-state: READY_FOR_DEV
-owner: codex
-since: 2026-08-16T16:04:17Z
-next: codex
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-16T16:08:16Z
+next: gemini
 action_required_by: none
 blocked: false
-note: "Sprint 9: corrigeer autorun.config.example.ps1 naar werkende Codex v0.147-ARGV."
+note: "Sprint 9 Codex v0.147-ARGV is gecorrigeerd en lokaal groen; gereed voor Gemini-review."
 ---
 
 # handoff.md — de estafettestok
