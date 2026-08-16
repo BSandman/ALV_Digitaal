@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate handoff.md frontmatter without third-party dependencies."""
+"""Validate handoff.md size and frontmatter without third-party dependencies."""
 
 from __future__ import annotations
 
@@ -36,6 +36,7 @@ STATE_OWNERS = {
     "SPRINT_DONE": {"claude", "bas"},
 }
 OWNERS = {"claude", "codex", "gemini", "mistral", "bas"}
+MAX_HANDOFF_LINES = 20
 
 
 class HandoffValidationError(ValueError):
@@ -141,6 +142,11 @@ def validate_file(path: Path) -> None:
         text = path.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError) as exc:
         raise HandoffValidationError(f"kan {path} niet als UTF-8 lezen: {exc}") from exc
+    line_count = len(text.splitlines())
+    if line_count > MAX_HANDOFF_LINES:
+        raise HandoffValidationError(
+            f"handoff.md telt {line_count} regels; maximaal {MAX_HANDOFF_LINES} toegestaan"
+        )
     validate_values(parse_frontmatter(text))
 
 

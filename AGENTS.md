@@ -117,6 +117,7 @@ Onbemand of overnight draaien blijft uit totdat meerdere begeleide cycli inclusi
 
 - README.md en bijbel.md: alleen Claude schrijft; anderen stellen voor via handoff.
 - Eén eigenaar tegelijk; alleen de eigenaar schrijft `handoff.md`.
+- **`handoff.md` blijft altijd ≤ 20 regels** (harde eis; afgedwongen door `lint_handoff.py`). Body minimaal; beurt-log/details in `progress.md`.
 - 60 s wachten vóór het claimen van een beurt.
 - Productcode uitsluitend via Codex; deploy uitsluitend via Mistral.
 - Geen echte PII in O/T/CI (ADR-0004/0005).

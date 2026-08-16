@@ -44,6 +44,19 @@ class LintHandoffTests(unittest.TestCase):
             path.write_text(VALID, encoding="utf-8")
             lint_handoff.validate_file(path)
 
+    def test_exactly_twenty_lines_is_green(self) -> None:
+        padding = ["detail"] * (lint_handoff.MAX_HANDOFF_LINES - len(VALID.splitlines()))
+        text = "\n".join([*VALID.splitlines(), *padding])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "handoff.md"
+            path.write_text(text, encoding="utf-8")
+            lint_handoff.validate_file(path)
+
+    def test_more_than_twenty_lines_is_red(self) -> None:
+        padding = ["detail"] * (lint_handoff.MAX_HANDOFF_LINES + 1 - len(VALID.splitlines()))
+        text = "\n".join([*VALID.splitlines(), *padding])
+        self.assert_invalid(text, "maximaal 20")
+
     def test_crlf_handoff_is_green(self) -> None:
         values = lint_handoff.parse_frontmatter(VALID.replace("\n", "\r\n"))
         lint_handoff.validate_values(values)
