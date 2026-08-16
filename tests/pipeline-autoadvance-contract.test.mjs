@@ -11,6 +11,10 @@ const WORKFLOW = fs.readFileSync(
   'utf8',
 );
 const EVALUATOR = fs.readFileSync(path.join(ROOT, 'scripts', 'check_pipeline_pr.py'), 'utf8');
+const GEMINI_WORKFLOW = fs.readFileSync(
+  path.join(ROOT, '.github', 'workflows', 'gemini-review.yml'),
+  'utf8',
+);
 
 
 test('auto-advance is default-uit en heeft begrensde triggers plus concurrency', () => {
@@ -38,12 +42,25 @@ test('evaluator vereist de twee CI-poorten en Gemini-review expliciet', () => {
     assert.match(EVALUATOR, new RegExp(JSON.stringify(name).slice(1, -1)));
   }
   assert.match(EVALUATOR, /CHANGES_REQUESTED/);
+  assert.match(EVALUATOR, /APPROVED/);
+  assert.match(EVALUATOR, /github-actions\[bot\]/);
   assert.match(EVALUATOR, /head_ref\.startswith\("agent\/"\)/);
   assert.match(EVALUATOR, /"pipeline" not in labels/);
 });
 
+test('Gemini plaatst een formele fail-closed review in plaats van een comment', () => {
+  assert.match(GEMINI_WORKFLOW, /VERDICT: APPROVE/);
+  assert.match(GEMINI_WORKFLOW, /VERDICT: REQUEST_CHANGES/);
+  assert.match(GEMINI_WORKFLOW, /parse_gemini_verdict\.py/);
+  assert.match(GEMINI_WORKFLOW, /pulls\.createReview/);
+  assert.match(GEMINI_WORKFLOW, /commit_id: context\.payload\.pull_request\.head\.sha/);
+  assert.doesNotMatch(GEMINI_WORKFLOW, /issues\.createComment/);
+});
+
 test('workflowrechten zijn beperkt tot checks, PR en inhoud', () => {
-  const permissionBlock = WORKFLOW.match(/permissions:\n([\s\S]*?)\n\nconcurrency:/)?.[1] ?? '';
+  const permissionBlock = WORKFLOW.match(
+    /permissions:\r?\n([\s\S]*?)\r?\n\r?\nconcurrency:/,
+  )?.[1] ?? '';
   assert.match(permissionBlock, /contents: write/);
   assert.match(permissionBlock, /pull-requests: write/);
   assert.match(permissionBlock, /checks: read/);

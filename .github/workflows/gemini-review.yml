@@ -34,7 +34,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash   # actueel model (aug 2026); bij 404 toont het log de beschikbare modellen voor jouw key
         run: |
-          INTRO="Je bent de Lead Tester in een softwareontwikkelingsteam voor een VvE-stem/presentie-app (server-side stemverwerking in MariaDB, atomair sluiten, quorum en gekwalificeerde meerderheden). Analyseer onderstaande code-diff. Schrijf concrete suggesties voor unit-tests, randgevallen (edge cases) en risico's, met bijzondere aandacht voor race-condities bij gelijktijdig stemmen en voor server-side autorisatie per eigenaarsgroep:"
+          INTRO="Je bent de Lead Tester in een softwareontwikkelingsteam voor een VvE-stem/presentie-app (server-side stemverwerking in MariaDB, atomair sluiten, quorum en gekwalificeerde meerderheden). Analyseer onderstaande code-diff. Schrijf concrete suggesties voor unit-tests, randgevallen (edge cases) en risico's, met bijzondere aandacht voor race-condities bij gelijktijdig stemmen en voor server-side autorisatie per eigenaarsgroep. Sluit je antwoord af met exact een van deze twee machine-leesbare regels, zonder tekst erna: VERDICT: APPROVE wanneer er geen blokkerende bevindingen zijn, of VERDICT: REQUEST_CHANGES wanneer aanpassingen nodig zijn. Licht een REQUEST_CHANGES vóór de verdictregel kort toe:"
           jq -n --arg intro "$INTRO" --rawfile diff pr_diff.txt \
             '{ contents: [{ parts: [{ text: ($intro + "\n\n" + $diff) }] }] }' \
             > payload.json
@@ -83,15 +83,32 @@ jobs:
           fi
           printf '%s' "$REVIEW" > review_output.txt
 
-      - name: Plaats Feedback als PR Comment
+      - name: Bepaal formeel reviewverdict fail-closed
+        id: verdict
+        run: python scripts/parse_gemini_verdict.py review_output.txt --github-output "$GITHUB_OUTPUT"
+
+      - name: Plaats formele Gemini-review
         uses: actions/github-script@v7
+        env:
+          REVIEW_EVENT: ${{ steps.verdict.outputs.event }}
+          VERDICT_VALID: ${{ steps.verdict.outputs.valid }}
         with:
           script: |
             const fs = require('fs');
             const reviewText = fs.readFileSync('review_output.txt', 'utf8');
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
+            const event = process.env.REVIEW_EVENT;
+            if (!['APPROVE', 'REQUEST_CHANGES'].includes(event)) {
+              core.setFailed(`Onveilig of onbekend review-event: ${event}`);
+              return;
+            }
+            const failClosedNote = process.env.VERDICT_VALID === 'true'
+              ? ''
+              : '\n\n> De verdict-trailer ontbrak, was dubbelzinnig of stond niet als laatste regel; daarom is fail-closed om wijzigingen gevraagd.';
+            await github.rest.pulls.createReview({
+              pull_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `### 🧪 Gemini Lead Tester Review\n\n${reviewText}`
+              commit_id: context.payload.pull_request.head.sha,
+              event,
+              body: `### 🧪 Gemini Lead Tester Review\n\n${reviewText}${failClosedNote}`
             });

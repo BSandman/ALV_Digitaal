@@ -17,7 +17,7 @@ Een **GitHub Action** (`pipeline-autoadvance`) sluit het gat, want de PR leeft o
 
 1. **Kill-switch aan:** repo-Actions-variabele `PIPELINE_AUTOMERGE == 'on'`. **Default = off** (attended-first, ADR-0017). Alleen Bas zet 'm aan.
 2. **Pipeline-PR:** head-branch matcht `agent/*` (of label `pipeline`); base = `main`. Nooit een release-/productiebranch.
-3. **Alles groen:** álle vereiste status-checks (CI-gates uit `ci.yml`) = success **én** de Gemini-review = groen/approved; geen `changes-requested`; mergebaar (geen conflict).
+3. **Groen vinkje ÉN approved:** álle vereiste status-checks (CI-gates uit `ci.yml` én de Gemini-workflow) = success, **én** er staat een **expliciete `APPROVED`-review** van de Gemini-reviewer op de PR; geen enkele `CHANGES_REQUESTED`; mergebaar (geen conflict). De groene check alleen is niet genoeg — de formele approve moet er zijn (besluit Bas 13-08-2026).
 
 ### Actie (idempotent)
 
