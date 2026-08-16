@@ -1,12 +1,12 @@
 ---
 sprint: 9
-state: READY_FOR_DEV
+state: DEV_IN_PROGRESS
 owner: codex
-since: 2026-08-16T16:04:17Z
+since: 2026-08-16T16:05:09Z
 next: codex
 action_required_by: none
 blocked: false
-note: "Sprint 9: corrigeer autorun.config.example.ps1 naar werkende Codex v0.147-ARGV."
+note: "Sprint 9: Codex corrigeert de attended-autorun-ARGV voor Codex CLI v0.147."
 ---
 
 # handoff.md — de estafettestok
