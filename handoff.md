@@ -1,12 +1,12 @@
 ---
 sprint: 9
-state: READY_FOR_TEST
-owner: gemini
-since: 2026-08-16T16:08:16Z
-next: gemini
+state: READY_FOR_VALIDATION
+owner: claude
+since: 2026-08-16T17:17:46Z
+next: mistral
 action_required_by: none
 blocked: false
-note: "Sprint 9 Codex v0.147-ARGV is gecorrigeerd en lokaal groen; gereed voor Gemini-review."
+note: "PR-gates en Gemini zijn groen; Claude valideert de gemergde sprint."
 ---
 
 # handoff.md — de estafettestok
