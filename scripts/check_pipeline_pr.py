@@ -16,6 +16,7 @@ REQUIRED_CHECKS = {
     "gates": "T-run architecture and privacy gates",
     "review": "Gemini Lead Tester Review",
 }
+EXPECTED_REVIEWER = "github-actions"
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,22 @@ def _repository_name(pr: Mapping[str, Any]) -> str:
     name = repository.get("name") if isinstance(repository, Mapping) else ""
     login = owner.get("login") if isinstance(owner, Mapping) else ""
     return f"{login}/{name}" if login and name else ""
+
+
+def _review_author(review: Mapping[str, Any]) -> str:
+    author = review.get("author") or {}
+    if not isinstance(author, Mapping):
+        return ""
+    return str(author.get("login", ""))
+
+
+def _normalize_reviewer_login(login: str) -> str:
+    """Normalize GitHub's GraphQL and REST spellings for bot logins."""
+    normalized = login.casefold()
+    bot_suffix = "[bot]"
+    if normalized.endswith(bot_suffix):
+        normalized = normalized[: -len(bot_suffix)]
+    return normalized
 
 
 def evaluate_pr(pr: Mapping[str, Any], *, repository: str) -> Evaluation:
@@ -65,14 +82,26 @@ def evaluate_pr(pr: Mapping[str, Any], *, repository: str) -> Evaluation:
     if str(pr.get("reviewDecision", "")) == "CHANGES_REQUESTED":
         return Evaluation("noop", "wijzigingen aangevraagd", head_sha)
     latest_reviews = pr.get("latestReviews", [])
+    if not isinstance(latest_reviews, list):
+        return Evaluation("noop", "reviewmetadata ontbreekt of is ongeldig", head_sha)
     if any(
         isinstance(review, Mapping) and review.get("state") == "CHANGES_REQUESTED"
         for review in latest_reviews
     ):
         return Evaluation("noop", "actief wijzigingsverzoek", head_sha)
+    if not any(
+        isinstance(review, Mapping)
+        and review.get("state") == "APPROVED"
+        and _normalize_reviewer_login(_review_author(review)) == EXPECTED_REVIEWER
+        for review in latest_reviews
+    ):
+        return Evaluation("noop", "expliciete Gemini-goedkeuring ontbreekt", head_sha)
 
+    check_rollup = pr.get("statusCheckRollup", [])
+    if not isinstance(check_rollup, list):
+        return Evaluation("noop", "checkmetadata ontbreekt of is ongeldig", head_sha)
     checks: dict[str, list[Mapping[str, Any]]] = {name: [] for name in REQUIRED_CHECKS}
-    for check in pr.get("statusCheckRollup", []):
+    for check in check_rollup:
         if isinstance(check, Mapping) and str(check.get("name", "")) in checks:
             checks[str(check["name"])].append(check)
     missing = sorted(name for name, values in checks.items() if not values)
@@ -94,7 +123,7 @@ def evaluate_pr(pr: Mapping[str, Any], *, repository: str) -> Evaluation:
         return Evaluation("noop", f"PR-state niet open: {state}", head_sha)
     if str(pr.get("mergeable", "")) != "MERGEABLE":
         return Evaluation("noop", "PR niet aantoonbaar mergebaar", head_sha)
-    return Evaluation("merge", "pipeline-PR en alle gates groen", head_sha)
+    return Evaluation("merge", "pipeline-PR, alle gates en Gemini-goedkeuring groen", head_sha)
 
 
 def _write_github_output(path: Path, result: Evaluation) -> None:

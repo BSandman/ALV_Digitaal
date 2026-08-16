@@ -1,12 +1,12 @@
 ---
-sprint: 7
+sprint: 8
 state: READY_FOR_TEST
 owner: gemini
-since: 2026-08-13T22:56:41Z
+since: 2026-08-16T12:31:17Z
 next: gemini
 action_required_by: none
 blocked: false
-note: "Sprint 7 auto-advance is gereed voor PR-review; alle lokale gates zijn groen en PIPELINE_AUTOMERGE blijft uit."
+note: "Sprint 8 formele Gemini-approval is gereed voor PR-review; alle lokale gates zijn groen en PIPELINE_AUTOMERGE blijft uit."
 ---
 
 # handoff.md — de estafettestok
@@ -15,9 +15,9 @@ note: "Sprint 7 auto-advance is gereed voor PR-review; alle lokale gates zijn gr
 
 ## Huidige beurt
 
-**Sprint 7 — PR-gate auto-advance.** Ontwerp: **ADR-0023**; taak: `docs/gates/Codex-taak-pr-auto-advance.md`.
+**Sprint 8 — groen én formeel approved.** Ontwerp: aangescherpte **ADR-0023**; taak: `docs/gates/Codex-taak-gemini-approved-gate.md`.
 
-**Opgeleverd op deze branch:** een fail-safe GitHub Action die uitsluitend bij `PIPELINE_AUTOMERGE=on`, een interne pipelinebranch/label, de drie vereiste checks uit hun verwachte workflows, geen wijzigingsverzoek en een mergeklare PR mag squash-mergen — direct vóór de merge opnieuw beoordeeld en gebonden aan exact de gecontroleerde head-SHA. Eén vaste repositorybrede concurrencygroep serialiseert alle merge- en batonwrites naar `main`. Daarna zet een apart, idempotent en dependency-vrij script alleen `READY_FOR_TEST/gemini` door naar `READY_FOR_VALIDATION/claude`; elke vervolgstap vereist expliciet succes van de mergeketen. Onbekende, ongeldige, incomplete of reeds verwerkte staten zijn no-op; een handmatige hersteltrigger kan na een geslaagde merge uitsluitend de baton alsnog doorzetten. Bewijs: 82 Node-tests, 86 Python-tests, YAML-, handoff-, architectuur-, release- en PII-gates groen. `PIPELINE_AUTOMERGE` bestaat nog niet en is dus fail-safe uit; deploy/productie worden niet geraakt.
+**Opgeleverd op deze branch:** de Gemini-workflow eist één exacte verdict-trailer, bindt de review aan de gecontroleerde PR-head en plaatst via `pulls.createReview` een formele `APPROVE` of fail-closed `REQUEST_CHANGES`. De auto-advance-evaluator accepteert alleen een expliciete `APPROVED`-review van de verwachte GitHub Actions-bot naast de drie groene checks; de GraphQL-vorm `github-actions` en REST-vorm `github-actions[bot]` worden na beperkte suffixnormalisatie gelijk behandeld, terwijl iedere andere auteur no-op blijft. De attended-runbookstap voor GitHubs bot-approvalinstelling is toegevoegd. Bewijs: 83 Node-tests, 92 Python-tests, YAML-, handoff-, architectuur-, release- en PII-gates groen; de bekende Windows Job Object-timingrace was bij gerichte en volledige herhaling groen. `PIPELINE_AUTOMERGE` blijft uit; deploy/productie worden niet geraakt.
 
 ## Beurt-log (kort; volledig verslag in progress.md)
 
@@ -32,3 +32,5 @@ note: "Sprint 7 auto-advance is gereed voor PR-review; alle lokale gates zijn gr
 - 2026-08-13 — Codex: Gemini-passfollow-up dekt conflicterende retried checks, dismissed/actieve wijzigingsreviews, fork-identiteit, BLOCKED/READY_FOR_DEV, lege/corrupte handoff en notesanitisatie; fail-closed gedrag bevestigd. → READY_FOR_TEST.
 - 2026-08-13 — Codex: finale TOCTOU-hardening herleest en herevalueert gates/reviews direct voor merge; mergefout of gewijzigde voorwaarde blokkeert expliciet iedere batonstap. → READY_FOR_TEST.
 - 2026-08-14 — Codex: alle `main`-writes repositorybreed geserialiseerd; lange checklijst en UTF-8-BOM/CRLF-transitie als regressietests toegevoegd. 82+86 tests en lokale gates groen. → READY_FOR_TEST.
+- 2026-08-16 — Codex: PR #16 stond reeds gemerged op `main`; Sprint 8 bouwt formele Gemini-review + verplichte verwachte bot-approval. 83+91 tests en lokale gates groen. → READY_FOR_TEST.
+- 2026-08-16 — Codex: echte PR #17-approval bevestigde GitHubs loginvarianten; optionele terminale `[bot]` wordt genormaliseerd, beide geldige vormen plus vreemde-auteur-no-op zijn getest. 83+92 tests groen. → READY_FOR_TEST.

@@ -27,8 +27,13 @@ def green_pr() -> dict:
         "headRepository": {"name": "ALV_Digitaal", "nameWithOwner": "BSandman/ALV_Digitaal"},
         "headRepositoryOwner": {"login": "BSandman"},
         "labels": [],
-        "reviewDecision": "",
-        "latestReviews": [],
+        "reviewDecision": "APPROVED",
+        "latestReviews": [
+            {
+                "state": "APPROVED",
+                "author": {"login": check_pipeline_pr.EXPECTED_REVIEWER},
+            }
+        ],
         "statusCheckRollup": [
             {
                 "name": name,
@@ -110,12 +115,38 @@ class CheckPipelinePrTests(unittest.TestCase):
         self.assertEqual(self.evaluate(fork).decision, "noop")
 
         active_request = green_pr()
-        active_request["latestReviews"] = [{"state": "CHANGES_REQUESTED"}]
+        active_request["latestReviews"].append({"state": "CHANGES_REQUESTED"})
         self.assertEqual(self.evaluate(active_request).decision, "noop")
 
         dismissed_request = green_pr()
-        dismissed_request["latestReviews"] = [{"state": "DISMISSED"}]
+        dismissed_request["latestReviews"].append({"state": "DISMISSED"})
         self.assertEqual(self.evaluate(dismissed_request).decision, "merge")
+
+    def test_expected_gemini_approval_is_mandatory(self) -> None:
+        missing = green_pr()
+        missing["latestReviews"] = []
+        result = self.evaluate(missing)
+        self.assertEqual(result.decision, "noop")
+        self.assertIn("goedkeuring ontbreekt", result.reason)
+
+        wrong_author = green_pr()
+        wrong_author["latestReviews"][0]["author"]["login"] = "andere-reviewer"
+        self.assertEqual(self.evaluate(wrong_author).decision, "noop")
+
+        missing_author = green_pr()
+        missing_author["latestReviews"][0].pop("author")
+        self.assertEqual(self.evaluate(missing_author).decision, "noop")
+
+        invalid_reviews = green_pr()
+        invalid_reviews["latestReviews"] = None
+        self.assertEqual(self.evaluate(invalid_reviews).decision, "noop")
+
+    def test_expected_gemini_reviewer_accepts_both_github_login_forms(self) -> None:
+        for login in ("github-actions", "github-actions[bot]"):
+            with self.subTest(login=login):
+                payload = green_pr()
+                payload["latestReviews"][0]["author"]["login"] = login
+                self.assertEqual(self.evaluate(payload).decision, "merge")
 
     def test_unknown_mergeability_or_malformed_payload_is_noop(self) -> None:
         payload = green_pr()
@@ -124,6 +155,9 @@ class CheckPipelinePrTests(unittest.TestCase):
         invalid_sha = green_pr()
         invalid_sha["headRefOid"] = "niet-een-sha"
         self.assertEqual(self.evaluate(invalid_sha).decision, "noop")
+        invalid_checks = green_pr()
+        invalid_checks["statusCheckRollup"] = None
+        self.assertEqual(self.evaluate(invalid_checks).decision, "noop")
         self.assertEqual(self.evaluate({}).decision, "noop")
 
 
