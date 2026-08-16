@@ -89,6 +89,8 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 ## Sprint 9 — Codex v0.147 autorun-ARGV (loopt)
 
 - 2026-08-16 · Codex · **Attended Codex-runner gecorrigeerd voor CLI v0.147:** de niet-bestaande `--ask-for-approval never`-argumenten zijn uit voorbeeldconfig en runbook verwijderd; workspace-write blijft begrensd en netwerktoegang loopt via `--config sandbox_workspace_write.network_access=true`. De contracttest parseert en vergelijkt voortaan de volledige JSON-ARGV exact. Bewijs: echte lokale v0.147-parse groen, 83/83 Node-tests, 94/94 Python-tests, architectuur-, release-, handoff- en PII-gates groen. Geen ADR- of deploywijziging. → READY_FOR_TEST (Gemini via PR).
+- 2026-08-16 · Bas/github-actions[bot] · **PR #19 gemerged** via auto-advance (`133ed1a`); baton → READY_FOR_VALIDATION. Kortstondige Claude-herauthenticatie onderbrak de eerste validatiepoging (`BLOCKED` → hervat door Bas).
+- 2026-08-16 · Claude · **Validatie GROEN** tegen ADR-0017/ADR-0023: de argv-fix verwijdert alleen het niet-bestaande `--ask-for-approval`-argument, laat sandbox-/netwerkgrenzen en de menselijke deploypoort ongemoeid, en de nieuwe `actions: read`-permissie is nodig om workflow-runs te lezen zonder extra rechten toe te voegen. Herbevestigd lokaal: 94/94 Python-tests groen; 82/83 Node-tests groen (enige rode test is een lokale git-bash/tar-padquirk in `pii-scan.test.mjs`, niet in de PR-diff geraakt en geen coderegressie — CI draait dit op Linux). `handoff.md` ≤ 20 regels bevestigd. Geen deploy uitgevoerd. → READY_FOR_INTEGRATION (Mistral).
 
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 

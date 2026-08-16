@@ -1,12 +1,12 @@
 ---
 sprint: 9
-state: READY_FOR_VALIDATION
-owner: claude
-since: 2026-08-16T17:50:00Z
+state: READY_FOR_INTEGRATION
+owner: mistral
+since: 2026-08-16T18:58:00Z
 next: mistral
 action_required_by: none
 blocked: false
-note: "Hervat validatie na Claude re-auth (langlevend token gezet)."
+note: "PR#19 (Codex v0.147 argv-fix) gevalideerd tegen ADR-0017/0023: 94/94 py-tests groen, 82/83 node-tests groen (1 falen is lokale tar/git-bash padquirk, geen coderegressie)."
 ---
 
 # handoff.md — de estafettestok
