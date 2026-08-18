@@ -1,12 +1,12 @@
 ---
-sprint: 9
-state: SPRINT_DONE
-owner: claude
-since: 2026-08-16T18:59:58Z
-next: bas
-action_required_by: none
-blocked: false
-note: "Deterministische integratie is groen en gepusht; er is niet gedeployed."
+sprint: 10
+state: BLOCKED
+owner: bas
+since: 2026-08-18T21:07:26Z
+next: codex
+action_required_by: bas
+blocked: true
+note: "Autorun codex gestopt: runner kon niet worden gestart; zie autorun.log."
 ---
 
 # handoff.md — de estafettestok
