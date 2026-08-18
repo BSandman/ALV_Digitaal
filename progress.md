@@ -92,6 +92,13 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 - 2026-08-16 · Bas/github-actions[bot] · **PR #19 gemerged** via auto-advance (`133ed1a`); baton → READY_FOR_VALIDATION. Kortstondige Claude-herauthenticatie onderbrak de eerste validatiepoging (`BLOCKED` → hervat door Bas).
 - 2026-08-16 · Claude · **Validatie GROEN** tegen ADR-0017/ADR-0023: de argv-fix verwijdert alleen het niet-bestaande `--ask-for-approval`-argument, laat sandbox-/netwerkgrenzen en de menselijke deploypoort ongemoeid, en de nieuwe `actions: read`-permissie is nodig om workflow-runs te lezen zonder extra rechten toe te voegen. Herbevestigd lokaal: 94/94 Python-tests groen; 82/83 Node-tests groen (enige rode test is een lokale git-bash/tar-padquirk in `pii-scan.test.mjs`, niet in de PR-diff geraakt en geen coderegressie — CI draait dit op Linux). `handoff.md` ≤ 20 regels bevestigd. Geen deploy uitgevoerd. → READY_FOR_INTEGRATION (Mistral).
 
+## Sprint 10 — Eigenaar-frontend v0.1 (deelnemen-UI) (loopt)
+
+**Doel:** het eigenlijke Fase-2-product zichtbaar maken — een door de Node-app geserveerde eigenaar-UI (login code-fallback → open ronde zien → Voor/Tegen → bevestiging), polling met ETag/jitter. Blok-cadans; admin/magic-link/gemachtigde geparkeerd. Zie `sprint.md`.
+
+- 2026-08-18 · Claude · **Sprint 10 opgezet** als Architect. Beoordeling: Sprints 1–9 leverden geharde backend, datasets, live acceptatie-deploy en de volledige pijplijn-automatisering (auto-advance/formele approval/autorun) — de "straat" staat, maar er is nog géén scherm. Volgende major-stap = de eigenaar-UI. **ADR-0024** vastgelegd (frontend-architectuur: vanilla/no-build, door Node geserveerd, sessietoken alleen in geheugen, polling ETag/jitter, in-app alleen Voor/Tegen met server-side één-actie-fan-out, scopegrens v0.1). Spec **`docs/gates/Codex-taak-frontend-eigenaar.md`** geschreven; `bijbel.md`-register + `sprint.md` bijgewerkt. Baton → READY_FOR_DEV (blok 1 Codex: statische serving + `/deelnemen/`-UI + fan-out). Scope-afweging voor Bas: v0.1 gebruikt code-login als ingang; echte magic-link/QR + admin-UI zijn Sprint 11.
+- 2026-08-18 · Claude · **Huisstijl vastgelegd.** Op vraag van Bas geverifieerd: honigfabriek.nl (live), de fase-1 ALV-app (`app-ui-overrides.css`) en HonigParkeren (`design/app/tokens.css`) ademen al één stijl — de Honigfabriek-huisstijl (warme papier, donker zijvlak, honing-amber, Archivo + IBM Plex Mono, oklch-tokens). Canonieke bron `honigfabriek-landing` = `HonigParkeren/tokens.css`. Vastgelegd als **`Platform/Platform_Stijlgids_v1.0.0.md`** + herbruikbare **`Platform/platform-tokens.css`** (platformbrede bron voor latere onderdelen). ADR-0024 §7 + Codex-taak aangescherpt: frontend verplicht op deze tokens, geen eigen kleuren/fonts, domeincodering (TF/NB/PG, Voor/Tegen) behouden.
+
 ## Sprint 1 — Fundament (afgerond, gevalideerd)
 
 **Doel:** T-omgeving draait, CI-gates groen. Zie `sprint.md`. **Uitkomst:** groen op alle poorten; gevalideerd.
@@ -117,3 +124,4 @@ Bevat deze sprint en de vorige. Oudere sprints worden ingekort naar één regel.
 Architectuurvoorstel v0.2.0 met vier-AI-gatemodel, ADR-0001..0003 (Docker-alleen-dev/test, zes shared-hosting-regels, MariaDB 11.8.8 bevestigd), Docker-scaffold en deploy-scriptvoorzet. Basis voor de OTAP-opzet.
 
 - 2026-08-16 · Mistral · **Sprint 9 integratie groen: Python-, app-, architectuur-, release- en PII-gates geslaagd; niet gedeployed.**
+- 2026-08-18 · Codex · **BLOCKED vóór claim: `.git` is alleen-lezen (`FETCH_HEAD` niet schrijfbaar) en `gh`-authenticatie is verlopen; geen productcode gewijzigd en geen deploy uitgevoerd. Bas moet beide herstellen en de baton terugzetten naar `READY_FOR_DEV`.**

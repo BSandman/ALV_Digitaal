@@ -79,10 +79,11 @@ Geneste, **aan/uit-schakelbare** modules. Aanpak: modulaire monoliet in één re
 - ADR-0021 — Presentie & quorum (supersedes ADR-0009): presentie = login, telt monotoon (vertrek verlaagt quorum niet, uitloggen gelogd); quorum per ronde bij admin-activatie; stemknop alleen voor wie op activatiemoment is ingelogd (laatkomer pas volgende ronde); present-niet-gestemd/vertrokken = onthouding
 - ADR-0023 — PR-gate auto-advance: GitHub Action merget een groene pipeline-PR (CI+Gemini groen) en zet de baton READY_FOR_TEST→READY_FOR_VALIDATION; kill-switch `PIPELINE_AUTOMERGE` default uit; fail-safe (bij twijfel niets); nooit deploy/productie. Sluit het enige handmatige gat in de onbemande keten
 - ADR-0022 — Machtiging & stemformulier: twee stromen op één genummerd formulier; gemachtigde krijgt eigen QR/magic-link (naam+e-mail, ≥1 dag vooraf), eigenaarslink blijft actief; eigenaar-login vernietigt machtiging óf stemformulier onherstelbaar (breidt ADR-0008 uit); digitale intake + gemachtigde-UX geparkeerd
+- ADR-0024 — Frontend-architectuur eigenaar-portaal: vanilla/no-build, door de Node-app geserveerd onder `/deelnemen/`, sessietoken alleen in geheugen (geen browseropslag), polling met ETag/jitter, in-app alleen Voor/Tegen (ADR-0011) met server-side één-actie-fan-out (ADR-0018); **visuele stijl = Honigfabriek-huisstijl op `Platform/platform-tokens.css` (norm: `Platform/Platform_Stijlgids_v1.0.0.md`)**; scopegrens v0.1 (Sprint 10): eigenaar-deelnemen-flow met code-login; admin-UI, magic-link/PIN en gemachtigde-UX later
 
 ## 10. Sleuteldocumenten
 
-`docs/OTAP_opzet_v1.0.0.md` (OTAP-plan) · `docs/Architectuur_en_infravoorstel_v0.2.0.md` (architectuur) · `docs/Mistral_Lokaal_setup_runbook_v1.0.0.md` · `docs/gates/handoff-template.md` (6-delig overdrachtsformaat) · `docs/gates/Codex-taak-10.2_T-run-en-CI-gates.md` · `AGENTS.md` (pijplijnregels).
+`docs/OTAP_opzet_v1.0.0.md` (OTAP-plan) · `docs/Architectuur_en_infravoorstel_v0.2.0.md` (architectuur) · `docs/Mistral_Lokaal_setup_runbook_v1.0.0.md` · `docs/gates/handoff-template.md` (6-delig overdrachtsformaat) · `docs/gates/Codex-taak-10.2_T-run-en-CI-gates.md` · `AGENTS.md` (pijplijnregels) · `../Platform_Stijlgids_v1.0.0.md` + `../platform-tokens.css` (platform-huisstijl, honigfabriek).
 
 ## 11. Openstaande beslispunten
 
