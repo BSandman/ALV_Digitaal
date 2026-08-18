@@ -1,12 +1,12 @@
 ---
 sprint: 10
-state: BLOCKED
-owner: bas
-since: 2026-08-18T21:52:54Z
-next: codex
-action_required_by: bas
-blocked: true
-note: "Autorun codex gestopt: runner liet ongecommitteerde wijzigingen achter; zie autorun.log."
+state: READY_FOR_DEV
+owner: codex
+since: 2026-08-18T22:19:44Z
+next: gemini
+action_required_by: none
+blocked: false
+note: "Hervat na runner/notifier-fix: bouw de eigenaar-deelnemen-UI (ADR-0024)."
 ---
 
 # handoff.md — de estafettestok
