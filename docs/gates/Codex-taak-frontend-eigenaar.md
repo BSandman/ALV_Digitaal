@@ -13,6 +13,7 @@ Doel: een werkende, door de Node-app geserveerde **eigenaar-UI** bovenop de best
 3. **Server-side één-actie-fan-out (ADR-0018).** De client stuurt **één** Voor/Tegen-keuze per ronde; de server fan-out't die over álle in-scope rechten van de eigenaar (eigen breukdeel, per VvE geteld), atomair en row-level (ADR-0002), niet splitsbaar. Als de bestaande `recordVote` per `entitlementId` werkt: voeg een dunne server-laag/endpoint toe die de in-scope rechten van de eigenaar voor de ronde bepaalt en er atomair overheen schrijft. Idempotent bij herhaalde submit (zelfde keuze → geen dubbele/afwijkende registratie).
 4. **Toegankelijkheid & mobiel-eerst** (ADR-0024 §6): semantische HTML, `aria-live` voor status/uitslag, focusbeheer, contrast/tikdoelen, NL-taal, werkt zonder muis.
 5. **Honigfabriek-huisstijl (verplicht, ADR-0024 §7).** Bouw op de canonieke tokens `Platform/platform-tokens.css` (Archivo + IBM Plex Mono, warme papier/donker-zijvlak/amber, royale afronding, warme schaduwen). **Geen eigen kleuren/fonts hardcoderen.** Hergebruik de fase-1-componentpatronen (`alv_presentie_stemmen_app/app/mijn_host_app/public/styles.css` + `app-ui-overrides.css`): knop-/kaart-/notice-stijl, 44px tikdoelen, mobiel card-tables. Domeincodering behouden: TF=groen / NB=geel / PG=blauw, Voor=groen / Tegen=rood. Norm: `Platform/Platform_Stijlgids_v1.0.0.md`.
+6. **Tokens vendoren (verplicht).** `platform-tokens.css` en `Platform_Stijlgids_v1.0.0.md` leven in `Platform/`-root, **buiten deze repo** — bij build/serve dus niet bereikbaar via een `../`-pad. Neem een **kopie** van `platform-tokens.css` op in de app-assets (bv. `app/public/deelnemen/vendor/platform-tokens.css`) en laad die vanuit de UI. Zet bovenin de kopie een herkomst-/versieregel (bron: `Platform/platform-tokens.css` v1.0.0) zodat een latere update traceerbaar is; wijzig de tokenwaarden niet lokaal. Bij een nieuwe stijlgids-versie wordt de vendored kopie ververst (aparte kleine taak).
 
 ## Scope (uit — latere sprints, niet bouwen)
 
@@ -32,7 +33,7 @@ Geen state buiten de DB; geen permanente verbindingen (polling + ETag/jitter); s
 6. **Statische serving veilig:** padtraversal (`..`, ge-encodeerd) geweigerd; alleen gewhiteliste content-types; API-routes onaangetast (bestaande 83/… Node-tests blijven groen).
 7. **Foutpaden:** verlopen/ongeldige sessie → login; `ROUND_NOT_OPEN` → wachtscherm; lockout/rate-limit tonen `Retry-After`.
 8. **Toegankelijkheid:** basis-a11y-check (semantiek, focus, `aria-live`) groen; werkt zonder muis op mobiel formaat.
-9. **Huisstijl:** de UI gebruikt `platform-tokens.css` (geen gehardcodeerde kleuren/fonts), draagt de Honigfabriek-look (Archivo/amber/warme papier) en de domeincodering (TF/NB/PG, Voor/Tegen); visueel consistent met de fase-1 ALV-app.
+9. **Huisstijl:** de UI gebruikt de **gevendorde** `platform-tokens.css` (geen gehardcodeerde kleuren/fonts, geen `../`-pad buiten de repo), draagt de Honigfabriek-look (Archivo/amber/warme papier) en de domeincodering (TF/NB/PG, Voor/Tegen); visueel consistent met de fase-1 ALV-app. De vendored kopie draagt een herkomst-/versieregel.
 10. **`npm run check` + Python-tests + architectuur-, release-, handoff- en PII-gates + Gemini-review groen.** Geen deploy.
 
 ## Versie
