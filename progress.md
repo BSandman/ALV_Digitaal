@@ -125,3 +125,4 @@ Architectuurvoorstel v0.2.0 met vier-AI-gatemodel, ADR-0001..0003 (Docker-alleen
 
 - 2026-08-16 · Mistral · **Sprint 9 integratie groen: Python-, app-, architectuur-, release- en PII-gates geslaagd; niet gedeployed.**
 - 2026-08-18 · Codex · **BLOCKED vóór claim: `.git` is alleen-lezen (`FETCH_HEAD` niet schrijfbaar) en `gh`-authenticatie is verlopen; geen productcode gewijzigd en geen deploy uitgevoerd. Bas moet beide herstellen en de baton terugzetten naar `READY_FOR_DEV`.**
+- 2026-08-19 · Codex · **BLOCKED vóór claim na volledige 60s-guard: `.git/FETCH_HEAD` blijft niet schrijfbaar en de actieve `gh`-token is ongeldig; geen productcode gewijzigd en geen deploy uitgevoerd. Bas moet beide herstellen en de baton terugzetten naar `READY_FOR_DEV`.**
