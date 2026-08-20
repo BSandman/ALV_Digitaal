@@ -1,12 +1,12 @@
 ---
 sprint: 11
-state: READY_FOR_INTEGRATION
+state: INTEGRATION_IN_PROGRESS
 owner: mistral
-since: 2026-08-20T22:35:38Z
-next: bas
+since: 2026-08-20T22:37:25Z
+next: claude
 action_required_by: none
 blocked: false
-note: "Claude-validatie Stap 1 groen tegen ADR-0025; Mistral kan integreren (gates, geen deploy)."
+note: "Mistral voert de vaste integratiecontroles uit; deploy blijft uit."
 ---
 
 # handoff.md — de estafettestok
