@@ -1,12 +1,12 @@
 ---
 sprint: 11
-state: READY_FOR_TEST
-owner: gemini
-since: 2026-08-20T21:45:36Z
-next: claude
-action_required_by: none
-blocked: false
-note: "PR #20 bevat de gereserveerde-domeinfilter en robuuste rebase-recovery; alle lokale gates zijn groen."
+state: BLOCKED
+owner: bas
+since: 2026-08-20T22:00:01Z
+next: codex
+action_required_by: bas
+blocked: true
+note: "Autorun codex gestopt: loop-cap van 1 beurten bereikt; zie autorun.log."
 ---
 
 # handoff.md — de estafettestok
