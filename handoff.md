@@ -1,12 +1,12 @@
 ---
 sprint: 11
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-20T20:41:04Z
-next: gemini
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-20T22:18:47Z
+next: claude
 action_required_by: none
 blocked: false
-note: "Lever alleen Stap 1: git_steward.py-kern + tests + PR (zie Codex-taak-gitsteward, Fasering)."
+note: "PR #20 bevat Git-identiteit voor alle subprocessen en fail-closed snapshotverificatie; CI en Gemini kunnen herbeoordelen."
 ---
 
 # handoff.md — de estafettestok
