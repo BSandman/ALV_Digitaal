@@ -1,12 +1,12 @@
 ---
 sprint: 11
-state: BLOCKED
-owner: bas
-since: 2026-08-20T16:38:43Z
-next: codex
-action_required_by: bas
-blocked: true
-note: "Autorun codex gestopt: runner rondde geen toestand-overgang af; zie autorun.log."
+state: READY_FOR_DEV
+owner: codex
+since: 2026-08-20T20:27:42Z
+next: gemini
+action_required_by: none
+blocked: false
+note: "Lever alleen Stap 1: git_steward.py-kern + tests + PR (zie Codex-taak-gitsteward, Fasering)."
 ---
 
 # handoff.md — de estafettestok

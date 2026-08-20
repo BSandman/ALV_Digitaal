@@ -2,6 +2,16 @@
 
 Doel: het leeuwendeel van de autorun-uitval (git) wegnemen door één deterministische **GitSteward** die álle schrijfacties naar `main` en álle pushes bezit, met verplichte block-finalize en retry. LLM-runners worden git-light en kunnen offline. Ontwerp: **ADR-0025**. Harness: `scripts/watch_handoff.py`.
 
+## Fasering — LEVER EERST STAP 1 (deze beurt)
+
+De taak is te groot voor één beurt. Splits in drie beurten; **rond deze beurt uitsluitend Stap 1 volledig af** (PR openen + baton → `READY_FOR_TEST`). Stap 2 en 3 zijn aparte latere beurten.
+
+- **Stap 1 (nu):** `scripts/git_steward.py` — het deterministische kernscript met `sync` + `block_finalize` + retry/backoff + stale-`index.lock`-opruiming + `GH_TOKEN`-gebruik, mét Python-tests (fixtures). **Nog geen** `watch_handoff.py`-refactor. Draai de bestaande gates, open een PR op `agent/sprint-11-gitsteward-core`, zet de baton door.
+- **Stap 2 (volgende beurt):** `watch_handoff.py` roept de steward aan voor sync + verplichte block-finalize; rol-runners pushen niet meer.
+- **Stap 3 (daarna):** runners git-light/offline-baar maken + runbook; de GitSteward draait als eigen niet-gesandboxd proces (buiten de Codex-sandbox — vandaar geen `.git`-DENY).
+
+De rest van dit document is de volledige eindscope (Stap 1–3 samen) als referentie.
+
 ## Scope (in)
 
 1. **GitSteward-proces (deterministisch, geen LLM):** nieuw script (`scripts/git_steward.py`, dependency-vrij, stijl van `advance_after_merge.py`). Enige houder van `GH_TOKEN` (uit `secure/`, via `gh auth git-credential` of `git -c http.extraheader`). Functies:
