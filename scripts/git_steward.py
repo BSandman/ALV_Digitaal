@@ -27,6 +27,8 @@ from lint_handoff import HandoffValidationError, parse_frontmatter, validate_fil
 COORDINATION_PATHS = ("handoff.md", "progress.md")
 DEFAULT_TOKEN_PATH = Path("mistral-lokaal/secure/git-steward.env")
 ROLE_NAMES = {"codex": "Codex", "claude": "Claude", "gemini": "Gemini", "mistral": "Mistral"}
+STEWARD_NAME = "ALV GitSteward"
+STEWARD_EMAIL = "git-steward@localhost.invalid"
 
 
 class GitStewardError(RuntimeError):
@@ -217,6 +219,10 @@ class GitSteward:
     def _environment(self) -> dict[str, str]:
         environment = dict(os.environ)
         environment["GIT_TERMINAL_PROMPT"] = "0"
+        environment["GIT_AUTHOR_NAME"] = STEWARD_NAME
+        environment["GIT_AUTHOR_EMAIL"] = STEWARD_EMAIL
+        environment["GIT_COMMITTER_NAME"] = STEWARD_NAME
+        environment["GIT_COMMITTER_EMAIL"] = STEWARD_EMAIL
         if self.token:
             environment["GH_TOKEN"] = self.token
             environment.pop("GITHUB_TOKEN", None)
@@ -255,8 +261,10 @@ class GitSteward:
                 if recovery is not None:
                     try:
                         recovery()
-                    except GitStewardError:
-                        pass
+                    except GitStewardError as recovery_error:
+                        raise GitStewardError(
+                            f"{label}-herstel faalde gesloten: {recovery_error}"
+                        ) from recovery_error
                 self.sleeper(self.backoff_seconds * (2 ** (attempt - 1)))
         assert last_error is not None
         raise GitStewardError(f"{label} mislukt na {self.attempts} pogingen: {last_error}")
@@ -319,6 +327,24 @@ class GitSteward:
         self._run_git(["rebase", f"{self.remote}/{self.branch}"], cwd=checkout)
         if self._stage_coordination(checkout, snapshots):
             self._commit(checkout)
+        self._verify_coordination_head(checkout, snapshots)
+
+    def _verify_coordination_head(self, checkout: Path, snapshots: Mapping[str, bytes]) -> None:
+        for relative, expected in snapshots.items():
+            path = checkout / relative
+            if not path.is_file() or path.read_bytes() != expected:
+                raise GitStewardError(
+                    f"fail-closed: coördinatiesnapshot ontbreekt na herstel: {relative}"
+                )
+            head_blob = self._run_git(["rev-parse", f"HEAD:{relative}"], cwd=checkout).stdout.strip()
+            snapshot_blob = self._run_git(
+                ["hash-object", f"--path={relative}", "--", relative],
+                cwd=checkout,
+            ).stdout.strip()
+            if not head_blob or head_blob != snapshot_blob:
+                raise GitStewardError(
+                    f"fail-closed: coördinatiesnapshot ontbreekt in HEAD na herstel: {relative}"
+                )
 
     def _push_once(self, checkout: Path) -> None:
         self._cleanup_lock(checkout)
@@ -338,9 +364,9 @@ class GitSteward:
         self._run_git(
             [
                 "-c",
-                "user.name=ALV GitSteward",
+                f"user.name={STEWARD_NAME}",
                 "-c",
-                "user.email=git-steward@localhost.invalid",
+                f"user.email={STEWARD_EMAIL}",
                 "commit",
                 "--quiet",
                 "-m",

@@ -8,6 +8,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -197,7 +198,16 @@ class GitStewardTests(unittest.TestCase):
             self.assertTrue(lock.exists())
 
     def test_non_fast_forward_push_recovers_with_rebase_retry(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory() as empty_home, tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ,
+            {
+                "GIT_CONFIG_GLOBAL": os.devnull,
+                "GIT_CONFIG_SYSTEM": os.devnull,
+                "HOME": empty_home,
+                "USERPROFILE": empty_home,
+                "XDG_CONFIG_HOME": empty_home,
+            },
+        ):
             fixture = GitFixture(Path(directory))
             competing = Path(directory) / "competing"
             git(Path(directory), "clone", "--quiet", str(fixture.remote), str(competing))
@@ -220,6 +230,18 @@ class GitStewardTests(unittest.TestCase):
             log = git(fixture.remote, "log", "--format=%s", "main").stdout
             self.assertIn("concurrent product commit", log)
             self.assertIn("sync pipeline coordination", log)
+            environment = steward._environment()
+            self.assertEqual(environment["GIT_AUTHOR_NAME"], steward_module.STEWARD_NAME)
+            self.assertEqual(environment["GIT_AUTHOR_EMAIL"], steward_module.STEWARD_EMAIL)
+            self.assertEqual(environment["GIT_COMMITTER_NAME"], steward_module.STEWARD_NAME)
+            self.assertEqual(environment["GIT_COMMITTER_EMAIL"], steward_module.STEWARD_EMAIL)
+
+            bad_snapshots = {
+                "handoff.md": (fixture.work / "handoff.md").read_bytes(),
+                "progress.md": b"# Progress\n- ontbreekt in HEAD\n",
+            }
+            with self.assertRaisesRegex(steward_module.GitStewardError, "fail-closed"):
+                steward._verify_coordination_head(fixture.work, bad_snapshots)
 
     def test_retry_uses_three_attempts_with_exponential_backoff(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
