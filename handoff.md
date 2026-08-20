@@ -1,12 +1,12 @@
 ---
 sprint: 11
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-20T22:12:37Z
-next: gemini
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-20T22:18:47Z
+next: claude
 action_required_by: none
 blocked: false
-note: "Fix-ronde 2: git-identiteit in _environment + fail-closed verify (zie Codex-taak); herpush PR."
+note: "PR #20 bevat Git-identiteit voor alle subprocessen en fail-closed snapshotverificatie; CI en Gemini kunnen herbeoordelen."
 ---
 
 # handoff.md — de estafettestok
