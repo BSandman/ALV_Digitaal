@@ -68,6 +68,24 @@ test('PII-scan blokkeert een lokaal SSH-deploysleutelbestand', async () => {
   }
 });
 
+test('PII-scan accepteert gereserveerde e-maildomeinen maar blokkeert echte domeinen', async () => {
+  const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), 'alv-pii-reserved-email-'));
+  try {
+    const reservedAddress = 'x@y.invalid';
+    await writeFile(path.join(fixtureRoot, 'reserved.txt'), `${reservedAddress}\n`, 'utf8');
+    const clean = runScanner('--path', fixtureRoot);
+    assert.equal(clean.status, 0, clean.stderr);
+
+    const realAddress = ['iemand', 'gmail.com'].join('@');
+    await writeFile(path.join(fixtureRoot, 'real.txt'), `${realAddress}\n`, 'utf8');
+    const blocked = runScanner('--path', fixtureRoot);
+    assert.notEqual(blocked.status, 0);
+    assert.match(blocked.stderr, /email/);
+  } finally {
+    await rm(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
 function runScanner(flag, target) {
   return spawnSync(process.execPath, [scanner, flag, target], { encoding: 'utf8', windowsHide: true });
 }

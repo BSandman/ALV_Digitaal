@@ -313,6 +313,13 @@ class GitSteward:
         self._cleanup_lock(checkout)
         self._run_git(["pull", "--rebase", self.remote, self.branch], cwd=checkout)
 
+    def _recover_coordination_push(self, checkout: Path, snapshots: Mapping[str, bytes]) -> None:
+        self._cleanup_lock(checkout)
+        self._run_git(["fetch", self.remote, self.branch], cwd=checkout)
+        self._run_git(["rebase", f"{self.remote}/{self.branch}"], cwd=checkout)
+        if self._stage_coordination(checkout, snapshots):
+            self._commit(checkout)
+
     def _push_once(self, checkout: Path) -> None:
         self._cleanup_lock(checkout)
         self._run_git(["push", self.remote, f"HEAD:{self.branch}"], cwd=checkout)
@@ -380,7 +387,7 @@ class GitSteward:
                 self._retry(
                     "push",
                     lambda: self._push_once(checkout),
-                    recovery=lambda: self._pull_once(checkout),
+                    recovery=lambda: self._recover_coordination_push(checkout, snapshots),
                 )
             self._consume_local_coordination()
             return changed

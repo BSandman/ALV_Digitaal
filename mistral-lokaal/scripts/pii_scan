@@ -143,7 +143,7 @@ function scanFileName(label) {
 function scanText(label, content) {
   const placeholderEmails = new Set(['user@starter.mijn.host']);
   const emails = content.match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi) ?? [];
-  if (emails.some((email) => !placeholderEmails.has(email.toLocaleLowerCase('nl-NL')))) {
+  if (emails.some((email) => !isAllowedPlaceholderEmail(email, placeholderEmails))) {
     findings.push({ kind: 'email', location: label, message: 'E-mailadres aangetroffen.' });
   }
   const patterns = [
@@ -162,6 +162,15 @@ function scanText(label, content) {
       findings.push({ kind: 'denylist', location: label, message: 'Bekende echte VvE-naam of straat uit de lokale denylist aangetroffen.' });
     }
   }
+}
+
+function isAllowedPlaceholderEmail(email, placeholderEmails) {
+  const normalized = email.toLocaleLowerCase('nl-NL');
+  if (placeholderEmails.has(normalized)) return true;
+  const domain = normalized.slice(normalized.lastIndexOf('@') + 1);
+  const reservedSuffixes = ['.invalid', '.test', '.example', '.localhost'];
+  const reservedExamples = new Set(['example.com', 'example.org', 'example.net']);
+  return reservedExamples.has(domain) || reservedSuffixes.some((suffix) => domain.endsWith(suffix));
 }
 
 function loadDenylist(explicitPath) {
