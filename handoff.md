@@ -1,12 +1,12 @@
 ---
 sprint: 11
-state: VALIDATION_IN_PROGRESS
-owner: claude
-since: 2026-08-21T00:00:00Z
-next: mistral
-action_required_by: none
-blocked: false
-note: "Claude valideert GitSteward-kern (PR #20) tegen ADR-0025."
+state: BLOCKED
+owner: bas
+since: 2026-08-20T22:31:18Z
+next: claude
+action_required_by: bas
+blocked: true
+note: "Autorun claude gestopt: runner eindigde met exitcode 1; zie autorun.log."
 ---
 
 # handoff.md — de estafettestok
