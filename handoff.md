@@ -1,12 +1,12 @@
 ---
 sprint: 11
-state: BLOCKED
-owner: bas
-since: 2026-08-20T22:00:01Z
-next: codex
-action_required_by: bas
-blocked: true
-note: "Autorun codex gestopt: loop-cap van 1 beurten bereikt; zie autorun.log."
+state: READY_FOR_DEV
+owner: codex
+since: 2026-08-20T22:07:17Z
+next: gemini
+action_required_by: none
+blocked: false
+note: "Fix-ronde 2: git-identiteit in _environment + fail-closed verify (zie Codex-taak); herpush PR."
 ---
 
 # handoff.md — de estafettestok
