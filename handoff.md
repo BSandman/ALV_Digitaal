@@ -1,8 +1,8 @@
 ---
 sprint: 11
-state: READY_FOR_DEV
+state: DEV_IN_PROGRESS
 owner: codex
-since: 2026-08-20T21:30:44Z
+since: 2026-08-20T21:42:19Z
 next: gemini
 action_required_by: none
 blocked: false
