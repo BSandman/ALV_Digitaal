@@ -1,12 +1,12 @@
 ---
 sprint: 11
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-20T21:42:19Z
-next: gemini
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-20T21:45:36Z
+next: claude
 action_required_by: none
 blocked: false
-note: "Fix-ronde 1 op branch sprint-11-gitsteward-core: pii_scan reserved-domeinen + rebase-recovery-test; herpush PR."
+note: "PR #20 bevat de gereserveerde-domeinfilter en robuuste rebase-recovery; alle lokale gates zijn groen."
 ---
 
 # handoff.md — de estafettestok
