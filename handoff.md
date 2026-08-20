@@ -1,12 +1,12 @@
 ---
 sprint: 11
-state: READY_FOR_TEST
-owner: gemini
-since: 2026-08-20T20:48:34Z
-next: claude
+state: READY_FOR_DEV
+owner: codex
+since: 2026-08-20T21:30:44Z
+next: gemini
 action_required_by: none
 blocked: false
-note: "Stap 1 GitSteward-kern en fixtures staan op PR; Gemini en CI kunnen toetsen."
+note: "Fix-ronde 1 op branch sprint-11-gitsteward-core: pii_scan reserved-domeinen + rebase-recovery-test; herpush PR."
 ---
 
 # handoff.md — de estafettestok

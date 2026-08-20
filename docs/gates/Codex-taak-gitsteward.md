@@ -2,6 +2,20 @@
 
 Doel: het leeuwendeel van de autorun-uitval (git) wegnemen door één deterministische **GitSteward** die álle schrijfacties naar `main` en álle pushes bezit, met verplichte block-finalize en retry. LLM-runners worden git-light en kunnen offline. Ontwerp: **ADR-0025**. Harness: `scripts/watch_handoff.py`.
 
+## Fix-ronde 1 (na CI-review — DIT NU) — blijf op branch `agent/sprint-11-gitsteward-core`
+
+De Stap 1-kern (`git_steward.py`) is inhoudelijk goed en door Claude gevalideerd tegen ADR-0025. Twee CI-bevindingen op PR #20 blokkeren de merge; los ze op **dezelfde branch** op en herpush (werkt de PR bij), zet daarna de baton terug naar `READY_FOR_TEST`.
+
+1. **PII-gate false-positive (Gate B + Gemini-voorwacht, ADR-0005).** `mistral-lokaal/scripts/pii_scan` flagt legitieme placeholder-adressen: `git-steward@localhost.invalid` (commit-identiteit in `git_steward.py`) en `@example.invalid` in `tests/test_git_steward.py`. **Fix:** whitelist in de e-maildetector de RFC-2606/6761 gereserveerde, niet-routeerbare domeinen — een adres waarvan het domein eindigt op `.invalid`, `.test`, `.example`, `.localhost`, of gelijk is aan `example.com`/`.org`/`.net`, is géén bevinding. Houd de gate streng voor echte domeinen. Borg met een test in de pii-scan-suite: `x@y.invalid` schoon, `iemand@gmail.com` nog steeds rood. (Wijzig de placeholders zelf niet — elk e-mailadres triggert anders opnieuw.)
+
+2. **Echte testfout — rebase-recovery verliest de coördinatie-commit.** `test_non_fast_forward_push_recovers_with_rebase_retry` faalt: na een concurrent competing push zijn `push_attempts==2` en `product.txt==release-v2`, maar de remote `progress.md` mist de `coordination`-inhoud (`'coordination' not found in '# Progress\n'`). De coördinatie-commit overleeft de rebase-recovery dus niet. Dit is de resilience-tak en moet echt kloppen. **Onderzoek** het `sync()`-push-retrypad met `recovery=_pull_once`: na de non-ff push moet de coördinatie-commit aantoonbaar op de opgehaalde competing-head worden herspeeld en in `HEAD` zitten vóór de her-push (bv. fetch + `rebase origin/main` + verifieer aanwezigheid, of her-stage/commit als de rebase 'm dropt). Maak de test groen: coördinatie op remote, `product.txt==release-v2` behouden, beide commits in de log.
+
+**DoD fix-ronde:** 102/102 Python-tests groen, PII-gate groen (placeholders schoon, echte adressen nog rood), overige gates + Gemini groen; geen productcode naar main; baton → `READY_FOR_TEST`.
+
+---
+
+_De rest van dit document is de oorspronkelijke Stap 1–3-scope._
+
 ## Fasering — LEVER EERST STAP 1 (deze beurt)
 
 De taak is te groot voor één beurt. Splits in drie beurten; **rond deze beurt uitsluitend Stap 1 volledig af** (PR openen + baton → `READY_FOR_TEST`). Stap 2 en 3 zijn aparte latere beurten.
