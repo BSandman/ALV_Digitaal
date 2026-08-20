@@ -1,27 +1,30 @@
-# sprint.md — Sprint 10: Eigenaar-frontend v0.1 (deelnemen-UI)
+# sprint.md — Sprint 11: Git-hardening (GitSteward)
 
-**Doel:** het eigenlijke Fase-2-product zichtbaar maken. Een door de Node-app geserveerde **eigenaar-UI** bovenop de bestaande API, zodat een eigenaar kan **inloggen (code-fallback) → de open ronde zien → Voor/Tegen stemmen → bevestiging zien**, met polling (ETag/jitter, ADR-0002). Architectuur: **ADR-0024**. Spec: **`docs/gates/Codex-taak-frontend-eigenaar.md`**.
+**Doel:** het leeuwendeel van de autorun-uitval (git) structureel wegnemen. Een apart deterministisch **GitSteward**-proces wordt de enige git-schrijver naar `main` en de enige houder van push-credentials; LLM-runners worden git-light (offline-sandboxbaar). Verplichte block-finalize + retry maken de tree altijd schoon en GitHub altijd de waarheid. Besluit: **ADR-0025**. Spec: **`docs/gates/Codex-taak-gitsteward.md`**.
+
+> Sprint 10 (eigenaar-frontend) is bewust **gepauzeerd** en hervat direct na deze hardening (ADR-0024 + `docs/gates/Codex-taak-frontend-eigenaar.md` blijven geldig). Reden: eerst de straat robuust, dan pas de 10-runs-test.
 
 ## Cadans — per blok
 
 | Blok | Rol | Watcher | Inhoud |
 |---|---|---|---|
-| 1 | **Codex** (dev) | `--role codex` | Statische serving + `/deelnemen/`-UI + server-side één-actie-fan-out; contract-/e2e-tests; PR |
+| 1 | **Codex** (dev) | `--role codex` | GitSteward-proces + `watch_handoff.py`-refactor + retry/block-finalize; tests; PR |
 | 2 | *auto* | — | CI-gates + Gemini-review op de PR |
-| 3 | **Claude** (validatie) | `--role claude` | Toets tegen ADR-0024/0011/0018/0021/0002 |
-| 4 | **Mistral** (integratie) | `--role mistral` | Gates + datasets; geen deploy |
+| 3 | **Claude** (validatie) | `--role claude` | Toets tegen ADR-0025 (block-finalize, credential-isolatie, geen productcode naar main) |
+| 4 | **Mistral** (integratie) | `--role mistral` | Gates; geen deploy |
 
 ## Scope
 
-- **In:** eigenaar-deelnemen-flow (login → open ronde → Voor/Tegen → bevestiging) tegen `/deelnemen/api/*`; code-login als ingang; sessietoken alleen in geheugen; polling met ETag/jitter dat stopt bij sluiting; server-side fan-out van één keuze over de in-scope rechten (per VvE, eigen breukdeel, exact decimal).
-- **Uit (latere sprints):** admin-UI (activeren/sluiten/vaststellen, quorum) · magic-link/QR-token + PIN (ADR-0016) · gemachtigde-UX + digitale intake (ADR-0022) · sessieherstel na herlaad · meerdere bezorg-e-mails (ADR-0020).
+- **In:** deterministische GitSteward (`sync` + `block_finalize`, retry/backoff, stale-`index.lock`-opruiming, `GH_TOKEN` uit `secure/`); watcher delegeert git aan de steward; verplichte block-finalize (BLOCKED-baton+progress altijd gecommit+gepusht); runners git-light/offline-baar.
+- **Uit:** feature-branch-commits + PR-creatie volledig naar de steward trekken · de PR-gate/auto-advance-mergeroute wijzigen · deploy · productfunctionaliteit · Gemini lokaal.
 
 ## Definition of done
 
-- End-to-end happy path groen op T (verse MariaDB 11.8.8); fan-out klopt (PG+TF, per VvE, exact decimal); row-level isolatie bewezen; geen token-at-rest; polling-304/stop-gedrag correct; statische serving zonder traversal.
-- Bestaande Node-tests blijven groen; `npm run check`, Python-tests, architectuur-, release-, handoff- en PII-gates en Gemini-review groen.
-- Claude valideert tegen ADR-0024; daarna integreert Mistral. **Geen deploy** in deze sprint.
+- Block-finalize bewezen: runner blokkeert vóór commit → steward commit+pusht BLOCKED-baton + progressregel; `git status --porcelain` leeg, `HEAD...@{u}` = `0 0`.
+- Transient git (stale lock, non-fast-forward) hersteld via retry/rebase zónder blokkade; echt-kapot escaleert netjes naar Bas.
+- Credential-isolatie: een runner zonder `GH_TOKEN`/netwerk doet zijn beurt lokaal; alleen de steward pusht. Geen half-af productcode naar `main`.
+- `npm run check` + Python-tests + architectuur-, release-, handoff- en PII-gates + Gemini-review groen. **Geen deploy.**
 
 ## Buiten scope
 
-Automatische deploy/productie · admin- en gemachtigde-schermen · magic-link/PIN · nieuwe frontend-frameworks of buildstap · sessiepersistentie in browseropslag.
+Automatische deploy/productie · magic-link/admin-UI (Sprint 10-frontend) · nieuwe merge-route naar main · onbemand/overnight zonder aparte Bas-go.

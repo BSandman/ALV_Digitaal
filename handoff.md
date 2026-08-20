@@ -1,12 +1,12 @@
 ---
-sprint: 10
-state: BLOCKED
-owner: bas
-since: 2026-08-18T22:24:20Z
-next: codex
-action_required_by: bas
-blocked: true
-note: "Autorun codex gestopt: runner liet ongecommitteerde wijzigingen achter; zie autorun.log."
+sprint: 11
+state: READY_FOR_DEV
+owner: codex
+since: 2026-08-20T15:52:35Z
+next: gemini
+action_required_by: none
+blocked: false
+note: "Bouw de deterministische GitSteward + block-finalize (ADR-0025); Sprint 10-frontend hervat erna."
 ---
 
 # handoff.md — de estafettestok
