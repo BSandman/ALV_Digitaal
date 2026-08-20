@@ -1,12 +1,12 @@
 ---
 sprint: 11
-state: READY_FOR_TEST
-owner: gemini
-since: 2026-08-20T22:18:47Z
-next: claude
+state: READY_FOR_VALIDATION
+owner: claude
+since: 2026-08-20T22:20:11Z
+next: mistral
 action_required_by: none
 blocked: false
-note: "PR #20 bevat Git-identiteit voor alle subprocessen en fail-closed snapshotverificatie; CI en Gemini kunnen herbeoordelen."
+note: "PR-gates en Gemini zijn groen; Claude valideert de gemergde sprint."
 ---
 
 # handoff.md — de estafettestok
