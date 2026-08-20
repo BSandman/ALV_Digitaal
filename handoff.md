@@ -1,12 +1,12 @@
 ---
 sprint: 11
-state: INTEGRATION_IN_PROGRESS
-owner: mistral
+state: SPRINT_DONE
+owner: claude
 since: 2026-08-20T22:37:25Z
-next: claude
+next: bas
 action_required_by: none
 blocked: false
-note: "Mistral voert de vaste integratiecontroles uit; deploy blijft uit."
+note: "Deterministische integratie is groen en gepusht; er is niet gedeployed."
 ---
 
 # handoff.md — de estafettestok
