@@ -1,12 +1,12 @@
 ---
 sprint: 11
-state: BLOCKED
-owner: bas
-since: 2026-08-20T22:31:18Z
-next: claude
-action_required_by: bas
-blocked: true
-note: "Autorun claude gestopt: runner eindigde met exitcode 1; zie autorun.log."
+state: READY_FOR_INTEGRATION
+owner: mistral
+since: 2026-08-20T22:35:38Z
+next: bas
+action_required_by: none
+blocked: false
+note: "Claude-validatie Stap 1 groen tegen ADR-0025; Mistral kan integreren (gates, geen deploy)."
 ---
 
 # handoff.md — de estafettestok
