@@ -1,12 +1,12 @@
 ---
 sprint: 11
-state: READY_FOR_VALIDATION
+state: VALIDATION_IN_PROGRESS
 owner: claude
-since: 2026-08-20T22:20:11Z
+since: 2026-08-21T00:00:00Z
 next: mistral
 action_required_by: none
 blocked: false
-note: "PR-gates en Gemini zijn groen; Claude valideert de gemergde sprint."
+note: "Claude valideert GitSteward-kern (PR #20) tegen ADR-0025."
 ---
 
 # handoff.md — de estafettestok
