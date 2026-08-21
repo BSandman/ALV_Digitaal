@@ -1,12 +1,12 @@
 ---
 sprint: 12
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-21T08:22:47Z
-next: gemini
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-21T08:35:07Z
+next: claude
 action_required_by: none
 blocked: false
-note: "Stap 2: watcher delegeert git+block-finalize aan git_steward + bijbel-trim/instructie/race-guard/schoon-exit (attended, zelf-modificerend)."
+note: "Sprint 12 Stap 2 staat op de featurebranch klaar voor CI en de serverless Gemini-review; geen deploy uitgevoerd."
 ---
 
 # handoff.md — de estafettestok
