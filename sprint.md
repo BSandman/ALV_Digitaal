@@ -1,30 +1,31 @@
-# sprint.md — Sprint 11: Git-hardening (GitSteward)
+# sprint.md — Sprint 12: Git-hardening Stap 2 (watcher ↔ GitSteward + verfijningen)
 
-**Doel:** het leeuwendeel van de autorun-uitval (git) structureel wegnemen. Een apart deterministisch **GitSteward**-proces wordt de enige git-schrijver naar `main` en de enige houder van push-credentials; LLM-runners worden git-light (offline-sandboxbaar). Verplichte block-finalize + retry maken de tree altijd schoon en GitHub altijd de waarheid. Besluit: **ADR-0025**. Spec: **`docs/gates/Codex-taak-gitsteward.md`**.
+**Doel:** de robuustheid van de GitSteward (Stap 1, op `main`) overal laten gelden. De `watch_handoff.py`-watcher delegeert zijn coördinatie-git + de **verplichte block-finalize** aan `git_steward.py`, en drie samenhangende context/protocol-verfijningen landen op dezelfde plek. Ontwerp: **ADR-0025**. Spec: **`docs/gates/Codex-taak-gitsteward-stap2.md`**.
 
-> Sprint 10 (eigenaar-frontend) is bewust **gepauzeerd** en hervat direct na deze hardening (ADR-0024 + `docs/gates/Codex-taak-frontend-eigenaar.md` blijven geldig). Reden: eerst de straat robuust, dan pas de 10-runs-test.
+> **Zelf-modificerend + attended.** Deze sprint wijzigt de watcher die de beurten zélf draait. Draai `--max-turns 1` met Bas erbij; één volledige begeleide beurt op de nieuwe watcher moet schoon + in-sync eindigen vóór je erop leunt. Niet onbemand.
 
 ## Cadans — per blok
 
 | Blok | Rol | Watcher | Inhoud |
 |---|---|---|---|
-| 1 | **Codex** (dev) | `--role codex` | GitSteward-proces + `watch_handoff.py`-refactor + retry/block-finalize; tests; PR |
+| 1 | **Codex** (dev) | `--role codex` | watcher→steward-delegatie + block-finalize + bijbel-trim + Codex-instructie + race-guard + schoon-exit; tests; PR |
 | 2 | *auto* | — | CI-gates + Gemini-review op de PR |
-| 3 | **Claude** (validatie) | `--role claude` | Toets tegen ADR-0025 (block-finalize, credential-isolatie, geen productcode naar main) |
+| 3 | **Claude** (validatie) | `--role claude` | Toets tegen ADR-0025/0015 (block-finalize via steward, geen productcode naar main, context per rol) |
 | 4 | **Mistral** (integratie) | `--role mistral` | Gates; geen deploy |
 
 ## Scope
 
-- **In:** deterministische GitSteward (`sync` + `block_finalize`, retry/backoff, stale-`index.lock`-opruiming, `GH_TOKEN` uit `secure/`); watcher delegeert git aan de steward; verplichte block-finalize (BLOCKED-baton+progress altijd gecommit+gepusht); runners git-light/offline-baar.
-- **Uit:** feature-branch-commits + PR-creatie volledig naar de steward trekken · de PR-gate/auto-advance-mergeroute wijzigen · deploy · productfunctionaliteit · Gemini lokaal.
+- **In:** (1) watcher delegeert coördinatie-sync + verplichte block-finalize aan `git_steward.py`; (2) bijbel-context per rol trimmen (volle bijbel alleen voor Claude); (3) `Codex-instructie.md` → register + taakdoc + op-afroep i.p.v. "lees eerst de hele bijbel"; (4) dubbele race-guard weg (alleen de watcher houdt 'm); (5) schoon exit na `--max-turns` (`running:false`, geen na-idlen).
+- **Uit (Stap 3+):** feature-branch-push + PR-creatie naar de steward (→ runners volledig offline); PR-gate/mergeroute wijzigen; deploy; productfunctionaliteit.
 
 ## Definition of done
 
-- Block-finalize bewezen: runner blokkeert vóór commit → steward commit+pusht BLOCKED-baton + progressregel; `git status --porcelain` leeg, `HEAD...@{u}` = `0 0`.
-- Transient git (stale lock, non-fast-forward) hersteld via retry/rebase zónder blokkade; echt-kapot escaleert netjes naar Bas.
-- Credential-isolatie: een runner zonder `GH_TOKEN`/netwerk doet zijn beurt lokaal; alleen de steward pusht. Geen half-af productcode naar `main`.
-- `npm run check` + Python-tests + architectuur-, release-, handoff- en PII-gates + Gemini-review groen. **Geen deploy.**
+- Block-finalize loopt via de steward (getest: blokkade → BLOCKED-baton+progress gecommit+gepusht, schone/in-sync tree); watcher doet zelf geen `git commit/push` op coördinatie meer.
+- Context voor `codex`/`mistral` bevat níet de volledige bijbel maar wél register+rollen+versiebeheer+taakdoc; voor `claude` wél volledig — getest.
+- Runner voert de 60s-guard niet dubbel uit; `--max-turns 1` eindigt met een gestopt proces (`running:false`).
+- `npm run check` + Python-tests + architectuur-, release-, handoff- en PII-gates + Gemini-review groen; `test_watch_handoff.py` bijgewerkt. **Geen deploy; geen productcode naar `main`.**
+- Eén begeleide beurt bewijst de nieuwe watcher schoon draait.
 
 ## Buiten scope
 
-Automatische deploy/productie · magic-link/admin-UI (Sprint 10-frontend) · nieuwe merge-route naar main · onbemand/overnight zonder aparte Bas-go.
+Deploy/productie · runners volledig offline (Stap 3) · nieuwe merge-route · onbemand/overnight zonder aparte Bas-go.

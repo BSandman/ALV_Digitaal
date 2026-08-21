@@ -1,12 +1,12 @@
 ---
-sprint: 11
-state: SPRINT_DONE
-owner: claude
-since: 2026-08-20T22:37:25Z
-next: bas
+sprint: 12
+state: READY_FOR_DEV
+owner: codex
+since: 2026-08-21T07:51:42Z
+next: gemini
 action_required_by: none
 blocked: false
-note: "Deterministische integratie is groen en gepusht; er is niet gedeployed."
+note: "Stap 2: watcher delegeert git+block-finalize aan git_steward + bijbel-trim/instructie/race-guard/schoon-exit (attended, zelf-modificerend)."
 ---
 
 # handoff.md — de estafettestok
