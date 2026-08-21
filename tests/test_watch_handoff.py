@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -40,36 +41,86 @@ note: "Bouw de volgende taak."
 VALIDATED_HANDOFF = READY_HANDOFF.replace("READY_FOR_DEV", "READY_FOR_VALIDATION").replace(
     "owner: codex", "owner: claude"
 )
+READY_FOR_TEST_HANDOFF = READY_HANDOFF.replace("READY_FOR_DEV", "READY_FOR_TEST").replace(
+    "owner: codex", "owner: gemini"
+)
 
 
 class WatchHandoffContextTests(unittest.TestCase):
     def make_repo(self, directory: str) -> Path:
         repo = Path(directory)
+        (repo / "docs" / "gates").mkdir(parents=True)
         (repo / "handoff.md").write_text("HANDOFF-HELEMAAL\nregel-2\n", encoding="utf-8")
-        (repo / "sprint.md").write_text("SPRINT-HELEMAAL\n", encoding="utf-8")
-        (repo / "bijbel.md").write_text("BIJBEL-HELEMAAL\nlaatste-bijbelregel\n", encoding="utf-8")
+        (repo / "sprint.md").write_text(
+            "SPRINT-HELEMAAL `docs/gates/Codex-taak-gitsteward-stap2.md`\n",
+            encoding="utf-8",
+        )
+        (repo / "bijbel.md").write_text(
+            "# BIJBEL-HELEMAAL\n\n"
+            "## 1. Product\nALLEEN-IN-VOLLEDIGE-BIJBEL\n\n"
+            "## 2. Rollen\nROLLEN-BEREIKBAAR\n\n"
+            "## 3. Techniek\nTECHNIEK-OP-AFROEP\n\n"
+            "## 8. Versiebeheer\nVERSIEBEHEER-BEREIKBAAR\n\n"
+            "## 9. ADR-register\nADR-REGISTER-BEREIKBAAR\n\n"
+            "## 10. Sleuteldocumenten\nLAATSTE-BIJBELREGEL\n",
+            encoding="utf-8",
+        )
+        (repo / "docs" / "gates" / "Codex-instructie.md").write_text(
+            "CODEX-CHARTER\n", encoding="utf-8"
+        )
+        (repo / "docs" / "gates" / "Codex-taak-gitsteward-stap2.md").write_text(
+            "CODEX-TAAKDOC\n", encoding="utf-8"
+        )
+        (repo / "docs" / "gates" / "Mistral-instructie.md").write_text(
+            "MISTRAL-TAAKDOC\n", encoding="utf-8"
+        )
         (repo / "progress.md").write_text(
             "\n".join(f"progress-{number:02d}" for number in range(1, 21)) + "\n",
             encoding="utf-8",
         )
         return repo
 
-    def test_context_contains_full_control_files_and_default_progress_tail(self) -> None:
+    def test_codex_context_contains_trimmed_bible_task_docs_and_progress_tail(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            context = watch_handoff.build_context(repo=self.make_repo(directory))
+            context = watch_handoff.build_context("codex", repo=self.make_repo(directory))
 
         self.assertIn("HANDOFF-HELEMAAL\nregel-2", context)
         self.assertIn("SPRINT-HELEMAAL", context)
-        self.assertIn("BIJBEL-HELEMAAL\nlaatste-bijbelregel", context)
+        self.assertNotIn("ALLEEN-IN-VOLLEDIGE-BIJBEL", context)
+        self.assertNotIn("TECHNIEK-OP-AFROEP", context)
+        self.assertIn("ROLLEN-BEREIKBAAR", context)
+        self.assertIn("VERSIEBEHEER-BEREIKBAAR", context)
+        self.assertIn("ADR-REGISTER-BEREIKBAAR", context)
+        self.assertIn("CODEX-CHARTER", context)
+        self.assertIn("CODEX-TAAKDOC", context)
         self.assertIn("progress.md (laatste 15 regels)", context)
         self.assertNotIn("progress-05", context)
         self.assertIn("progress-06", context)
         self.assertIn("progress-20", context)
 
+    def test_claude_defaults_to_full_bible_and_override_is_knobbed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = self.make_repo(directory)
+            claude = watch_handoff.build_context("claude", repo=repo)
+            codex_full = watch_handoff.build_context("codex", repo=repo, bijbel_mode="full")
+
+        self.assertIn("bijbel.md (volledig)", claude)
+        self.assertIn("ALLEEN-IN-VOLLEDIGE-BIJBEL", claude)
+        self.assertIn("ALLEEN-IN-VOLLEDIGE-BIJBEL", codex_full)
+
+    def test_mistral_context_uses_register_and_its_own_task_doc(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            context = watch_handoff.build_context("mistral", repo=self.make_repo(directory))
+
+        self.assertNotIn("ALLEEN-IN-VOLLEDIGE-BIJBEL", context)
+        self.assertIn("ADR-REGISTER-BEREIKBAAR", context)
+        self.assertIn("MISTRAL-TAAKDOC", context)
+        self.assertNotIn("CODEX-TAAKDOC", context)
+
     def test_progress_tail_is_configurable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             context = watch_handoff.build_context(
-                progress_tail=3, repo=self.make_repo(directory)
+                "codex", progress_tail=3, repo=self.make_repo(directory)
             )
 
         self.assertNotIn("progress-17", context)
@@ -81,7 +132,7 @@ class WatchHandoffContextTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             repo = self.make_repo(directory)
             (repo / "progress.md").write_text("eerste\ntweede\n", encoding="utf-8")
-            context = watch_handoff.build_context(progress_tail=15, repo=repo)
+            context = watch_handoff.build_context("codex", progress_tail=15, repo=repo)
 
         self.assertIn("eerste\ntweede", context)
 
@@ -89,25 +140,46 @@ class WatchHandoffContextTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             repo = self.make_repo(directory)
             with self.assertRaisesRegex(ValueError, "minimaal 1"):
-                watch_handoff.build_context(progress_tail=0, repo=repo)
+                watch_handoff.build_context("codex", progress_tail=0, repo=repo)
 
     def test_utf8_bom_is_not_forwarded_into_context(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo = self.make_repo(directory)
-            (repo / "bijbel.md").write_text("BIJBEL-BOM\n", encoding="utf-8-sig")
-            context = watch_handoff.build_context(repo=repo)
+            original = (repo / "bijbel.md").read_text(encoding="utf-8")
+            (repo / "bijbel.md").write_text(original, encoding="utf-8-sig")
+            context = watch_handoff.build_context("claude", repo=repo)
 
-        self.assertIn("BIJBEL-BOM", context)
+        self.assertIn("BIJBEL-HELEMAAL", context)
         self.assertNotIn("\ufeff", context)
+
+    def test_runner_prompt_does_not_repeat_the_watcher_race_guard(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            context = watch_handoff.build_runner_input("codex", repo=self.make_repo(directory))
+
+        self.assertIn("watcher heeft de race-guard al voltooid", context)
+        self.assertNotIn("wacht 60", context.lower())
 
 
 class WatchHandoffAutorunTests(unittest.TestCase):
     def make_repo(self, directory: str, handoff: str = READY_HANDOFF) -> Path:
         repo = Path(directory)
         (repo / "scripts").mkdir()
+        (repo / "docs" / "gates").mkdir(parents=True)
         (repo / "handoff.md").write_text(handoff, encoding="utf-8")
-        (repo / "sprint.md").write_text("SPRINT\n", encoding="utf-8")
-        (repo / "bijbel.md").write_text("BIJBEL\n", encoding="utf-8")
+        (repo / "sprint.md").write_text(
+            "SPRINT `docs/gates/Codex-taak-gitsteward-stap2.md`\n", encoding="utf-8"
+        )
+        (repo / "bijbel.md").write_text(
+            "## 2. Rollen\nROLLEN\n\n## 8. Versiebeheer\nVERSIES\n\n"
+            "## 9. ADR-register\nREGISTER\n",
+            encoding="utf-8",
+        )
+        (repo / "docs" / "gates" / "Codex-instructie.md").write_text(
+            "CHARTER\n", encoding="utf-8"
+        )
+        (repo / "docs" / "gates" / "Codex-taak-gitsteward-stap2.md").write_text(
+            "TAAK\n", encoding="utf-8"
+        )
         (repo / "progress.md").write_text("PROGRESS\n", encoding="utf-8")
         return repo
 
@@ -115,6 +187,108 @@ class WatchHandoffAutorunTests(unittest.TestCase):
     def clean_git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
         stdout = "0\t0\n" if args[:3] == ("rev-list", "--left-right", "--count") else ""
         return subprocess.CompletedProcess(["git", *args], 0, stdout=stdout, stderr="")
+
+    @staticmethod
+    def fixture_git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        result = subprocess.run(
+            ["git", *args], cwd=repo, capture_output=True, text=True, check=False
+        )
+        if result.returncode != 0:
+            raise AssertionError(f"git {' '.join(args)} faalde: {result.stderr}")
+        return result
+
+    def test_attended_single_turn_uses_real_steward_and_exits_clean_in_sync(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            remote = root / "remote.git"
+            seed = root / "seed"
+            work = root / "work"
+            self.fixture_git(root, "init", "--bare", str(remote))
+            self.fixture_git(root, "init", "-b", "main", str(seed))
+            self.fixture_git(seed, "config", "user.name", "Fixture")
+            self.fixture_git(seed, "config", "user.email", "fixture@example.invalid")
+            (seed / "scripts").mkdir()
+            (seed / "docs" / "gates").mkdir(parents=True)
+            for name in ("git_steward.py", "lint_handoff.py", "notify_bas.py", "autorun_io.py"):
+                shutil.copy2(REPO / "scripts" / name, seed / "scripts" / name)
+            (seed / ".gitignore").write_text(
+                "autorun-status.json\nautorun.log\nautorun.paused\n__pycache__/\n*.pyc\n",
+                encoding="utf-8",
+            )
+            (seed / "handoff.md").write_text(READY_HANDOFF, encoding="utf-8")
+            (seed / "progress.md").write_text("# Progress\n", encoding="utf-8")
+            (seed / "sprint.md").write_text(
+                "Sprint `docs/gates/Codex-taak-gitsteward-stap2.md`\n", encoding="utf-8"
+            )
+            (seed / "bijbel.md").write_text(
+                "## 2. Rollen\nROLLEN\n\n## 8. Versiebeheer\nVERSIES\n\n"
+                "## 9. ADR-register\nREGISTER\n",
+                encoding="utf-8",
+            )
+            (seed / "docs" / "gates" / "Codex-instructie.md").write_text(
+                "CHARTER\n", encoding="utf-8"
+            )
+            (seed / "docs" / "gates" / "Codex-taak-gitsteward-stap2.md").write_text(
+                "TAAK\n", encoding="utf-8"
+            )
+            self.fixture_git(
+                seed,
+                "add",
+                "--",
+                ".gitignore",
+                "scripts",
+                "docs",
+                "handoff.md",
+                "progress.md",
+                "sprint.md",
+                "bijbel.md",
+            )
+            self.fixture_git(seed, "commit", "-m", "seed")
+            self.fixture_git(seed, "remote", "add", "origin", str(remote))
+            self.fixture_git(seed, "push", "-u", "origin", "main")
+            self.fixture_git(remote, "symbolic-ref", "HEAD", "refs/heads/main")
+            self.fixture_git(root, "clone", "--quiet", str(remote), str(work))
+            self.fixture_git(work, "config", "user.name", "Fixture")
+            self.fixture_git(work, "config", "user.email", "fixture@example.invalid")
+            self.fixture_git(work, "switch", "-c", "agent/attended-proof")
+            self.fixture_git(work, "push", "-u", "origin", "agent/attended-proof")
+
+            runner = root / "runner.py"
+            runner.write_text(
+                "from pathlib import Path\n"
+                "import subprocess\n"
+                f"Path('handoff.md').write_text({READY_FOR_TEST_HANDOFF!r}, encoding='utf-8')\n"
+                "with Path('progress.md').open('a', encoding='utf-8') as handle:\n"
+                "    handle.write('- attended watcher proof\\n')\n"
+                "subprocess.run(['git', 'add', '--', 'handoff.md', 'progress.md'], check=True)\n"
+                "subprocess.run(['git', 'commit', '-m', 'test: complete attended turn'], check=True)\n"
+                "subprocess.run(['git', 'push'], check=True)\n",
+                encoding="utf-8",
+            )
+
+            result = watch_handoff.run_session(
+                "codex",
+                autorun=True,
+                command=[sys.executable, str(runner)],
+                interval=1,
+                progress_tail=15,
+                max_turns=1,
+                max_wallclock=30,
+                once=False,
+                race_guard_seconds=0,
+                repo=work,
+            )
+
+            runtime = json.loads((work / "autorun-status.json").read_text(encoding="utf-8"))
+            remote_handoff = self.fixture_git(remote, "show", "main:handoff.md").stdout
+            self.assertEqual(result, 0)
+            self.assertIn("state: READY_FOR_TEST", remote_handoff)
+            self.assertFalse(runtime["running"])
+            self.assertEqual(self.fixture_git(work, "status", "--porcelain").stdout, "")
+            self.assertEqual(
+                self.fixture_git(work, "rev-list", "--left-right", "--count", "HEAD...@{u}").stdout.strip(),
+                "0\t0",
+            )
 
     def test_local_environment_can_set_bounded_defaults(self) -> None:
         defaults = watch_handoff.load_autorun_defaults(
@@ -215,13 +389,20 @@ class WatchHandoffAutorunTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             repo = self.make_repo(directory)
             notifications = []
+            steward_calls = []
 
             def fake_act(command, context, *, repo, timeout, pause_path=None):
-                self.assertIn("===== bijbel.md (volledig) =====", context)
+                self.assertIn("§9 ADR-register", context)
+                self.assertNotIn("bijbel.md (volledig)", context)
                 self.assertIn("Voer exact één handoff-beurt uit als rol codex", context)
+                self.assertIn("race-guard al voltooid", context)
                 self.assertIn("Voer nooit zelf een deploy uit", context)
                 (repo / "handoff.md").write_text(VALIDATED_HANDOFF, encoding="utf-8")
                 return subprocess.CompletedProcess(command, 0)
+
+            def fake_steward(current_repo, *args):
+                steward_calls.append(args)
+                return subprocess.CompletedProcess(["git_steward", *args], 0, stdout="", stderr="")
 
             with mock.patch.object(watch_handoff, "act", side_effect=fake_act):
                 result = watch_handoff.execute_autorun_turn(
@@ -231,24 +412,43 @@ class WatchHandoffAutorunTests(unittest.TestCase):
                     deadline=watch_handoff.time.monotonic() + 10,
                     repo=repo,
                     git_runner=self.clean_git,
+                    steward_runner=fake_steward,
                     notifier_runner=lambda current_repo: notifications.append(current_repo) or 0,
                     log_path=repo / "autorun.log",
                 )
 
             self.assertEqual(result, "success")
+            self.assertEqual(steward_calls, [("sync",)])
             self.assertEqual(notifications, [repo])
             log = (repo / "autorun.log").read_text(encoding="utf-8")
             self.assertIn("READY_FOR_DEV → READY_FOR_VALIDATION · OK", log)
 
-    def test_nonzero_runner_blocks_commits_pushes_and_notifies(self) -> None:
+    def test_nonzero_runner_block_finalizes_via_steward_then_notifies(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo = self.make_repo(directory)
             git_calls = []
+            steward_calls = []
             notifications = []
 
             def fake_git(current_repo, *args):
                 git_calls.append(args)
                 return subprocess.CompletedProcess(["git", *args], 0, stdout="", stderr="")
+
+            def fake_steward(current_repo, *args):
+                steward_calls.append(args)
+                values = {
+                    "state": "BLOCKED",
+                    "owner": "bas",
+                    "next": "none",
+                    "action_required_by": "bas",
+                    "blocked": "true",
+                    "note": args[-1],
+                }
+                text = (current_repo / "handoff.md").read_text(encoding="utf-8")
+                (current_repo / "handoff.md").write_text(
+                    watch_handoff._frontmatter_with_updates(text, values), encoding="utf-8"
+                )
+                return subprocess.CompletedProcess(["git_steward", *args], 0, stdout="", stderr="")
 
             with mock.patch.object(
                 watch_handoff,
@@ -262,6 +462,7 @@ class WatchHandoffAutorunTests(unittest.TestCase):
                     deadline=watch_handoff.time.monotonic() + 10,
                     repo=repo,
                     git_runner=fake_git,
+                    steward_runner=fake_steward,
                     notifier_runner=lambda current_repo: notifications.append(current_repo) or 0,
                     log_path=repo / "autorun.log",
                 )
@@ -272,8 +473,42 @@ class WatchHandoffAutorunTests(unittest.TestCase):
             self.assertEqual(blocked["owner"], "bas")
             self.assertEqual(blocked["action_required_by"], "bas")
             self.assertEqual(blocked["blocked"], "true")
-            self.assertEqual([call[0] for call in git_calls], ["add", "commit", "push"])
+            self.assertEqual(git_calls, [])
+            self.assertEqual(steward_calls[0][0], "block_finalize")
+            self.assertIn("--role", steward_calls[0])
             self.assertEqual(notifications, [repo])
+
+    def test_failed_coordination_sync_is_block_finalized_via_steward(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = self.make_repo(directory)
+            steward_calls = []
+
+            def fake_act(command, context, *, repo, timeout, pause_path=None):
+                (repo / "handoff.md").write_text(VALIDATED_HANDOFF, encoding="utf-8")
+                return subprocess.CompletedProcess(command, 0)
+
+            def fake_steward(current_repo, *args):
+                steward_calls.append(args)
+                return subprocess.CompletedProcess(
+                    ["git_steward", *args], 1 if args[0] == "sync" else 0, stdout="", stderr=""
+                )
+
+            with mock.patch.object(watch_handoff, "act", side_effect=fake_act):
+                result = watch_handoff.execute_autorun_turn(
+                    "codex",
+                    ["runner"],
+                    progress_tail=15,
+                    deadline=watch_handoff.time.monotonic() + 10,
+                    repo=repo,
+                    git_runner=self.clean_git,
+                    steward_runner=fake_steward,
+                    notifier_runner=lambda current_repo: 0,
+                    log_path=repo / "autorun.log",
+                )
+
+        self.assertEqual(result, "failed")
+        self.assertEqual(steward_calls[0], ("sync",))
+        self.assertEqual(steward_calls[1][0], "block_finalize")
 
     def test_paused_runner_keeps_current_baton_resumable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -445,7 +680,7 @@ class WatchHandoffAutorunTests(unittest.TestCase):
             execute.assert_called_once()
             guard.assert_not_called()
 
-    def test_loop_cap_blocks_before_a_second_turn(self) -> None:
+    def test_max_turns_exits_cleanly_without_after_idle_or_block(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo = self.make_repo(directory)
             clean_pull = subprocess.CompletedProcess(["git"], 0, stdout="", stderr="")
@@ -469,10 +704,12 @@ class WatchHandoffAutorunTests(unittest.TestCase):
                     repo=repo,
                 )
 
-            self.assertEqual(result, 1)
+            self.assertEqual(result, 0)
             execute.assert_called_once()
-            blocked.assert_called_once()
-            self.assertIn("loop-cap van 1", blocked.call_args.args[1])
+            blocked.assert_not_called()
+            runtime = json.loads((repo / "autorun-status.json").read_text(encoding="utf-8"))
+            self.assertFalse(runtime["running"])
+            self.assertEqual(runtime["turns"], 1)
 
     def test_activity_log_is_single_line_and_excludes_multiline_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
