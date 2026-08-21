@@ -1,12 +1,12 @@
 ---
 sprint: 12
-state: BLOCKED
-owner: bas
-since: 2026-08-21T09:46:30Z
-next: none
-action_required_by: bas
-blocked: true
-note: "Autorun mistral gestopt: runner eindigde met exitcode 1; zie autorun.log."
+state: SPRINT_DONE
+owner: claude
+since: 2026-08-21T09:50:32Z
+next: bas
+action_required_by: none
+blocked: false
+note: "Stap 2 op main + gevalideerd; nieuwe watcher bewezen. Lokale Mistral-integrator faalt op ontbrekende rsync (env, backlog)."
 ---
 
 # handoff.md — de estafettestok
