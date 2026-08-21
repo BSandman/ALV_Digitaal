@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -47,6 +48,11 @@ RACE_GUARD_SECONDS = 60
 DEFAULT_PROGRESS_TAIL = 15
 DEFAULT_MAX_TURNS = 3
 DEFAULT_MAX_WALLCLOCK = 1800
+BIJBEL_MODES = ("full", "register")
+ROLE_CHARTERS = {
+    "codex": "docs/gates/Codex-instructie.md",
+    "mistral": "docs/gates/Mistral-instructie.md",
+}
 
 AUTORUN_DEFAULT_ENV = {
     "interval": ("ALV_AUTORUN_INTERVAL_SECONDS", 45, 3600),
@@ -203,31 +209,90 @@ def tail_text(path: Path, line_count: int) -> str:
     return "\n".join(lines[-line_count:])
 
 
-def build_context(progress_tail: int = DEFAULT_PROGRESS_TAIL, repo: Path = REPO) -> str:
-    paths = {
-        "handoff.md": repo / "handoff.md",
-        "sprint.md": repo / "sprint.md",
-        "bijbel.md": repo / "bijbel.md",
-    }
-    sections = []
-    for name, path in paths.items():
-        content = path.read_text(encoding="utf-8-sig").rstrip("\r\n")
-        sections.append(f"===== {name} (volledig) =====\n{content}")
+def default_bijbel_mode(role: str) -> str:
+    return "full" if role == "claude" else "register"
+
+
+def _bijbel_register(text: str) -> str:
+    """Select the authoritative role, versioning and ADR-register sections."""
+    wanted = {"2", "8", "9"}
+    found: set[str] = set()
+    selected: list[str] = []
+    active = False
+    for line in text.splitlines():
+        heading = re.match(r"^##\s+(\d+)\.\s", line)
+        if heading:
+            number = heading.group(1)
+            active = number in wanted
+            if active:
+                found.add(number)
+        if active:
+            selected.append(line)
+    if found != wanted:
+        missing = ", ".join(sorted(wanted - found))
+        raise AutorunError(f"bijbel-register mist vereiste sectie(s): {missing}")
+    return "\n".join(selected).rstrip()
+
+
+def _role_context_docs(role: str, sprint: str) -> tuple[str, ...]:
+    documents: list[str] = []
+    charter = ROLE_CHARTERS.get(role)
+    if charter:
+        documents.append(charter)
+    for relative in re.findall(r"`(docs/gates/[^`\r\n]+\.md)`", sprint):
+        if role in Path(relative).name.lower() and relative not in documents:
+            documents.append(relative)
+    return tuple(documents)
+
+
+def build_context(
+    role: str,
+    progress_tail: int = DEFAULT_PROGRESS_TAIL,
+    repo: Path = REPO,
+    bijbel_mode: str | None = None,
+) -> str:
+    mode = bijbel_mode or default_bijbel_mode(role)
+    if mode not in BIJBEL_MODES:
+        raise ValueError(f"bijbel-mode moet een van {', '.join(BIJBEL_MODES)} zijn")
+    sections: list[str] = []
+    handoff = (repo / "handoff.md").read_text(encoding="utf-8-sig").rstrip("\r\n")
+    sprint = (repo / "sprint.md").read_text(encoding="utf-8-sig").rstrip("\r\n")
+    sections.append(f"===== handoff.md (volledig) =====\n{handoff}")
+    sections.append(f"===== sprint.md (volledig) =====\n{sprint}")
+
+    bijbel = (repo / "bijbel.md").read_text(encoding="utf-8-sig").rstrip("\r\n")
+    if mode == "full":
+        sections.append(f"===== bijbel.md (volledig) =====\n{bijbel}")
+    else:
+        sections.append(
+            "===== bijbel.md (§2 rollen + §8 versiebeheer + §9 ADR-register) =====\n"
+            f"{_bijbel_register(bijbel)}"
+        )
+
+    for relative in _role_context_docs(role, sprint):
+        content = (repo / relative).read_text(encoding="utf-8-sig").rstrip("\r\n")
+        sections.append(f"===== {relative} (rol-taakdoc) =====\n{content}")
 
     progress = tail_text(repo / "progress.md", progress_tail)
     sections.append(f"===== progress.md (laatste {progress_tail} regels) =====\n{progress}")
     return "\n\n".join(sections) + "\n"
 
 
-def build_runner_input(role: str, progress_tail: int = DEFAULT_PROGRESS_TAIL, repo: Path = REPO) -> str:
+def build_runner_input(
+    role: str,
+    progress_tail: int = DEFAULT_PROGRESS_TAIL,
+    repo: Path = REPO,
+    bijbel_mode: str | None = None,
+) -> str:
     instructions = (
         f"Voer exact één handoff-beurt uit als rol {role}. Volg README.md en AGENTS.md; "
-        "claim een READY-beurt of hervat je eigen IN_PROGRESS-beurt, voer alleen je opgedragen "
+        "de watcher heeft de race-guard al voltooid, dus claim een READY-beurt direct zonder "
+        "een tweede wachttijd of hervat je eigen IN_PROGRESS-beurt. Voer alleen je opgedragen "
         "werk uit en sluit af met een geldige handoff + progress-commit die je pusht. "
         "Voer nooit zelf een deploy uit; zet voor een menselijke deploy action_required_by: bas. "
         "Bij twijfel of afwijking: BLOCKED voor Bas.\n\n"
     )
-    return instructions + build_context(progress_tail, repo)
+    return instructions + build_context(role, progress_tail, repo, bijbel_mode)
 
 
 def load_runner_command(role: str, environ: Mapping[str, str] | None = None) -> list[str]:
@@ -325,17 +390,38 @@ def run_notifier(repo: Path = REPO) -> int:
     return result.returncode
 
 
+def run_git_steward(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    """Invoke the credential-owning steward without exposing its captured output."""
+    return subprocess.run(
+        [sys.executable, str(repo / "scripts" / "git_steward.py"), "--repo", str(repo), *args],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def sync_coordination(repo: Path = REPO, steward_runner=run_git_steward) -> None:
+    try:
+        result = steward_runner(repo, "sync")
+    except OSError as exc:
+        raise AutorunError("GitSteward kon niet worden gestart") from exc
+    if result.returncode != 0:
+        raise AutorunError("GitSteward kon de coördinatie na retries niet synchroniseren")
+
+
 def mark_blocked(
     role: str,
     reason: str,
     *,
     repo: Path = REPO,
     fallback_handoff: str | None = None,
-    git_runner=run_git,
+    steward_runner=run_git_steward,
     notifier_runner=run_notifier,
     log_path: Path | None = None,
 ) -> bool:
     handoff_path = repo / "handoff.md"
+    restore_fallback = False
     try:
         current_text = handoff_path.read_text(encoding="utf-8-sig")
         parse_frontmatter(current_text)
@@ -344,40 +430,43 @@ def mark_blocked(
             append_activity(role, "ONBEKEND", "BLOCKED", "FOUT: handoff onherstelbaar", log_path=log_path or repo / "autorun.log")
             return False
         current_text = fallback_handoff
+        restore_fallback = True
 
     safe_reason = " ".join(reason.replace('"', "'").splitlines()).strip()[:180]
     previous = parse_frontmatter(current_text).get("state", "ONBEKEND")
-    blocked_text = _frontmatter_with_updates(
-        current_text,
-        {
-            "state": "BLOCKED",
-            "owner": "bas",
-            "since": utc_now(),
-            "next": role,
-            "action_required_by": "bas",
-            "blocked": "true",
-            "note": f"Autorun {role} gestopt: {safe_reason}; zie autorun.log.",
-        },
+    if restore_fallback:
+        _write_text_atomic(handoff_path, current_text)
+    block_note = f"Autorun {role} gestopt: {safe_reason}; zie autorun.log."
+    try:
+        steward = steward_runner(
+            repo,
+            "block_finalize",
+            "--role",
+            role,
+            "--note",
+            block_note,
+        )
+    except OSError:
+        append_activity(
+            role,
+            previous,
+            "BLOCKED",
+            "FOUT: GitSteward kon niet worden gestart",
+            log_path=log_path or repo / "autorun.log",
+        )
+        return False
+    steward_ok = steward.returncode == 0
+    try:
+        notify_ok = notifier_runner(repo) == 0 if steward_ok else False
+    except OSError:
+        notify_ok = False
+    outcome = (
+        "BLOCKED via GitSteward + notify"
+        if steward_ok and notify_ok
+        else "BLOCKED; GitSteward/notifier aandacht nodig"
     )
-    _write_text_atomic(handoff_path, blocked_text)
-    validate_file(handoff_path)
-
-    add = git_runner(repo, "add", "handoff.md")
-    commit = git_runner(
-        repo,
-        "commit",
-        "--only",
-        "-m",
-        f"chore: block failed {role} autorun",
-        "--",
-        "handoff.md",
-    )
-    push = git_runner(repo, "push") if commit.returncode == 0 else commit
-    git_ok = add.returncode == 0 and commit.returncode == 0 and push.returncode == 0
-    notify_ok = notifier_runner(repo) == 0
-    outcome = "BLOCKED + notify" if git_ok and notify_ok else "BLOCKED; git/notifier aandacht nodig"
     append_activity(role, previous, "BLOCKED", outcome, log_path=log_path or repo / "autorun.log")
-    return git_ok and notify_ok
+    return steward_ok and notify_ok
 
 
 def act(
@@ -502,9 +591,11 @@ def execute_autorun_turn(
     command: Sequence[str],
     *,
     progress_tail: int,
+    bijbel_mode: str | None = None,
     deadline: float,
     repo: Path = REPO,
     git_runner=run_git,
+    steward_runner=run_git_steward,
     notifier_runner=run_notifier,
     log_path: Path | None = None,
 ) -> str:
@@ -519,7 +610,7 @@ def execute_autorun_turn(
             "maximale wandklok bereikt vóór runnerstart",
             repo=repo,
             fallback_handoff=original_text,
-            git_runner=git_runner,
+            steward_runner=steward_runner,
             notifier_runner=notifier_runner,
             log_path=log_path,
         )
@@ -528,7 +619,7 @@ def execute_autorun_turn(
     try:
         result = act(
             command,
-            build_runner_input(role, progress_tail, repo),
+            build_runner_input(role, progress_tail, repo, bijbel_mode),
             repo=repo,
             timeout=remaining,
             pause_path=repo / "autorun.paused",
@@ -536,6 +627,7 @@ def execute_autorun_turn(
         if result.returncode != 0:
             raise AutorunError(f"runner eindigde met exitcode {result.returncode}")
         final = verify_completed_turn(role, initial_state, repo=repo, git_runner=git_runner)
+        sync_coordination(repo, steward_runner)
     except AutorunPaused as exc:
         current = read_frontmatter(handoff_path)
         append_activity(
@@ -552,7 +644,7 @@ def execute_autorun_turn(
             str(exc),
             repo=repo,
             fallback_handoff=original_text,
-            git_runner=git_runner,
+            steward_runner=steward_runner,
             notifier_runner=notifier_runner,
             log_path=log_path,
         )
@@ -560,9 +652,19 @@ def execute_autorun_turn(
 
     notifier_code = notifier_runner(repo)
     final_state = final.get("state", "ONBEKEND")
-    notify_outcome = "OK" if notifier_code == 0 else "OK; notifier gaf fout"
-    append_activity(role, initial_state, final_state, notify_outcome, log_path=log_path or repo / "autorun.log")
-    return "success" if notifier_code == 0 else "failed"
+    if notifier_code != 0:
+        mark_blocked(
+            role,
+            "notifier gaf een fout na de coördinatie-sync",
+            repo=repo,
+            fallback_handoff=original_text,
+            steward_runner=steward_runner,
+            notifier_runner=notifier_runner,
+            log_path=log_path,
+        )
+        return "failed"
+    append_activity(role, initial_state, final_state, "OK", log_path=log_path or repo / "autorun.log")
+    return "success"
 
 
 def run_session(
@@ -572,6 +674,7 @@ def run_session(
     command: Sequence[str] | None,
     interval: int,
     progress_tail: int,
+    bijbel_mode: str | None = None,
     max_turns: int,
     max_wallclock: int,
     once: bool = False,
@@ -585,20 +688,37 @@ def run_session(
     status_path = repo / "autorun-status.json"
     log_path = repo / "autorun.log"
     paused_logged = False
+    fallback_handoff: str | None = None
+    try:
+        candidate = (repo / "handoff.md").read_text(encoding="utf-8-sig")
+        validate_values(parse_frontmatter(candidate))
+        fallback_handoff = candidate
+    except (OSError, UnicodeError, HandoffValidationError):
+        pass
 
     if autorun:
-        write_runtime_status(
-            status_path,
-            running=True,
-            paused=pause_path.exists(),
-            role=role,
-            pid=os.getpid(),
-            turns=turns,
-            max_turns=max_turns,
-            max_wallclock=max_wallclock,
-            started_at=started_at,
-            last_turn_at=None,
-        )
+        try:
+            write_runtime_status(
+                status_path,
+                running=True,
+                paused=pause_path.exists(),
+                role=role,
+                pid=os.getpid(),
+                turns=turns,
+                max_turns=max_turns,
+                max_wallclock=max_wallclock,
+                started_at=started_at,
+                last_turn_at=None,
+            )
+        except AutorunError as exc:
+            mark_blocked(
+                role,
+                str(exc),
+                repo=repo,
+                fallback_handoff=fallback_handoff,
+                log_path=log_path,
+            )
+            return 1
 
     try:
         while True:
@@ -637,22 +757,20 @@ def run_session(
             pull = run_git(repo, "pull", "--quiet", "--ff-only")
             if pull.returncode != 0:
                 print(f"[{role}] git pull faalde — watcher stopt.", file=sys.stderr)
-                append_activity(role, "SESSIE", "STOP", "git pull faalde", log_path=log_path)
+                mark_blocked(
+                    role,
+                    "git pull faalde",
+                    repo=repo,
+                    fallback_handoff=fallback_handoff,
+                    log_path=log_path,
+                )
                 return 1
             fm = read_frontmatter(repo / "handoff.md")
+            fallback_handoff = (repo / "handoff.md").read_text(encoding="utf-8-sig")
 
             if fm.get("state") == "BLOCKED":
                 print(f"[{role}] BLOCKED — wacht op Bas. note={fm.get('note')!r}")
             elif my_turn(fm, role) or (autorun and role_in_progress(fm, role)):
-                if autorun and turns >= max_turns:
-                    mark_blocked(
-                        role,
-                        f"loop-cap van {max_turns} beurten bereikt",
-                        repo=repo,
-                        fallback_handoff=(repo / "handoff.md").read_text(encoding="utf-8-sig"),
-                        log_path=log_path,
-                    )
-                    return 1
                 ready_turn = my_turn(fm, role)
                 if ready_turn:
                     print(f"[{role}] mijn beurt gedetecteerd — race-guard {race_guard_seconds}s...")
@@ -661,8 +779,16 @@ def run_session(
                     pull = run_git(repo, "pull", "--quiet", "--ff-only")
                     if pull.returncode != 0:
                         print(f"[{role}] tweede git pull faalde — watcher stopt.", file=sys.stderr)
+                        mark_blocked(
+                            role,
+                            "tweede git pull na race-guard faalde",
+                            repo=repo,
+                            fallback_handoff=fallback_handoff,
+                            log_path=log_path,
+                        )
                         return 1
                     fm = read_frontmatter(repo / "handoff.md")
+                    fallback_handoff = (repo / "handoff.md").read_text(encoding="utf-8-sig")
                 else:
                     print(f"[{role}] hervat eigen IN_PROGRESS-beurt zonder nieuwe race-guard.")
                 if my_turn(fm, role) or (autorun and role_in_progress(fm, role)):
@@ -673,6 +799,7 @@ def run_session(
                             role,
                             command,
                             progress_tail=progress_tail,
+                            bijbel_mode=bijbel_mode,
                             deadline=deadline,
                             repo=repo,
                             log_path=log_path,
@@ -697,14 +824,32 @@ def run_session(
                             continue
                         if outcome == "failed":
                             return 1
+                        if turns >= max_turns:
+                            append_activity(
+                                role,
+                                "SESSIE",
+                                "STOP",
+                                f"max-turns {max_turns} bereikt",
+                                log_path=log_path,
+                            )
+                            return 0
                     else:
                         print(f"[{role}] AAN ZET — state={fm.get('state')} note={fm.get('note')!r}")
-                        print(build_context(progress_tail, repo), end="")
+                        print(build_context(role, progress_tail, repo, bijbel_mode), end="")
                 else:
                     print(f"[{role}] beurt gewijzigd tijdens guard — afgebroken.")
             if once:
                 return 0
             time.sleep(min(interval, max_wallclock - elapsed) if autorun else interval)
+    except (AutorunError, OSError, UnicodeError) as exc:
+        mark_blocked(
+            role,
+            str(exc),
+            repo=repo,
+            fallback_handoff=fallback_handoff,
+            log_path=log_path,
+        )
+        return 1
     finally:
         if autorun:
             try:
@@ -731,6 +876,11 @@ def main(argv: list[str] | None = None) -> int:
     except AutorunError as exc:
         parser.error(str(exc))
     parser.add_argument("--role", required=True, choices=list(ROLE_STATE))
+    parser.add_argument(
+        "--bijbel",
+        choices=BIJBEL_MODES,
+        help="bijbel-context; default full voor Claude, register voor overige rollen",
+    )
     parser.add_argument(
         "--interval",
         type=int,
@@ -787,6 +937,7 @@ def main(argv: list[str] | None = None) -> int:
             command=command,
             interval=args.interval,
             progress_tail=args.progress_tail,
+            bijbel_mode=args.bijbel,
             max_turns=args.max_turns,
             max_wallclock=args.max_wallclock,
             once=args.once,

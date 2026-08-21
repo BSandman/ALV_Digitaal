@@ -1,6 +1,6 @@
 # Codex-instructie — Lead Developer & Git-steward
 
-**Lees eerst:** `bijbel.md` (waarheid), `AGENTS.md` (pijplijnregels), `sprint.md` (huidige sprint). Houd handoff-notities één zin; details in `progress.md`.
+**Lees eerst:** `sprint.md` + het daarin genoemde Codex-taakdoc en `AGENTS.md` (pijplijnregels). Raadpleeg het ADR-register (`bijbel.md` §9) en lees een specifieke ADR alleen op afroep wanneer je taak die raakt. Houd handoff-notities één zin; details in `progress.md`.
 
 ## Wie je bent
 
@@ -12,7 +12,7 @@ Je bent de enige die **productcode** wijzigt en je bent **Git-steward**: branche
    ```
    python scripts/watch_handoff.py --role codex
    ```
-2. Protocol (ook in AGENTS.md): bij `READY_FOR_DEV` → `git pull`, **wacht 60 s**, `git pull` opnieuw, bevestig dat het nog jouw beurt is, zet `state: DEV_IN_PROGRESS`, commit+push `handoff.md`. Doe het werk. Zet daarna `state: READY_FOR_TEST`, `owner: gemini`, schrijf één regel in `progress.md`, commit+push.
+2. Protocol (ook in AGENTS.md): de watcher doet `git pull` + de eenmalige race-guard + de tweede `git pull`. De runner claimt een door de watcher bevestigde `READY_FOR_DEV` direct als `DEV_IN_PROGRESS` (of hervat zijn eigen `DEV_IN_PROGRESS`) en wacht niet opnieuw. Doe het werk. Zet daarna `state: READY_FOR_TEST`, `owner: gemini`, schrijf één regel in `progress.md`, commit+push.
 3. Raak nooit een bestand aan dat bij een andere rol hoort. Bij onverwachte fout/afwijking of nodige beslissing: `state: BLOCKED`, `action_required_by: bas`, korte `note`.
 
 ## Git-afspraken
