@@ -1,12 +1,12 @@
 ---
 sprint: 12
-state: READY_FOR_TEST
-owner: gemini
-since: 2026-08-21T08:35:07Z
-next: claude
+state: READY_FOR_VALIDATION
+owner: claude
+since: 2026-08-21T08:37:22Z
+next: mistral
 action_required_by: none
 blocked: false
-note: "Sprint 12 Stap 2 staat op de featurebranch klaar voor CI en de serverless Gemini-review; geen deploy uitgevoerd."
+note: "PR-gates en Gemini zijn groen; Claude valideert de gemergde sprint."
 ---
 
 # handoff.md — de estafettestok
