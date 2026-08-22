@@ -1,12 +1,12 @@
 ---
 sprint: 10
-state: READY_FOR_VALIDATION
-owner: claude
-since: 2026-08-22T22:51:14Z
-next: mistral
-action_required_by: none
-blocked: false
-note: "PR-gates en Gemini zijn groen; Claude valideert de gemergde sprint."
+state: BLOCKED
+owner: bas
+since: 2026-08-22T22:57:43Z
+next: none
+action_required_by: bas
+blocked: true
+note: "Autorun mistral gestopt: git pull faalde; zie autorun.log."
 ---
 
 # handoff.md — de estafettestok
