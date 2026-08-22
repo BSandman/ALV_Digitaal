@@ -1,12 +1,12 @@
 ---
 sprint: 10
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-22T19:15:56Z
-next: gemini
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-22T19:18:52Z
+next: claude
 action_required_by: none
 blocked: false
-note: "Codex hervat Sprint 10: vendored tokens v1.0.1 verversen en alle gates opnieuw draaien."
+note: "Frontend en vendored tokens v1.0.1 zijn gate-groen; Gemini: review de PR."
 ---
 
 # handoff.md — de estafettestok
