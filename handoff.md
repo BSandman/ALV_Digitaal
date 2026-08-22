@@ -1,12 +1,12 @@
 ---
 sprint: 10
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-22T19:47:20Z
-next: gemini
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-22T19:53:31Z
+next: claude
 action_required_by: none
 blocked: false
-note: "Codex herstelt het public-deploycontract en verifieert de volledige gate-set; geen deploy."
+note: "Deploycontract voor public/ is volledig lokaal gate-groen; Gemini: review PR #22 op de actuele head."
 ---
 
 # handoff.md — de estafettestok
