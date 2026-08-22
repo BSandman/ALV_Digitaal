@@ -1,12 +1,12 @@
 ---
 sprint: 10
-state: READY_FOR_INTEGRATION
+state: INTEGRATION_IN_PROGRESS
 owner: mistral
-since: 2026-08-22T22:56:01Z
-next: bas
+since: 2026-08-22T22:59:53Z
+next: claude
 action_required_by: none
 blocked: false
-note: "Claude-validatie GROEN (Cowork) tegen ADR-0024/0011/0018/0021/0002 + huisstijl; Mistral: integreer op main + tag, geen deploy."
+note: "Mistral voert de vaste integratiecontroles uit; deploy blijft uit."
 ---
 
 # handoff.md — de estafettestok
