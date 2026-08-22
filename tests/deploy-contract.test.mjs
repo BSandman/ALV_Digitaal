@@ -72,6 +72,7 @@ test('deploy controleert code-only artefact, serversecrets, health en rollback',
   assert.match(deploy, /\.backup-ready/);
   assert.match(deploy, /rollback_remote/);
   assert.match(deploy, /rsync -a --delete payload\/src\/ "\$remote_dir\/src\/"/);
+  assert.match(deploy, /rsync -a --delete payload\/public\/ "\$remote_dir\/public\/"/);
   assert.match(deploy, /nodeapp\/tmp\/restart\.txt|"\$remote_dir\/tmp\/restart\.txt"/);
   assert.match(deploy, /--confirm-no-open-round/);
   assert.match(deploy, /lsnode stderr/);

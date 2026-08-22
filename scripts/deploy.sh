@@ -281,10 +281,10 @@ test -f "$backup_dir/.backup-ready" || { echo "Rollback-backup is niet compleet.
 lock_dir="$deploy_root/deploy.lock"
 mkdir "$lock_dir" 2>/dev/null || { echo "Een andere deploy of rollback is actief." >&2; exit 32; }
 trap 'rmdir "$lock_dir" 2>/dev/null || true' EXIT HUP INT TERM
-for name in src package.json package-lock.json; do
+for name in src public package.json package-lock.json; do
   if [ -L "$remote_dir/$name" ]; then rm -f "$remote_dir/$name"; else rm -rf "$remote_dir/$name"; fi
 done
-for name in src package.json package-lock.json; do
+for name in src public package.json package-lock.json; do
   if [ -e "$backup_dir/managed/$name" ]; then
     rsync -a "$backup_dir/managed/$name" "$remote_dir/"
   fi
@@ -352,7 +352,7 @@ tar -tzf app.tgz > entries.txt
 while IFS= read -r original_entry; do
   entry="${original_entry#./}"
   case "$entry" in
-    package.json|package-lock.json|src|src/|src/*) ;;
+    package.json|package-lock.json|src|src/|src/*|public|public/|public/*) ;;
     *) echo "Onverwacht pad in release-artefact: $entry" >&2; exit 18;;
   esac
   case "$entry" in
@@ -364,18 +364,19 @@ tar -xzf app.tgz -C payload
 test -f payload/package.json
 test -f payload/package-lock.json
 test -d payload/src
+test -d payload/public
 if find payload -type l -print -quit | grep -q .; then
   echo "Release-artefact mag geen symlinks bevatten." >&2
   exit 18
 fi
-for name in src package.json package-lock.json; do
+for name in src public package.json package-lock.json; do
   test ! -L "$remote_dir/$name" || { echo "Beheerd app-pad mag geen symlink zijn: $name" >&2; exit 18; }
 done
 
 umask 077
 test ! -e "$backup_dir" || { echo "Backup-map bestaat al; deploy-id is niet uniek." >&2; exit 18; }
 mkdir -p "$backup_dir/managed"
-for name in src package.json package-lock.json; do
+for name in src public package.json package-lock.json; do
   if [ -e "$remote_dir/$name" ]; then
     rsync -a "$remote_dir/$name" "$backup_dir/managed/"
   fi
@@ -385,6 +386,8 @@ touch "$backup_dir/.backup-ready"
 
 mkdir -p "$remote_dir/src"
 rsync -a --delete payload/src/ "$remote_dir/src/"
+mkdir -p "$remote_dir/public"
+rsync -a --delete payload/public/ "$remote_dir/public/"
 rsync -a payload/package.json payload/package-lock.json "$remote_dir/"
 (cd "$remote_dir" && npm ci --omit=dev --no-audit --no-fund)
 mkdir -p "$remote_dir/tmp"

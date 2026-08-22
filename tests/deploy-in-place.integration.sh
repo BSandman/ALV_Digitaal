@@ -87,8 +87,9 @@ exit 0
 FAKE_NODE
 chmod 700 "$FAKE_BIN/ssh" "$FAKE_BIN/scp" "$FAKE_BIN/curl" "$FAKE_BIN/sleep" "$NODE_BIN/npm" "$NODE_BIN/node"
 
-mkdir -p "$REMOTE_DIR/src"
+mkdir -p "$REMOTE_DIR/src" "$REMOTE_DIR/public"
 printf 'oude code\n' > "$REMOTE_DIR/src/old.txt"
+printf 'oude asset\n' > "$REMOTE_DIR/public/old.txt"
 printf '{"name":"oude-app","version":"0.1.0","private":true}\n' > "$REMOTE_DIR/package.json"
 printf '{"name":"oude-app","version":"0.1.0","lockfileVersion":3,"requires":true,"packages":{"":{"name":"oude-app","version":"0.1.0"}}}\n' > "$REMOTE_DIR/package-lock.json"
 
@@ -156,14 +157,17 @@ printf 'success\n' > "$HEALTH_STATE"
 printf 'success\n' > "$NPM_STATE"
 "$PROJECT_ROOT/scripts/deploy.sh" --target acceptatie --confirm-no-open-round --artifact "$ARTIFACT"
 [[ -f "$REMOTE_DIR/src/start.js" ]]
+[[ -f "$REMOTE_DIR/public/deelnemen/index.html" ]]
 [[ ! -e "$REMOTE_DIR/current" ]]
 [[ -f "$REMOTE_DIR/tmp/restart.txt" ]]
 [[ -f "$REMOTE_DIR/node_modules/.deploy-test" ]]
 first_backup="$(find "$REMOTE_DEPLOY_ROOT/backups" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 [[ -f "$first_backup/.backup-ready" ]]
 [[ "$(cat "$first_backup/managed/src/old.txt")" = "oude code" ]]
+[[ "$(cat "$first_backup/managed/public/old.txt")" = "oude asset" ]]
 
 printf 'stabiele code vóór fout\n' > "$REMOTE_DIR/src/rollback-marker.txt"
+printf 'stabiele asset vóór fout\n' > "$REMOTE_DIR/public/rollback-marker.txt"
 printf 'ERR_REQUIRE_ASYNC_MODULE: testmarker\nDB_PASSWORD = dotenv-mag-niet\n{"AUTH_PEPPER":"json-mag-niet"}\nmysql://stemmer:uri-mag-niet@localhost/alv\n' > "$REMOTE_DIR/stderr.log"
 printf 'failure\n' > "$HEALTH_STATE"
 set +e
@@ -177,10 +181,12 @@ grep -q '"AUTH_PEPPER":"\[REDACTED\]"' "$STDERR_OUTPUT"
 grep -q 'mysql://stemmer:\[REDACTED\]@localhost/alv' "$STDERR_OUTPUT"
 ! grep -Eq 'dotenv-mag-niet|json-mag-niet|uri-mag-niet' "$STDERR_OUTPUT"
 [[ "$(cat "$REMOTE_DIR/src/rollback-marker.txt")" = "stabiele code vóór fout" ]]
+[[ "$(cat "$REMOTE_DIR/public/rollback-marker.txt")" = "stabiele asset vóór fout" ]]
 [[ -f "$REMOTE_DIR/tmp/restart.txt" ]]
 [[ ! -e "$REMOTE_DIR/current" ]]
 
 printf 'stabiele code vóór installatiefout\n' > "$REMOTE_DIR/src/rollback-marker.txt"
+printf 'stabiele asset vóór installatiefout\n' > "$REMOTE_DIR/public/rollback-marker.txt"
 printf 'success\n' > "$HEALTH_STATE"
 printf 'fail-once\n' > "$NPM_STATE"
 set +e
@@ -189,6 +195,7 @@ install_failure_status=$?
 set -e
 [[ "$install_failure_status" -eq 19 ]] || { echo "Installatiefout gaf $install_failure_status in plaats van 19." >&2; exit 1; }
 [[ "$(cat "$REMOTE_DIR/src/rollback-marker.txt")" = "stabiele code vóór installatiefout" ]]
+[[ "$(cat "$REMOTE_DIR/public/rollback-marker.txt")" = "stabiele asset vóór installatiefout" ]]
 [[ -f "$REMOTE_DIR/tmp/restart.txt" ]]
 [[ ! -e "$REMOTE_DIR/current" ]]
 

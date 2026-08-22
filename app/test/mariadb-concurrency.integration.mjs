@@ -26,12 +26,12 @@ const { port } = server.address();
 
 try {
   // Eén aantoonbaar geaccepteerde HTTP-stem vóór de grens.
-  assert.equal(await postVote(port, round.id, ids.entitlementId, 'voor'), 201);
+  assert.equal(await postVote(port, round.id, 'voor'), 201);
 
   // Vijftig HTTP-verzoeken en het sluiten starten zonder onderlinge await. Iedere
   // stem eindigt óf vóór de round-lock (201), óf ziet daarna closed (409).
   const pendingVotes = Array.from({ length: 50 }, (_, index) =>
-    postVote(port, round.id, ids.entitlementId, index % 2 ? 'voor' : 'tegen')
+    postVote(port, round.id, index % 2 ? 'voor' : 'tegen')
   );
   const closing = votes.closeRoundAtomically(round.id);
   const [statuses, closed] = await Promise.all([Promise.all(pendingVotes), closing]);
@@ -135,7 +135,7 @@ try {
   await closePool();
 }
 
-async function postVote(port, roundId, entitlementId, choice) {
+async function postVote(port, roundId, choice) {
   const response = await fetch(`http://127.0.0.1:${port}/deelnemen/api/vote`, {
     method: 'POST',
     headers: {
@@ -143,7 +143,7 @@ async function postVote(port, roundId, entitlementId, choice) {
       'X-Device-Binding': 'integration-device-binding-race',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ roundId, entitlementId, choice }),
+    body: JSON.stringify({ roundId, choice }),
   });
   return response.status;
 }

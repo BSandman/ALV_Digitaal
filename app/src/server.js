@@ -1,10 +1,22 @@
 import http from 'node:http';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createAuthStoreMariaDB } from './stores/mariadb/AuthStoreMariaDB.js';
 import { createVoteStoreMariaDB } from './stores/mariadb/VoteStoreMariaDB.js';
 import { getVerifiedClientIp } from './security/client-ip.js';
 import { withConnection } from './db/pool.js';
 
 const PORT = Number(process.env.PORT || 3000);
+const DEFAULT_PUBLIC_ROOT = fileURLToPath(new URL('../public/deelnemen/', import.meta.url));
+const STATIC_CONTENT_TYPES = new Map([
+  ['.html', 'text/html; charset=utf-8'],
+  ['.css', 'text/css; charset=utf-8'],
+  ['.js', 'text/javascript; charset=utf-8'],
+  ['.svg', 'image/svg+xml'],
+  ['.woff2', 'font/woff2'],
+]);
 
 export function createRequestHandler({
   authStore = process.env.AUTH_PEPPER
@@ -13,6 +25,7 @@ export function createRequestHandler({
   voteStore = createVoteStoreMariaDB(),
   trustProxy = process.env.TRUST_PROXY === '1',
   healthCheck = checkDatabaseHealth,
+  publicRoot = DEFAULT_PUBLIC_ROOT,
 } = {}) {
   return async function requestHandler(req, res) {
     try {
@@ -24,21 +37,25 @@ export function createRequestHandler({
       }
 
       if (req.method === 'GET' && url.pathname === '/deelnemen/api/status') {
+        if (!authStore) return json(res, 503, { error: 'authentication_not_configured' }, noStore());
+        const owner = await authenticateRequest(req, authStore);
         const roundId = positiveInteger(url.searchParams.get('roundId'));
-        const status = roundId
-          ? await voteStore.getRoundStatus(roundId)
-          : { version: 0, round: 'waiting', remainingSeconds: 0 };
-        if (!status) return json(res, 404, { error: 'round_not_found' });
-        const etag = `"${status.roundVersion ?? status.version ?? 0}-${status.status ?? status.round}-${status.remainingSeconds}"`;
+        const status = await voteStore.getParticipantStatus(
+          owner.participantId,
+          owner.meetingId,
+          roundId
+        );
+        if (!status) return json(res, 404, { error: 'round_not_found' }, noStore());
+        const etag = createEtag(status);
         if (req.headers['if-none-match'] === etag) {
-          res.writeHead(304, { ETag: etag });
+          res.writeHead(304, { ETag: etag, ...noStore() });
           return res.end();
         }
-        return json(res, 200, status, { ETag: etag, 'Cache-Control': 'no-store' });
+        return json(res, 200, status, { ETag: etag, ...noStore() });
       }
 
       if (req.method === 'POST' && url.pathname === '/deelnemen/api/login') {
-        if (!authStore) return json(res, 503, { error: 'authentication_not_configured' });
+        if (!authStore) return json(res, 503, { error: 'authentication_not_configured' }, noStore());
         const body = await readJson(req);
         const clientIp = getVerifiedClientIp(req, { trustProxy });
         const result = await authStore.authenticate({
@@ -46,32 +63,34 @@ export function createRequestHandler({
           deviceBinding: body.deviceBinding,
           clientIp,
         });
-        return json(res, 200, result, { 'Cache-Control': 'no-store' });
+        return json(res, 200, result, noStore());
       }
 
       if (url.pathname === '/deelnemen/api/vote') {
-        if (!authStore) return json(res, 503, { error: 'authentication_not_configured' });
+        if (!authStore) return json(res, 503, { error: 'authentication_not_configured' }, noStore());
         const owner = await authenticateRequest(req, authStore);
         if (req.method === 'POST') {
           const body = await readJson(req);
-          const result = await voteStore.recordVote(
+          const result = await voteStore.recordOwnerVote(
             requirePositiveInteger(body.roundId, 'roundId'),
             owner.participantId,
-            {
-              entitlementId: requirePositiveInteger(body.entitlementId, 'entitlementId'),
-              choice: body.choice,
-            }
+            { choice: body.choice }
           );
-          return json(res, 201, result, { 'Cache-Control': 'no-store' });
+          return json(res, result.changed === false ? 200 : 201, result, noStore());
         }
         if (req.method === 'GET') {
-          const result = await voteStore.getCurrentVote(
+          const result = await voteStore.getOwnerCurrentVote(
             requirePositiveInteger(url.searchParams.get('roundId'), 'roundId'),
-            owner.participantId,
-            requirePositiveInteger(url.searchParams.get('entitlementId'), 'entitlementId')
+            owner.participantId
           );
-          return json(res, 200, result, { 'Cache-Control': 'no-store' });
+          return json(res, 200, result, noStore());
         }
+      }
+
+      if ((req.method === 'GET' || req.method === 'HEAD')
+          && (url.pathname === '/deelnemen' || url.pathname.startsWith('/deelnemen/'))
+          && !url.pathname.startsWith('/deelnemen/api/')) {
+        return serveDeelnemenAsset(req, res, url, publicRoot);
       }
 
       return json(res, 404, { error: 'not_found' });
@@ -143,9 +162,15 @@ function handleError(res, error) {
     PAYLOAD_TOO_LARGE: 413,
   };
   const status = statusByCode[error.code] ?? 500;
-  const headers = error.retryAfterSeconds ? { 'Retry-After': String(error.retryAfterSeconds) } : {};
+  const headers = {
+    ...noStore(),
+    ...(error.retryAfterSeconds ? { 'Retry-After': String(error.retryAfterSeconds) } : {}),
+  };
   const message = status === 500 ? 'internal_error' : error.message;
-  return json(res, status, { error: message }, headers);
+  const body = status === 500
+    ? { error: message }
+    : { error: error.code ?? message, message };
+  return json(res, status, body, headers);
 }
 
 function json(res, status, body, headers = {}) {
@@ -160,6 +185,65 @@ export function startServer() {
     console.log(`[alv-app] luistert op :${PORT} (single process)`);
   });
   return server;
+}
+
+async function serveDeelnemenAsset(req, res, url, publicRoot) {
+  if (url.pathname === '/deelnemen') {
+    res.writeHead(308, { Location: '/deelnemen/', 'Cache-Control': 'no-store' });
+    return res.end();
+  }
+
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(url.pathname);
+  } catch {
+    return json(res, 400, { error: 'invalid_path' }, noStore());
+  }
+  const relative = decodedPath.slice('/deelnemen/'.length);
+  if (relative.includes('\\') || relative.includes('\0')
+      || relative.split('/').includes('..')) {
+    return json(res, 400, { error: 'invalid_path' }, noStore());
+  }
+
+  const requested = relative === '' ? 'index.html' : relative;
+  const extension = path.extname(requested).toLowerCase();
+  const shellFallback = extension === '';
+  const assetName = shellFallback ? 'index.html' : requested;
+  const contentType = STATIC_CONTENT_TYPES.get(path.extname(assetName).toLowerCase());
+  if (!contentType) return json(res, 404, { error: 'not_found' }, noStore());
+
+  const root = path.resolve(publicRoot);
+  const file = path.resolve(root, assetName);
+  if (file !== root && !file.startsWith(`${root}${path.sep}`)) {
+    return json(res, 400, { error: 'invalid_path' }, noStore());
+  }
+
+  try {
+    const body = await readFile(file);
+    const cacheControl = assetName === 'index.html'
+      ? 'no-cache'
+      : 'public, max-age=3600';
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Content-Length': String(body.length),
+      'Cache-Control': cacheControl,
+      'X-Content-Type-Options': 'nosniff',
+    });
+    return res.end(req.method === 'HEAD' ? undefined : body);
+  } catch (error) {
+    if (error.code === 'ENOENT' || error.code === 'EISDIR') {
+      return json(res, 404, { error: 'not_found' }, noStore());
+    }
+    throw error;
+  }
+}
+
+function createEtag(body) {
+  return `"${createHash('sha256').update(JSON.stringify(body)).digest('base64url')}"`;
+}
+
+function noStore() {
+  return { 'Cache-Control': 'no-store' };
 }
 
 async function checkDatabaseHealth() {

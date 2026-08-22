@@ -24,7 +24,7 @@ for (const entry of await readdir(distRoot)) {
 
 const packed = spawnSync(
   'tar',
-  ['-czf', artifactPath, '-C', appRoot, 'package.json', 'package-lock.json', 'src'],
+  ['-czf', artifactPath, '-C', appRoot, 'package.json', 'package-lock.json', 'src', 'public'],
   { encoding: 'utf8', windowsHide: true }
 );
 if (packed.status !== 0) throw new Error(`Release-archief bouwen mislukt: ${packed.stderr}`);
@@ -37,8 +37,18 @@ const unexpected = entries.filter((entry) =>
   && entry !== 'package-lock.json'
   && entry !== 'src/'
   && !entry.startsWith('src/')
+  && entry !== 'public/'
+  && !entry.startsWith('public/')
 );
 if (unexpected.length > 0) throw new Error(`Onverwachte release-inhoud: ${unexpected.join(', ')}`);
+for (const required of [
+  'public/deelnemen/index.html',
+  'public/deelnemen/app.css',
+  'public/deelnemen/app.js',
+  'public/deelnemen/vendor/platform-tokens.css',
+]) {
+  if (!entries.includes(required)) throw new Error(`Verplicht frontend-asset ontbreekt: ${required}`);
+}
 
 console.log(`Release-artefact gebouwd: ${artifactPath}`);
 console.log(`Release-inhoud: ${entries.length} code-/manifestpaden, geen runtime-data.`);

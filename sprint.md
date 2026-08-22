@@ -1,31 +1,31 @@
-# sprint.md — Sprint 12: Git-hardening Stap 2 (watcher ↔ GitSteward + verfijningen)
+# sprint.md — Sprint 10: Eigenaar-frontend v0.1 (deelnemen-UI, mobiel-eerst)
 
-**Doel:** de robuustheid van de GitSteward (Stap 1, op `main`) overal laten gelden. De `watch_handoff.py`-watcher delegeert zijn coördinatie-git + de **verplichte block-finalize** aan `git_steward.py`, en drie samenhangende context/protocol-verfijningen landen op dezelfde plek. Ontwerp: **ADR-0025**. Spec: **`docs/gates/Codex-taak-gitsteward-stap2.md`**.
+**Doel:** het eerste zichtbare Fase-2-product — een door de Node-app geserveerde **eigenaar-UI** (mobiel-eerst) waarmee een eigenaar kan **inloggen (code-fallback) → de open ronde zien → Voor/Tegen stemmen (wijzigbaar tot sluiting) → bevestiging zien**, met polling volgens ADR-0002. Architectuur/scopegrens: **ADR-0024**. Spec: **`docs/gates/Codex-taak-frontend-eigenaar.md`**. Visuele + interactie-referentie: **`Platform/_design-prestage/deelnemen/deelnemen-v0.1.html`** (klikbaar, Honigfabriek-huisstijl, gesimuleerde data — akkoord als v0.1-milestone; bewust buiten de repo).
 
-> **Zelf-modificerend + attended.** Deze sprint wijzigt de watcher die de beurten zélf draait. Draai `--max-turns 1` met Bas erbij; één volledige begeleide beurt op de nieuwe watcher moet schoon + in-sync eindigen vóór je erop leunt. Niet onbemand.
+> **Attended, geen deploy.** Reguliere feature-sprint via de PR-route; productcode uitsluitend op de feature-branch, nooit rechtstreeks naar `main`. Deploy naar acceptatie is een aparte, latere menselijke poort (ADR-0013).
 
 ## Cadans — per blok
 
 | Blok | Rol | Watcher | Inhoud |
 |---|---|---|---|
-| 1 | **Codex** (dev) | `--role codex` | watcher→steward-delegatie + block-finalize + bijbel-trim + Codex-instructie + race-guard + schoon-exit; tests; PR |
+| 1 | **Codex** (dev) | `--role codex` | statische serving + `app/public/deelnemen/`-UI (login→ronde→stem→bevestig), één-actie-fan-out, gevendorde tokens; tests; PR op `feat/sprint-10-frontend-eigenaar` |
 | 2 | *auto* | — | CI-gates + Gemini-review op de PR |
-| 3 | **Claude** (validatie) | `--role claude` | Toets tegen ADR-0025/0015 (block-finalize via steward, geen productcode naar main, context per rol) |
-| 4 | **Mistral** (integratie) | `--role mistral` | Gates; geen deploy |
+| 3 | **Claude** (validatie) | `--role claude` | Toets tegen ADR-0024/0011/0018/0021/0002 + huisstijl (gevendorde tokens, geen token-at-rest, row-level isolatie) |
+| 4 | **Mistral** (integratie) | `--role mistral` | Gates; **geen deploy** |
 
 ## Scope
 
-- **In:** (1) watcher delegeert coördinatie-sync + verplichte block-finalize aan `git_steward.py`; (2) bijbel-context per rol trimmen (volle bijbel alleen voor Claude); (3) `Codex-instructie.md` → register + taakdoc + op-afroep i.p.v. "lees eerst de hele bijbel"; (4) dubbele race-guard weg (alleen de watcher houdt 'm); (5) schoon exit na `--max-turns` (`running:false`, geen na-idlen).
-- **Uit (Stap 3+):** feature-branch-push + PR-creatie naar de steward (→ runners volledig offline); PR-gate/mergeroute wijzigen; deploy; productfunctionaliteit.
+- **In:** door Node geserveerde eigenaar-UI (login code-fallback, wachtscherm/rondescherm met ETag+jitter-polling, Voor/Tegen-stem wijzigbaar tot sluiting, bevestiging), server-side één-actie-fan-out (ADR-0018), veilige statische serving, mobiel-eerst + basis-a11y, verplicht op de gevendorde Honigfabriek-tokens.
+- **Uit (latere sprints):** admin/voorzitter-frontend (ronde activeren/sluiten/vaststellen — aparte **tablet/pc-view**) · magic-link/QR + PIN · gemachtigde-UX · sessieherstel na herlaad · meerdere bezorg-e-mails · deploy.
 
 ## Definition of done
 
-- Block-finalize loopt via de steward (getest: blokkade → BLOCKED-baton+progress gecommit+gepusht, schone/in-sync tree); watcher doet zelf geen `git commit/push` op coördinatie meer.
-- Context voor `codex`/`mistral` bevat níet de volledige bijbel maar wél register+rollen+versiebeheer+taakdoc; voor `claude` wél volledig — getest.
-- Runner voert de 60s-guard niet dubbel uit; `--max-turns 1` eindigt met een gestopt proces (`running:false`).
-- `npm run check` + Python-tests + architectuur-, release-, handoff- en PII-gates + Gemini-review groen; `test_watch_handoff.py` bijgewerkt. **Geen deploy; geen productcode naar `main`.**
-- Eén begeleide beurt bewijst de nieuwe watcher schoon draait.
+- End-to-end happy path op T (verse MariaDB 11.8.8): code-login → open ronde → Voor → bevestiging; `GET vote` toont de keuze; keuze **wijzigbaar** zolang de ronde open is (nieuwe `POST vote` overschrijft atomair, geen dubbeltelling).
+- Fan-out klopt (één actie → elk in-scope recht, per VvE geteld, exact decimal); row-level isolatie bewezen; geen token-at-rest; polling stopt bij gesloten/vastgestelde ronde.
+- Veilige statische serving (geen `..`-traversal, gewhiteliste content-types); bestaande Node-tests groen.
+- UI draagt de Honigfabriek-look via de **gevendorde** `platform-tokens.css` (geen gehardcodeerde kleuren/fonts), domeincodering TF/NB/PG + Voor/Tegen, mobiel-eerst + basis-a11y.
+- `npm run check` + Python-tests + architectuur-, release-, handoff- en PII-gates + Gemini-review groen. **Geen deploy; geen productcode naar `main` buiten de PR-route.**
 
 ## Buiten scope
 
-Deploy/productie · runners volledig offline (Stap 3) · nieuwe merge-route · onbemand/overnight zonder aparte Bas-go.
+Admin/voorzitter-frontend (aparte tablet/pc-view, latere sprint) · magic-link/QR + PIN · gemachtigde-intake · sessieherstel · deploy/productie · onbemand draaien zonder aparte Bas-go.

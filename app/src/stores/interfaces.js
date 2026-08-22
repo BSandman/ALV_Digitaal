@@ -46,8 +46,12 @@
  *           vereist een reeds bevroren vergaderingquorum
  * @property {(roundId:number, participantId:number, vote:VoteChoice) => Promise<{acceptedAt:string}>} recordVote
  *           append-only revisie; alleen na expliciete serverbevestiging telt een stem
+ * @property {(roundId:number, participantId:number, vote:{choice:'voor'|'tegen'}) => Promise<object>} recordOwnerVote
+ *           één atomaire eigenaarsactie; server-side fan-out naar alle eigen in-scope rechten
  * @property {(roundId:number, participantId:number, entitlementId:number) => Promise<VoteChoice|null>} getCurrentVote
+ * @property {(roundId:number, participantId:number) => Promise<object|null>} getOwnerCurrentVote
  * @property {(roundId:number) => Promise<object|null>} getRoundStatus
+ * @property {(participantId:number, meetingId:number, roundId?:number|null) => Promise<object|null>} getParticipantStatus
  * @property {(roundId:number) => Promise<RoundResult>} closeRoundAtomically
  *           bevries ronde, registreer niet-stemmers als onthouding en bereken meerderheid — alles in één transactie
  */

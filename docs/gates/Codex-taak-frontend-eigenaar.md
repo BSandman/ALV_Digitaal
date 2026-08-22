@@ -2,13 +2,19 @@
 
 Doel: een werkende, door de Node-app geserveerde **eigenaar-UI** bovenop de bestaande API, zodat een eigenaar op T (en later A) kan **inloggen (code-fallback) → de open ronde zien → Voor/Tegen stemmen → bevestiging zien**, met polling volgens ADR-0002. Architectuur en scopegrens: **ADR-0024**. Domeinregels: ADR-0011 (alleen Voor/Tegen), ADR-0018 (één actie, server-side fan-out), ADR-0021 (stemknop alleen bij activatie-ingelogd), ADR-0010 (niet/te laat = onthouding). Bestaande API: `app/src/server.js` (`/deelnemen/api/status|login|vote`).
 
+## Referentie — klikbaar prototype (v0.1-milestone, akkoord)
+
+Het klikbare, mobiel-eerst **referentie-prototype** van deze flow (Honigfabriek-huisstijl, gesimuleerde data, door Bas akkoord als v0.1-milestone) leeft in de **pre-stage**: `Platform/_design-prestage/deelnemen/deelnemen-v0.1.html` — bewust buiten de repo, niet in het code-artefact. Gebruik het als **visuele + interactie-referentie** (schermindeling, live-statusstrip, motie-kaart, "u stemt namens …"-fan-out, bevestig-sheet, receipt-scherm). Het is een **referentie, geen productcode**: bouw de echte UI op de bestaande API en de gevendorde tokens; neem geen gesimuleerde data of demo-affordances (thema-/reset-knop, telefoon-frame) over.
+
+**Stem wijzigen tot sluiting.** De eigenaar kan zijn Voor/Tegen **wijzigen zolang de ronde open is** (herhaalde `POST vote` overschrijft de vorige keuze atomair, geen dubbeltelling; de bevestiging toont de huidige keuze met een 'wijzig'-terugweg naar het stemscherm). Het **sluiten/vaststellen** van de ronde doet de voorzitter via de **aparte admin-frontend (tablet/pc-view, latere sprint)** — niet in deze eigenaar-UI.
+
 ## Scope (in)
 
 1. **Statische serving in `app/src/server.js`.** Serveer assets onder `/deelnemen/` (index op `/deelnemen/`), buiten `/deelnemen/api/`. Strikte padafhandeling (geen `..`-traversal, canonicaliseer), whitelist content-types (html/css/js/svg/woff2), `Cache-Control` verstandig voor assets; API blijft `no-store`. Onbekend pad onder `/deelnemen/` → de app-shell (of 404 voor assets). Geen framework, geen nieuwe runtime-dependency.
 2. **Eigenaar-frontend `app/public/deelnemen/`** (vanilla HTML/CSS/JS, no-build): 
    - **Login-scherm** met code-fallback (`POST /deelnemen/api/login`, body `{code, deviceBinding}`); duidelijke fout-UX bij `AUTH_INVALID/AUTH_LOCKED/AUTH_RATE_LIMITED` (toon `Retry-After`). Sessietoken **alleen in geheugen** (JS-var), nooit in `localStorage`/`sessionStorage`/cookie.
    - **Wachtscherm/rondescherm** dat `GET /deelnemen/api/status` pollt met `If-None-Match` + **jitter**, 304 respecteert, en **stopt** bij gesloten/vastgestelde ronde of ongeldige sessie.
-   - **Stemscherm**: één **Voor/Tegen**-keuze (twee knoppen, ADR-0011); na keuze `POST /deelnemen/api/vote` en bevestiging. Geen blanco/onthouding-knop. Knop alleen actief als de eigenaar stemgerechtigd is voor deze ronde (ADR-0021 §4).
+   - **Stemscherm**: één **Voor/Tegen**-keuze (twee knoppen, ADR-0011); na keuze `POST /deelnemen/api/vote` en bevestiging. Geen blanco/onthouding-knop. Knop alleen actief als de eigenaar stemgerechtigd is voor deze ronde (ADR-0021 §4). De keuze is **wijzigbaar zolang de ronde open is** (herhaalde `POST vote` overschrijft atomair; de ronde sluit de voorzitter via de aparte admin-frontend, niet hier).
    - **Bevestiging + huidige stem** (`GET /deelnemen/api/vote`); toon dat de stem geregistreerd is.
 3. **Server-side één-actie-fan-out (ADR-0018).** De client stuurt **één** Voor/Tegen-keuze per ronde; de server fan-out't die over álle in-scope rechten van de eigenaar (eigen breukdeel, per VvE geteld), atomair en row-level (ADR-0002), niet splitsbaar. Als de bestaande `recordVote` per `entitlementId` werkt: voeg een dunne server-laag/endpoint toe die de in-scope rechten van de eigenaar voor de ronde bepaalt en er atomair overheen schrijft. Idempotent bij herhaalde submit (zelfde keuze → geen dubbele/afwijkende registratie).
 4. **Toegankelijkheid & mobiel-eerst** (ADR-0024 §6): semantische HTML, `aria-live` voor status/uitslag, focusbeheer, contrast/tikdoelen, NL-taal, werkt zonder muis.
@@ -25,7 +31,7 @@ Geen state buiten de DB; geen permanente verbindingen (polling + ETag/jitter); s
 
 ## Acceptatiecriteria / tests
 
-1. **End-to-end happy path (T, verse MariaDB 11.8.8):** code-login → status-poll ziet open ronde → Voor → bevestiging; `GET vote` toont de geregistreerde keuze. Bewijs reproduceerbaar.
+1. **End-to-end happy path (T, verse MariaDB 11.8.8):** code-login → status-poll ziet open ronde → Voor → bevestiging; `GET vote` toont de geregistreerde keuze; de keuze is **wijzigbaar** zolang de ronde open is (nieuwe `POST vote` overschrijft atomair, geen dubbeltelling). Bewijs reproduceerbaar.
 2. **Fan-out klopt (ADR-0018):** een eigenaar met meerdere in-scope rechten (bv. PG + TF) krijgt met één actie op elk recht zijn eigen breukdeel geregistreerd, per VvE geteld, nooit samengevoegd; exact decimal (ADR-0008 §3).
 3. **Row-level isolatie:** de status-/vote-responses lekken nooit rechten of stemmen van een andere eigenaar; negatieftest.
 4. **Geen token-at-rest:** test/inspectie bewijst dat de sessietoken niet naar `localStorage`/`sessionStorage`/cookie wordt geschreven.
@@ -39,6 +45,29 @@ Geen state buiten de DB; geen permanente verbindingen (polling + ETag/jitter); s
 ## Versie
 
 Eerste eigenaar-UI = major/nieuwe-functionaliteit-stap. Richt op release-tag **v0.1.0** (herstelbare sessie/echte magic-link komen ná v0.1). Exacte tag/branch door Codex als steward; werk op een feature-branch (bv. `feat/sprint-10-frontend-eigenaar`).
+
+## Blok-resolutie (2026-08-22) — PII-false-positive + tokens v1.0.1
+
+De vorige dev-beurt bouwde de frontend, maar de PII-gate blokkeerde **vals** op een viercijferige `px`-maat in het referentie-prototype: de postcode-regex `\d{4}\s?[A-Z]{2}` leest vier cijfers gevolgd door een 2-letter-eenheid als een NL-postcode. Opgelost door het referentie-prototype **uit de repo** te halen (designschetsen horen in de pre-stage, buiten het code-artefact). De app-CSS zelf trok de gate niet.
+
+Nog te doen in de hervatte beurt:
+1. **Ververs de vendored tokens naar v1.0.1.** Neem `Platform/platform-tokens.css` (nu v1.0.1 — donkerder `--ink-2`/`--ink-3` voor leesbaarheid) opnieuw over in `app/public/deelnemen/vendor/platform-tokens.css`, met de herkomst-/versieregel op **v1.0.1**. Wijzig geen tokenwaarden lokaal.
+2. Draai de gates opnieuw (PII nu schoon) en zet door naar `READY_FOR_TEST`.
+
+**Los, aanbevolen als aparte mini-taak (niet nu):** hard de PII-detector zodat `\d{4}` gevolgd door een 2-letter CSS-eenheid (px/em/ex/ch/vw/vh/cm/mm/pt/pc/in/fr/ms) geen postcode-hit is — anders blokkeert straks ook echte app-CSS met 4-cijferige px. Guardrail-wijziging → met rood/groen-test + Claude-validatie.
+
+## Fix-ronde 1 (CI) — `public/` in het deploy-contract
+
+De frontend-assets staan in `app/public/deelnemen/`. `build-release.mjs` neemt `public/` al mee in het artefact, maar **`scripts/deploy.sh` kent `public/` niet**, waardoor de CI-gate *CloudLinux in-place deploy en rollback* (`tests/deploy-in-place.integration.sh`) faalt met `Onverwacht pad in release-artefact: public/` (exit 18). De daaropvolgende `ROLLBACK MISLUKT` is een **gevolg** (de allowlist breekt af vóór de backup is gemaakt, dus `.backup-ready` ontbreekt), geen los defect — met de fix hieronder verdwijnen beide.
+
+Neem `public/` overal in `scripts/deploy.sh` op als beheerd pad, symmetrisch met `src/`:
+1. **Allowlist** (`case "$entry"`): voeg `public|public/|public/*` toe naast `src|src/|src/*`.
+2. **Forward install:** naast `rsync -a --delete payload/src/ "$remote_dir/src/"` een `mkdir -p "$remote_dir/public"` + `rsync -a --delete payload/public/ "$remote_dir/public/"` — doel is de **subdir** `"$remote_dir/public/"`, zodat de bestaande guard tegen `--delete` op de remote-root intact blijft.
+3. **Backup-vóór-install** en **rollback (verwijder- én herstel-lus):** voeg `public` toe aan de drie `for name in src package.json package-lock.json`-lussen → `for name in src public package.json package-lock.json`.
+4. **`tests/deploy-contract.test.mjs`:** assert de nieuwe `payload/public/ -> $remote_dir/public/`-rsync; de bestaande `doesNotMatch`-guard op `--delete "$remote_dir/"` blijft groen (public-doel is een subdir).
+5. **`tests/deploy-in-place.integration.sh`:** zaai `public/` in de fixture zodat de volledige install->backup->rollback-cyclus mét public/ wordt bewezen; test groen.
+
+Geen tokenwaarden/PII; alleen het deploy-contract. Draai de gates opnieuw (incl. de CloudLinux in-place-job) en zet door naar `READY_FOR_TEST`.
 
 ## Overdracht
 
