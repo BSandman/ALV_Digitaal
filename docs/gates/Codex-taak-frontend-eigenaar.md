@@ -4,7 +4,7 @@ Doel: een werkende, door de Node-app geserveerde **eigenaar-UI** bovenop de best
 
 ## Referentie — klikbaar prototype (v0.1-milestone, akkoord)
 
-`docs/gates/prototype-deelnemen-v0.1.html` is een **klikbaar, mobiel-eerst prototype** van deze flow in de Honigfabriek-huisstijl met gesimuleerde data — door Bas akkoord als v0.1-milestone. Gebruik het als **visuele + interactie-referentie** (schermindeling, live-statusstrip, motie-kaart, "u stemt namens …"-fan-out, bevestig-sheet, receipt-scherm). Het is een **referentie, geen productcode**: bouw de echte UI op de bestaande API en de gevendorde tokens; neem geen gesimuleerde data of demo-affordances (thema-/reset-knop, telefoon-frame) over.
+Het klikbare, mobiel-eerst **referentie-prototype** van deze flow (Honigfabriek-huisstijl, gesimuleerde data, door Bas akkoord als v0.1-milestone) leeft in de **pre-stage**: `Platform/_design-prestage/deelnemen/deelnemen-v0.1.html` — bewust buiten de repo, niet in het code-artefact. Gebruik het als **visuele + interactie-referentie** (schermindeling, live-statusstrip, motie-kaart, "u stemt namens …"-fan-out, bevestig-sheet, receipt-scherm). Het is een **referentie, geen productcode**: bouw de echte UI op de bestaande API en de gevendorde tokens; neem geen gesimuleerde data of demo-affordances (thema-/reset-knop, telefoon-frame) over.
 
 **Stem wijzigen tot sluiting.** De eigenaar kan zijn Voor/Tegen **wijzigen zolang de ronde open is** (herhaalde `POST vote` overschrijft de vorige keuze atomair, geen dubbeltelling; de bevestiging toont de huidige keuze met een 'wijzig'-terugweg naar het stemscherm). Het **sluiten/vaststellen** van de ronde doet de voorzitter via de **aparte admin-frontend (tablet/pc-view, latere sprint)** — niet in deze eigenaar-UI.
 
@@ -45,6 +45,16 @@ Geen state buiten de DB; geen permanente verbindingen (polling + ETag/jitter); s
 ## Versie
 
 Eerste eigenaar-UI = major/nieuwe-functionaliteit-stap. Richt op release-tag **v0.1.0** (herstelbare sessie/echte magic-link komen ná v0.1). Exacte tag/branch door Codex als steward; werk op een feature-branch (bv. `feat/sprint-10-frontend-eigenaar`).
+
+## Blok-resolutie (2026-08-22) — PII-false-positive + tokens v1.0.1
+
+De vorige dev-beurt bouwde de frontend, maar de PII-gate blokkeerde **vals** op een viercijferige `px`-maat in het referentie-prototype: de postcode-regex `\d{4}\s?[A-Z]{2}` leest vier cijfers gevolgd door een 2-letter-eenheid als een NL-postcode. Opgelost door het referentie-prototype **uit de repo** te halen (designschetsen horen in de pre-stage, buiten het code-artefact). De app-CSS zelf trok de gate niet.
+
+Nog te doen in de hervatte beurt:
+1. **Ververs de vendored tokens naar v1.0.1.** Neem `Platform/platform-tokens.css` (nu v1.0.1 — donkerder `--ink-2`/`--ink-3` voor leesbaarheid) opnieuw over in `app/public/deelnemen/vendor/platform-tokens.css`, met de herkomst-/versieregel op **v1.0.1**. Wijzig geen tokenwaarden lokaal.
+2. Draai de gates opnieuw (PII nu schoon) en zet door naar `READY_FOR_TEST`.
+
+**Los, aanbevolen als aparte mini-taak (niet nu):** hard de PII-detector zodat `\d{4}` gevolgd door een 2-letter CSS-eenheid (px/em/ex/ch/vw/vh/cm/mm/pt/pc/in/fr/ms) geen postcode-hit is — anders blokkeert straks ook echte app-CSS met 4-cijferige px. Guardrail-wijziging → met rood/groen-test + Claude-validatie.
 
 ## Overdracht
 

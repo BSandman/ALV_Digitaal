@@ -1,6 +1,6 @@
 # sprint.md — Sprint 10: Eigenaar-frontend v0.1 (deelnemen-UI, mobiel-eerst)
 
-**Doel:** het eerste zichtbare Fase-2-product — een door de Node-app geserveerde **eigenaar-UI** (mobiel-eerst) waarmee een eigenaar kan **inloggen (code-fallback) → de open ronde zien → Voor/Tegen stemmen (wijzigbaar tot sluiting) → bevestiging zien**, met polling volgens ADR-0002. Architectuur/scopegrens: **ADR-0024**. Spec: **`docs/gates/Codex-taak-frontend-eigenaar.md`**. Visuele + interactie-referentie: **`docs/gates/prototype-deelnemen-v0.1.html`** (klikbaar, Honigfabriek-huisstijl, gesimuleerde data — akkoord als v0.1-milestone).
+**Doel:** het eerste zichtbare Fase-2-product — een door de Node-app geserveerde **eigenaar-UI** (mobiel-eerst) waarmee een eigenaar kan **inloggen (code-fallback) → de open ronde zien → Voor/Tegen stemmen (wijzigbaar tot sluiting) → bevestiging zien**, met polling volgens ADR-0002. Architectuur/scopegrens: **ADR-0024**. Spec: **`docs/gates/Codex-taak-frontend-eigenaar.md`**. Visuele + interactie-referentie: **`Platform/_design-prestage/deelnemen/deelnemen-v0.1.html`** (klikbaar, Honigfabriek-huisstijl, gesimuleerde data — akkoord als v0.1-milestone; bewust buiten de repo).
 
 > **Attended, geen deploy.** Reguliere feature-sprint via de PR-route; productcode uitsluitend op de feature-branch, nooit rechtstreeks naar `main`. Deploy naar acceptatie is een aparte, latere menselijke poort (ADR-0013).
 
