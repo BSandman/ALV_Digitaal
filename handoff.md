@@ -1,12 +1,12 @@
 ---
 sprint: 10
-state: BLOCKED
-owner: bas
-since: 2026-08-22T14:21:11Z
-next: bas
-action_required_by: bas
-blocked: true
-note: "PII-gate blokkeert vals op een viercijferige CSS-pixelmaat in Claude-prototype; Bas: laat Claude het prototype of Mistral de detector corrigeren."
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-22T19:18:52Z
+next: claude
+action_required_by: none
+blocked: false
+note: "Frontend en vendored tokens v1.0.1 zijn gate-groen; Gemini: review de PR."
 ---
 
 # handoff.md — de estafettestok
