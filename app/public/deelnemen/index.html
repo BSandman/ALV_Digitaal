@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="only light">
+  <title>ALV Digitaal — deelnemen</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/deelnemen/vendor/platform-tokens.css">
+  <link rel="stylesheet" href="/deelnemen/app.css">
+  <script src="/deelnemen/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand" href="/deelnemen/" aria-label="ALV Digitaal, deelnemen">
+        <span class="brand-mark" aria-hidden="true">◆</span>
+        <span><strong>ALV Digitaal</strong><small>Honigfabriek · deelnemen</small></span>
+      </a>
+      <div class="meeting-identity" id="meetingIdentity" hidden>
+        <strong id="meetingCode"></strong>
+        <small id="meetingDate"></small>
+      </div>
+    </header>
+
+    <main id="mainContent">
+      <section class="screen login-screen" id="loginScreen" aria-labelledby="loginTitle">
+        <div class="hero-card">
+          <p class="eyebrow">Veilig digitaal stemmen</p>
+          <h1 id="loginTitle">Neem deel aan uw ALV</h1>
+          <p>Log in met de persoonlijke toegangscode van uw uitnodiging. Na herladen logt u opnieuw in; uw sessie wordt niet op dit toestel bewaard.</p>
+        </div>
+
+        <form class="card login-form" id="loginForm" novalidate>
+          <div class="field">
+            <label for="accessCode">Toegangscode</label>
+            <input id="accessCode" name="code" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" required aria-describedby="codeHint loginError">
+            <small id="codeHint">Neem de code exact over, inclusief eventuele streepjes.</small>
+          </div>
+          <p class="notice notice-error" id="loginError" role="alert" hidden></p>
+          <button class="button button-primary" id="loginButton" type="submit">Inloggen</button>
+          <p class="trust-note"><span aria-hidden="true">✓</span> Sessietoken uitsluitend tijdelijk in het geheugen</p>
+        </form>
+      </section>
+
+      <section class="screen" id="roundScreen" aria-labelledby="roundScreenTitle" hidden>
+        <div class="owner-bar">
+          <div><span>Ingelogd als</span><strong id="ownerName"></strong></div>
+          <span class="object-label font-mono" id="ownerObject"></span>
+        </div>
+
+        <div class="status-strip" id="liveStatus" aria-live="polite">
+          <span class="status-dot" aria-hidden="true"></span>
+          <strong id="statusLabel">Rondestatus ophalen…</strong>
+          <span class="font-mono" id="remainingTime"></span>
+        </div>
+
+        <div class="card waiting-card" id="waitingCard">
+          <p class="eyebrow">Vergadering live</p>
+          <h1 id="roundScreenTitle">Wachten op de volgende stemronde</h1>
+          <p>Dit scherm ververst automatisch. U hoeft niets te doen.</p>
+          <span class="poll-indicator"><span aria-hidden="true"></span> Automatisch verbonden</span>
+        </div>
+
+        <article class="round-card" id="roundCard" hidden>
+          <header>
+            <div>
+              <p class="eyebrow">Nu in stemming</p>
+              <h1 id="motionTitle"></h1>
+            </div>
+            <span class="round-number font-mono" id="roundNumber"></span>
+          </header>
+
+          <div class="scope-chips" id="scopeChips" aria-label="Betrokken splitsingen"></div>
+
+          <section class="entitlement-card" aria-labelledby="entitlementTitle">
+            <h2 id="entitlementTitle">U stemt namens</h2>
+            <ul id="entitlementList"></ul>
+            <p id="fanoutExplanation">Eén keuze geldt tegelijk voor alle hierboven genoemde stemrechten.</p>
+          </section>
+
+          <p class="notice" id="eligibilityNotice" hidden></p>
+          <div class="current-vote" id="currentVotePanel" aria-live="polite" hidden>
+            <span>Uw huidige stem</span>
+            <strong id="currentChoice"></strong>
+          </div>
+
+          <fieldset class="vote-field" id="voteField">
+            <legend>Hoe stemt u op dit voorstel?</legend>
+            <div class="vote-actions">
+              <button class="vote-button vote-voor" type="button" data-choice="voor">
+                <span aria-hidden="true">✓</span><strong>Voor</strong><small>Ik ga akkoord</small>
+              </button>
+              <button class="vote-button vote-tegen" type="button" data-choice="tegen">
+                <span aria-hidden="true">×</span><strong>Tegen</strong><small>Ik ga niet akkoord</small>
+              </button>
+            </div>
+            <p>U kunt uw keuze wijzigen zolang deze ronde open is.</p>
+          </fieldset>
+          <p class="notice notice-error" id="voteError" role="alert" hidden></p>
+        </article>
+      </section>
+
+      <section class="screen receipt-screen" id="receiptScreen" aria-labelledby="receiptTitle" hidden>
+        <div class="receipt-check" aria-hidden="true">✓</div>
+        <p class="eyebrow">Stem ontvangen</p>
+        <h1 id="receiptTitle">Uw stem is geregistreerd</h1>
+        <p>De keuze is voor al uw stemrechten in deze ronde vastgelegd.</p>
+        <dl class="receipt card">
+          <div><dt>Voorstel</dt><dd id="receiptMotion"></dd></div>
+          <div><dt>Uw keuze</dt><dd id="receiptChoice"></dd></div>
+          <div><dt>Namens</dt><dd id="receiptEntitlements"></dd></div>
+          <div><dt>Ontvangen</dt><dd class="font-mono" id="receiptTime"></dd></div>
+        </dl>
+        <button class="button button-secondary" id="changeVoteButton" type="button">Stem bekijken of wijzigen</button>
+      </section>
+    </main>
+
+    <footer>ALV Digitaal · veilig stemmen binnen uw eigen VvE</footer>
+  </div>
+
+  <dialog class="confirm-dialog" id="confirmDialog" aria-labelledby="confirmTitle">
+    <form method="dialog">
+      <p class="eyebrow">Controleer uw keuze</p>
+      <h2 id="confirmTitle">Stem bevestigen</h2>
+      <p>U kiest <strong id="pendingChoice"></strong>. Deze keuze geldt voor <strong id="pendingCount"></strong>.</p>
+      <div class="dialog-actions">
+        <button class="button button-secondary" value="cancel">Terug</button>
+        <button class="button button-primary" id="confirmVoteButton" value="default">Bevestig stem</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

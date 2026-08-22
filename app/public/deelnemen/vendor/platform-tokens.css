@@ -1,0 +1,96 @@
+/* Gevendorde kopie — bron: Platform/platform-tokens.css v1.0.0 (ongewijzigde tokenwaarden). */
+/* ============================================================================
+ * platform-tokens.css — Honigfabriek-huisstijl, canonieke design-tokens
+ * ----------------------------------------------------------------------------
+ * Eén bron voor de hele Honigfabriek/VvE-platformfamilie: honigfabriek.nl,
+ * parkeren.honigfabriek.nl, HonigParkeren-apps en ALV-Digitaal.
+ * Industrieel & warm: beton/baksteen-neutraal + honing-amber accent.
+ * Mono-type voor alle technische data (ID's, tijden, codes, bedragen).
+ *
+ * Kleuren in oklch (perceptueel, licht/donker consistent). Bewaar deze waarden
+ * exact gelijk aan honigfabriek.nl / HonigParkeren design/app/tokens.css.
+ * Versie: v1.0.0 — zie Platform_Stijlgids_v1.0.0.md.
+ * Fonts (in de <head> laden):
+ *   <link rel="preconnect" href="https://fonts.googleapis.com">
+ *   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+ * ==========================================================================*/
+
+:root {
+  /* warm neutrals */
+  --paper:      oklch(0.968 0.006 80);   /* app-achtergrond */
+  --paper-2:    oklch(0.945 0.008 78);   /* ingezonken vlakken */
+  --surface:    oklch(0.995 0.003 85);   /* kaart / wit vlak */
+  --surface-2:  oklch(0.978 0.006 80);   /* subtiel verhoogd */
+  --ink:        oklch(0.255 0.012 55);   /* primaire tekst, warm bijna-zwart */
+  --ink-2:      oklch(0.46 0.012 58);    /* secundaire tekst */
+  --ink-3:      oklch(0.60 0.010 60);    /* tertiair / muted */
+  --line:       oklch(0.90 0.008 72);    /* hairline */
+  --line-2:     oklch(0.85 0.010 70);    /* sterkere rand */
+
+  /* honing-amber accent (dubbelt als NL-kenteken-geel) */
+  --amber:      oklch(0.80 0.135 78);    /* accent vlak */
+  --amber-2:    oklch(0.73 0.150 72);    /* knop / actief */
+  --amber-deep: oklch(0.62 0.130 62);    /* hover / pressed */
+  --amber-wash: oklch(0.95 0.045 82);    /* zachte achtergrond */
+  --on-amber:   oklch(0.28 0.04 60);     /* tekst op amber */
+
+  /* baksteen — tweede structurele accent, spaarzaam */
+  --brick:      oklch(0.52 0.115 38);
+  --brick-wash: oklch(0.95 0.035 45);
+
+  /* donker zijvlak / navigatie (honigfabriek dark) */
+  --shell-dark: oklch(0.255 0.010 50);   /* ~ #1d1916 */
+
+  /* semantisch (warm, ingetogen) */
+  --ok:         oklch(0.58 0.095 150);   /* akkoord / Voor / aanwezig */
+  --ok-wash:    oklch(0.95 0.04 150);
+  --warn:       oklch(0.70 0.135 70);
+  --warn-wash:  oklch(0.95 0.05 80);
+  --bad:        oklch(0.56 0.145 28);    /* afgewezen / Tegen / fout */
+  --bad-wash:   oklch(0.95 0.05 30);
+  --steel:      oklch(0.55 0.03 240);    /* neutraal / proxy */
+  --steel-wash: oklch(0.95 0.015 240);
+
+  /* VvE-splitsingscodering (functioneel herkenbaar — ALV-domein) */
+  --tf:         oklch(0.58 0.095 150);   /* Transformatiewoningen — groen */
+  --tf-wash:    oklch(0.95 0.04 150);
+  --nb:         oklch(0.70 0.135 70);    /* Nieuwbouw — amber/geel */
+  --nb-wash:    oklch(0.95 0.05 80);
+  --pg:         oklch(0.52 0.09 240);    /* Parkeergarage — blauw */
+  --pg-wash:    oklch(0.95 0.02 240);
+
+  /* NL kentekenplaat (HonigParkeren) */
+  --plate-yellow: #f5cf12;
+  --plate-ink:    #15130c;
+  --plate-blue:   #18338a;
+
+  /* type */
+  --font-ui:   "Archivo", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* radius */
+  --r-xs: 6px;
+  --r-sm: 9px;
+  --r:    13px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+
+  /* elevation — warme zachte schaduwen */
+  --sh-sm: 0 1px 2px oklch(0.4 0.02 60 / 0.06), 0 1px 3px oklch(0.4 0.02 60 / 0.05);
+  --sh:    0 2px 8px oklch(0.4 0.02 60 / 0.07), 0 8px 24px oklch(0.4 0.02 60 / 0.08);
+  --sh-lg: 0 8px 24px oklch(0.4 0.02 60 / 0.10), 0 18px 48px oklch(0.4 0.02 60 / 0.10);
+
+  /* tikdoel — minimaal, mobiel-eerst */
+  --tap-min: 44px;
+}
+
+* { box-sizing: border-box; }
+
+.font-mono { font-family: var(--font-mono); }
+
+/* gedeelde resets */
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 99px; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }

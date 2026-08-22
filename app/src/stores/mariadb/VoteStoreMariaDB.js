@@ -88,6 +88,7 @@ export function createVoteStoreMariaDB({
                ON mqe.meeting_id = m.meeting_id AND mqe.entitlement_id = e.id
             WHERE e.id = ?
               AND e.participant_id = ?
+              AND mqe.attendance_present = 1
               AND (m.splitsingen IS NULL OR JSON_CONTAINS(m.splitsingen, JSON_QUOTE(e.splitsing_code)))
               AND NOT EXISTS (
                     SELECT 1 FROM power_of_attorney pa
@@ -117,6 +118,91 @@ export function createVoteStoreMariaDB({
       });
     },
 
+    async recordOwnerVote(roundId, participantId, { choice }) {
+      assertParticipantScope(participantId);
+      assertChoice(choice);
+      return withTransaction(async (conn) => {
+        const [[round]] = await conn.execute(
+          `SELECT status, closes_at,
+                  TIMESTAMPDIFF(MICROSECOND, UTC_TIMESTAMP(3), closes_at) AS remaining_microseconds
+             FROM round WHERE id = ? FOR UPDATE`,
+          [roundId]
+        );
+        if (!round || round.status !== 'open' || BigInt(round.remaining_microseconds ?? 0) <= 0n) {
+          throw domainError('ROUND_NOT_OPEN', 'round_not_open');
+        }
+
+        // Eén eigenaarsactie selecteert de volledige, bevroren set server-side.
+        // De client kent geen entitlement-id's en kan de fan-out dus niet sturen.
+        const [entitlements] = await conn.execute(
+          `SELECT e.id, e.splitsing_code, CAST(e.weight AS CHAR) AS weight,
+                  (SELECT vr.choice
+                     FROM vote_revision vr
+                    WHERE vr.round_id = r.id AND vr.entitlement_id = e.id
+                    ORDER BY vr.id DESC LIMIT 1) AS current_choice,
+                  (SELECT vr.accepted_at
+                     FROM vote_revision vr
+                    WHERE vr.round_id = r.id AND vr.entitlement_id = e.id
+                    ORDER BY vr.id DESC LIMIT 1) AS current_accepted_at
+             FROM entitlement e
+             JOIN participant p ON p.id = e.participant_id
+             JOIN round r ON r.id = ?
+             JOIN motion m ON m.id = r.motion_id AND m.meeting_id = p.meeting_id
+             JOIN meeting_quorum_entitlement mqe
+               ON mqe.meeting_id = m.meeting_id
+              AND mqe.entitlement_id = e.id
+              AND mqe.attendance_present = 1
+            WHERE e.participant_id = ?
+              AND (m.splitsingen IS NULL OR JSON_CONTAINS(m.splitsingen, JSON_QUOTE(e.splitsing_code)))
+              AND NOT EXISTS (
+                    SELECT 1 FROM power_of_attorney pa
+                     WHERE pa.meeting_id = p.meeting_id
+                       AND pa.entitlement_id = e.id
+                       AND pa.status = 'active'
+                  )
+            ORDER BY e.id
+            FOR UPDATE`,
+          [roundId, participantId]
+        );
+        if (entitlements.length === 0) {
+          throw domainError('ENTITLEMENT_FORBIDDEN', 'entitlement_forbidden');
+        }
+
+        const unchanged = entitlements.every((row) => row.current_choice === choice);
+        if (unchanged) {
+          const acceptedAt = mostRecent(entitlements.map((row) => row.current_accepted_at));
+          return {
+            roundId,
+            choice,
+            entitlementCount: entitlements.length,
+            acceptedAt: toIso(acceptedAt),
+            changed: false,
+          };
+        }
+
+        let lastInsertId;
+        for (const entitlement of entitlements) {
+          const [result] = await conn.execute(
+            `INSERT INTO vote_revision (round_id, entitlement_id, choice, accepted_at)
+             VALUES (?, ?, ?, UTC_TIMESTAMP(3))`,
+            [roundId, entitlement.id, choice]
+          );
+          lastInsertId = result.insertId;
+        }
+        const [[revision]] = await conn.execute(
+          'SELECT accepted_at FROM vote_revision WHERE id = ?',
+          [lastInsertId]
+        );
+        return {
+          roundId,
+          choice,
+          entitlementCount: entitlements.length,
+          acceptedAt: toIso(revision.accepted_at),
+          changed: true,
+        };
+      });
+    },
+
     async getCurrentVote(roundId, participantId, entitlementId) {
       assertOwnerScope(participantId, entitlementId);
       return withConnection(async (conn) => {
@@ -136,6 +222,147 @@ export function createVoteStoreMariaDB({
           [roundId, entitlementId, participantId]
         );
         return row ? { entitlementId: row.entitlement_id, choice: row.choice } : null;
+      });
+    },
+
+    async getOwnerCurrentVote(roundId, participantId) {
+      assertParticipantScope(participantId);
+      return withConnection(async (conn) => {
+        const [rows] = await conn.execute(
+          `SELECT e.id AS entitlement_id, vr.choice, vr.accepted_at
+             FROM entitlement e
+             JOIN participant p ON p.id = e.participant_id
+             JOIN round r ON r.id = ?
+             JOIN motion m ON m.id = r.motion_id AND m.meeting_id = p.meeting_id
+             JOIN meeting_quorum_entitlement mqe
+               ON mqe.meeting_id = m.meeting_id
+              AND mqe.entitlement_id = e.id
+              AND mqe.attendance_present = 1
+             JOIN vote_revision vr
+               ON vr.round_id = r.id
+              AND vr.entitlement_id = e.id
+              AND vr.id = (
+                    SELECT MAX(latest.id)
+                      FROM vote_revision latest
+                     WHERE latest.round_id = r.id
+                       AND latest.entitlement_id = e.id
+                  )
+            WHERE e.participant_id = ?
+              AND (m.splitsingen IS NULL OR JSON_CONTAINS(m.splitsingen, JSON_QUOTE(e.splitsing_code)))
+            ORDER BY e.id`,
+          [roundId, participantId]
+        );
+        if (rows.length === 0) return null;
+        const choices = new Set(rows.map((row) => row.choice));
+        if (choices.size !== 1) throw domainError('VOTE_STATE_INCONSISTENT', 'vote_state_inconsistent');
+        const acceptedAt = mostRecent(rows.map((row) => row.accepted_at));
+        return {
+          roundId,
+          choice: rows[0].choice,
+          entitlementCount: rows.length,
+          acceptedAt: toIso(acceptedAt),
+        };
+      });
+    },
+
+    async getParticipantStatus(participantId, meetingId, roundId = null) {
+      assertParticipantScope(participantId);
+      assertParticipantScope(meetingId, 'meetingId');
+      return withConnection(async (conn) => {
+        const [[participant]] = await conn.execute(
+          `SELECT p.display_name, p.object_label, mt.vve_code, mt.meeting_date
+             FROM participant p
+             JOIN meeting mt ON mt.id = p.meeting_id
+            WHERE p.id = ? AND p.meeting_id = ?`,
+          [participantId, meetingId]
+        );
+        if (!participant) throw domainError('SESSION_INVALID', 'session_invalid');
+
+        const roundFilter = roundId ? ' AND r.id = ?' : '';
+        const roundParams = roundId ? [meetingId, roundId] : [meetingId];
+        const [[round]] = await conn.execute(
+          `SELECT r.id, r.round_version, m.title, m.splitsingen,
+                  CASE
+                    WHEN r.status = 'open' AND r.closes_at <= UTC_TIMESTAMP(3) THEN 'closing'
+                    ELSE r.status
+                  END AS effective_status,
+                  GREATEST(0, CEIL(TIMESTAMPDIFF(MICROSECOND, UTC_TIMESTAMP(3), r.closes_at) / 1000000))
+                    AS remaining_seconds
+             FROM round r
+             JOIN motion m ON m.id = r.motion_id
+            WHERE m.meeting_id = ?${roundFilter}
+            ORDER BY CASE
+                       WHEN r.status = 'open' AND r.closes_at > UTC_TIMESTAMP(3) THEN 0
+                       WHEN r.status = 'waiting' THEN 1
+                       WHEN r.status IN ('open', 'closing') THEN 2
+                       ELSE 3
+                     END,
+                     r.id DESC
+            LIMIT 1`,
+          roundParams
+        );
+
+        const base = {
+          participant: {
+            displayName: participant.display_name,
+            objectLabel: participant.object_label,
+          },
+          meeting: {
+            vveCode: participant.vve_code,
+            date: dateOnly(participant.meeting_date),
+          },
+        };
+        if (!round) {
+          if (roundId) return null;
+          return {
+            ...base,
+            version: 0,
+            status: 'waiting',
+            remainingSeconds: 0,
+            round: null,
+            eligible: false,
+            entitlements: [],
+          };
+        }
+
+        const [entitlements] = await conn.execute(
+          `SELECT e.splitsing_code, CAST(e.weight AS CHAR) AS weight
+             FROM entitlement e
+             JOIN participant p ON p.id = e.participant_id
+             JOIN motion m ON m.meeting_id = p.meeting_id
+             JOIN round r ON r.motion_id = m.id AND r.id = ?
+             JOIN meeting_quorum_entitlement mqe
+               ON mqe.meeting_id = m.meeting_id
+              AND mqe.entitlement_id = e.id
+              AND mqe.attendance_present = 1
+            WHERE e.participant_id = ?
+              AND (m.splitsingen IS NULL OR JSON_CONTAINS(m.splitsingen, JSON_QUOTE(e.splitsing_code)))
+              AND NOT EXISTS (
+                    SELECT 1 FROM power_of_attorney pa
+                     WHERE pa.meeting_id = p.meeting_id
+                       AND pa.entitlement_id = e.id
+                       AND pa.status = 'active'
+                  )
+            ORDER BY e.splitsing_code, e.id`,
+          [round.id, participantId]
+        );
+        const status = round.effective_status;
+        return {
+          ...base,
+          version: Number(round.round_version),
+          status,
+          remainingSeconds: status === 'open' ? Number(round.remaining_seconds) : 0,
+          round: {
+            id: Number(round.id),
+            title: round.title,
+            splitsingen: parseJsonArray(round.splitsingen),
+          },
+          eligible: status === 'open' && entitlements.length > 0,
+          entitlements: entitlements.map((row) => ({
+            splitsingCode: row.splitsing_code,
+            weight: row.weight,
+          })),
+        };
       });
     },
 
@@ -310,6 +537,10 @@ function assertOwnerScope(participantId, entitlementId) {
   if (!Number.isSafeInteger(entitlementId) || entitlementId < 1) throw new TypeError('entitlementId ontbreekt.');
 }
 
+function assertParticipantScope(value, field = 'participantId') {
+  if (!Number.isSafeInteger(value) || value < 1) throw new TypeError(`${field} ontbreekt.`);
+}
+
 function assertChoice(choice) {
   // ADR-0011: het eigenaarpad kent uitsluitend de twee in-app knoppen.
   // Blanco komt later via het papier-/adminpad; onthouding ontstaat bij sluiten.
@@ -332,4 +563,22 @@ function domainError(code, message) {
   const error = new Error(message);
   error.code = code;
   return error;
+}
+
+function parseJsonArray(value) {
+  if (value === null || value === undefined) return [];
+  const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function dateOnly(value) {
+  if (typeof value === 'string') return value.slice(0, 10);
+  return value ? new Date(value).toISOString().slice(0, 10) : null;
+}
+
+function mostRecent(values) {
+  return values.filter(Boolean).reduce(
+    (latest, value) => latest === null || value > latest ? value : latest,
+    null
+  );
 }
