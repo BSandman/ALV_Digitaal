@@ -155,7 +155,7 @@ test('frontendcontract dekt in-memory token, ETag+jitter-stop, twee keuzes en ba
   assert.match(html, /<dialog/);
   assert.match(css, /min-height: var\(--tap-min\)/);
   assert.doesNotMatch(css, /#[0-9a-f]{3,8}\b|\brgb\(|\boklch\(|font-family:\s*["']?(?:Archivo|IBM Plex Mono)/i);
-  assert.match(vendor.split(/\r?\n/, 1)[0], /bron: Platform\/platform-tokens\.css v1\.0\.0/);
+  assert.match(vendor.split(/\r?\n/, 1)[0], /bron: Platform\/platform-tokens\.css v1\.0\.1/);
   assert.match(vendor, /--tf:.*oklch/);
   assert.match(vendor, /--nb:.*oklch/);
   assert.match(vendor, /--pg:.*oklch/);
