@@ -22,17 +22,10 @@ Je bent de enige die **productcode** wijzigt en je bent **Git-steward**: branche
 - Jij tagt `vX.y.z` bij een afgeronde sprint/feature. **Mistral** zet de release-/deploytags bij livegang — jij niet.
 - Gemini en Claude committen alleen hun eigen handoff/progress/doc-bestanden; jij bewaakt de merges daarvan naar `main`.
 
-## Sprint 1 — je concrete taken
+## Je concrete taken — per sprint
 
-Volledige opdracht: `docs/gates/Codex-taak-10.2_T-run-en-CI-gates.md`. Kern:
+De opdracht staat **niet** hier maar in `sprint.md` + het daarin genoemde Codex-taakdoc (`docs/gates/Codex-taak-*.md`); dat taakdoc is per sprint leidend, incl. de bijbehorende ADR's en (indien aanwezig) een referentie-prototype. **Definition of done:** zie `sprint.md`. Lever op via `docs/gates/handoff-template.md` (zes delen), met rood+groen testbewijs en een schone privacyclassificatie.
 
-- `docker compose --profile dev --profile loadtest up` levert een werkende **T**: app single-process, MariaDB **11.8.8**, proxy die `X-Forwarded-For` zet, k6. Scaffold staat in `infra/`.
-- **Seedroute:** laad synthetische data uit `mistral-lokaal/out/synthetic/owners.synthetic.json` (Mistral levert dit; zie zijn instructie). Bestaat die nog niet, val terug op de ingecheckte fictieve seed `infra/mysql/init/02-seed-synthetic.sql`. **Nooit** echte data.
-- **CI-gate A** (ADR-0002, zes regels) en **CI-gate B** (PII-scan, ADR-0005) draaien en falen aantoonbaar op een geprepareerde overtreding. De deterministische scan-kern leeft in `mistral-lokaal/scripts/pii_scan` (Mistral hangt de LLM-tweede-beoordeling er later aan; de kern moet zonder model werken).
-- Release-artefact = **alleen code**; nooit `owners.*`/`events.json`/`audit.log`/`cycle.json`/snapshots. Versie via `package.json` + git-tag.
+## Buiten scope
 
-**Definition of done:** zie `sprint.md`. Lever op via `docs/gates/handoff-template.md` (zes delen), met rood+groen testbewijs en een schone privacyclassificatie.
-
-## Buiten scope deze sprint
-
-A-domein (`docs/gates/Codex-Mistral-taak-10.3_A-domein.md`, Sprint 2) en productfunctionaliteit (fasen 1–3, v0.2.0 §6).
+Alles buiten de scope van de actieve sprint (zie `sprint.md` → *Buiten scope*), en altijd: deploy/livegang (menselijke poort — **Mistral** tagt bij livegang, jij niet) en werk dat bij een andere rol hoort.

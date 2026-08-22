@@ -1,12 +1,12 @@
 ---
-sprint: 12
-state: SPRINT_DONE
-owner: claude
-since: 2026-08-21T09:50:32Z
-next: bas
+sprint: 10
+state: DEV_IN_PROGRESS
+owner: codex
+since: 2026-08-22T14:05:07Z
+next: gemini
 action_required_by: none
 blocked: false
-note: "Stap 2 op main + gevalideerd; nieuwe watcher bewezen. Lokale Mistral-integrator faalt op ontbrekende rsync (env, backlog)."
+note: "Codex bouwt Sprint 10 op feat/sprint-10-frontend-eigenaar; geen deploy."
 ---
 
 # handoff.md — de estafettestok
