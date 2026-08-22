@@ -1,12 +1,12 @@
 ---
 sprint: 10
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-22T14:05:07Z
-next: gemini
-action_required_by: none
-blocked: false
-note: "Codex bouwt Sprint 10 op feat/sprint-10-frontend-eigenaar; geen deploy."
+state: BLOCKED
+owner: bas
+since: 2026-08-22T14:21:11Z
+next: bas
+action_required_by: bas
+blocked: true
+note: "PII-gate blokkeert vals op een viercijferige CSS-pixelmaat in Claude-prototype; Bas: laat Claude het prototype of Mistral de detector corrigeren."
 ---
 
 # handoff.md — de estafettestok
