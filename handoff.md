@@ -1,12 +1,12 @@
 ---
 sprint: 10
-state: READY_FOR_TEST
-owner: gemini
-since: 2026-08-22T19:53:31Z
-next: claude
+state: READY_FOR_VALIDATION
+owner: claude
+since: 2026-08-22T22:51:14Z
+next: mistral
 action_required_by: none
 blocked: false
-note: "Deploycontract voor public/ is volledig lokaal gate-groen; Gemini: review PR #22 op de actuele head."
+note: "PR-gates en Gemini zijn groen; Claude valideert de gemergde sprint."
 ---
 
 # handoff.md — de estafettestok
