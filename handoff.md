@@ -1,12 +1,12 @@
 ---
 sprint: 10
-state: READY_FOR_TEST
-owner: gemini
-since: 2026-08-22T19:18:52Z
-next: claude
+state: DEV_IN_PROGRESS
+owner: codex
+since: 2026-08-22T19:47:20Z
+next: gemini
 action_required_by: none
 blocked: false
-note: "Frontend en vendored tokens v1.0.1 zijn gate-groen; Gemini: review de PR."
+note: "Codex herstelt het public-deploycontract en verifieert de volledige gate-set; geen deploy."
 ---
 
 # handoff.md — de estafettestok

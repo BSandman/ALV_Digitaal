@@ -56,6 +56,19 @@ Nog te doen in de hervatte beurt:
 
 **Los, aanbevolen als aparte mini-taak (niet nu):** hard de PII-detector zodat `\d{4}` gevolgd door een 2-letter CSS-eenheid (px/em/ex/ch/vw/vh/cm/mm/pt/pc/in/fr/ms) geen postcode-hit is — anders blokkeert straks ook echte app-CSS met 4-cijferige px. Guardrail-wijziging → met rood/groen-test + Claude-validatie.
 
+## Fix-ronde 1 (CI) — `public/` in het deploy-contract
+
+De frontend-assets staan in `app/public/deelnemen/`. `build-release.mjs` neemt `public/` al mee in het artefact, maar **`scripts/deploy.sh` kent `public/` niet**, waardoor de CI-gate *CloudLinux in-place deploy en rollback* (`tests/deploy-in-place.integration.sh`) faalt met `Onverwacht pad in release-artefact: public/` (exit 18). De daaropvolgende `ROLLBACK MISLUKT` is een **gevolg** (de allowlist breekt af vóór de backup is gemaakt, dus `.backup-ready` ontbreekt), geen los defect — met de fix hieronder verdwijnen beide.
+
+Neem `public/` overal in `scripts/deploy.sh` op als beheerd pad, symmetrisch met `src/`:
+1. **Allowlist** (`case "$entry"`): voeg `public|public/|public/*` toe naast `src|src/|src/*`.
+2. **Forward install:** naast `rsync -a --delete payload/src/ "$remote_dir/src/"` een `mkdir -p "$remote_dir/public"` + `rsync -a --delete payload/public/ "$remote_dir/public/"` — doel is de **subdir** `"$remote_dir/public/"`, zodat de bestaande guard tegen `--delete` op de remote-root intact blijft.
+3. **Backup-vóór-install** en **rollback (verwijder- én herstel-lus):** voeg `public` toe aan de drie `for name in src package.json package-lock.json`-lussen → `for name in src public package.json package-lock.json`.
+4. **`tests/deploy-contract.test.mjs`:** assert de nieuwe `payload/public/ -> $remote_dir/public/`-rsync; de bestaande `doesNotMatch`-guard op `--delete "$remote_dir/"` blijft groen (public-doel is een subdir).
+5. **`tests/deploy-in-place.integration.sh`:** zaai `public/` in de fixture zodat de volledige install->backup->rollback-cyclus mét public/ wordt bewezen; test groen.
+
+Geen tokenwaarden/PII; alleen het deploy-contract. Draai de gates opnieuw (incl. de CloudLinux in-place-job) en zet door naar `READY_FOR_TEST`.
+
 ## Overdracht
 
 `handoff.md` → open PR bij `READY_FOR_TEST` (Gemini-review + gates), daarna `READY_FOR_VALIDATION` (Claude), dan `READY_FOR_INTEGRATION` (Mistral). Bij een nodige beslissing/afwijking van een ADR: `BLOCKED` + `action_required_by: bas`, of een nieuwe ADR voorstellen via de `note`. **Deploy nooit** in deze sprint.
