@@ -1,12 +1,12 @@
 ---
 sprint: 10
-state: BLOCKED
-owner: bas
-since: 2026-08-22T22:57:43Z
-next: none
-action_required_by: bas
-blocked: true
-note: "Autorun mistral gestopt: git pull faalde; zie autorun.log."
+state: READY_FOR_INTEGRATION
+owner: mistral
+since: 2026-08-22T22:56:01Z
+next: bas
+action_required_by: none
+blocked: false
+note: "Claude-validatie GROEN (Cowork) tegen ADR-0024/0011/0018/0021/0002 + huisstijl; Mistral: integreer op main + tag, geen deploy."
 ---
 
 # handoff.md — de estafettestok
