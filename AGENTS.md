@@ -122,3 +122,6 @@ Onbemand of overnight draaien blijft uit totdat meerdere begeleide cycli inclusi
 - Productcode uitsluitend via Codex; deploy uitsluitend via Mistral.
 - Geen echte PII in O/T/CI (ADR-0004/0005).
 - Afwijking van een ADR = nieuwe ADR, niet stilzwijgend.
+- Elke nieuwe ADR/spec/module/taakdoc draagt een `Raakt:`-regel (forward-links = look-ahead, ADR-0000).
+- Open keuzes in een taakdoc krijgen de voorkeur + het gevolg-van-afwijken mee (ADR-0000).
+- README.md/bijbel.md zijn index + invarianten (kaart, geen territorium); detail hoort in ADR's/specs (ADR-0000).

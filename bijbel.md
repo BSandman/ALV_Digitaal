@@ -2,6 +2,10 @@
 
 Dit is de gezaghebbende bron. `sprint.md`/`handoff.md`/`progress.md` blijven kort en verwijzen hierheen. Wijzig de bijbel alleen bewust; een besluit dat verandert krijgt een nieuwe ADR.
 
+## 0. Leeswijzer (ADR-0000)
+
+Deze bijbel is een **kaart, geen territorium**: een verwijzende index + de harde invarianten. Detail staat in de ADR's/specs, niet hier. Elke ADR/spec/module/taakdoc draagt een vaste **`Raakt:`-regel** met forward-links naar wat het raakt (= de look-ahead: zie vóór je iets wijzigt wat het verderop raakt). Het register (§9) is daarmee een **traverseerbare index** die je van besluit naar besluit kunt aflopen; een korte `Raakt:`-keten = schone grenzen, een lange = een koppelings-smell. Open keuzes in taakdocs krijgen altijd **voorkeur + gevolg-van-afwijken** mee. Volledige conventie: **ADR-0000**.
+
 ## 1. Wat we bouwen
 
 Digitaal ALV-eigenaarportaal voor VvE's De Bij, náást de bestaande beheerapp. Eigenaar logt in (QR/toegangscode), ziet de open stemronde en stemt; de beheerkant (strak aan de bestaande ALV-STEM-APP) opent/activeert rondes, ziet voortgang, sluit, en toont de uitslag. Fase 1 = `alv_presentie_stemmen_app` (fysieke ALV-ondersteuning). Fase 2 = dit digitale portaal.
@@ -54,37 +58,41 @@ Geneste, **aan/uit-schakelbare** modules. Aanpak: modulaire monoliet in één re
 
 `vX.y.z` — X major/nieuwe functionaliteit·layout·architectuur, y minor/next-step, z patch. Versie in documentnaam en in `package.json` + git-tag; niet in elke bronbestandsnaam. ADR's genummerd en onveranderlijk.
 
-## 9. ADR-register
+## 9. ADR-register (traverseerbare index — ADR-0000)
 
-- ADR-0001 — Docker alleen dev/test/CI
-- ADR-0002 — Shared-hosting-architectuurregels (zes regels)
-- ADR-0003 — Databasekeuze (MariaDB 11.8.8 bevestigd)
-- ADR-0004 — OTAP-topologie + testdatastrategie
-- ADR-0005 — PII buiten release + provisioning
-- ADR-0006 — Bewaartermijnen + datamodel + stemvaststelling
-- ADR-0007 — Repo-scope (ALV_Digitaal = eigen repo) + coördinatie-topologie
-- ADR-0008 — Domeinregels: multi-VvE-stemrechten (PG + TF/NB, nooit samenvoegen), machtiging vervalt bij login, exacte rekenkunde
-- ADR-0009 — Quorummodel (VERVANGEN door ADR-0021): was vergadering-breed/bevroren; kernregel "grondslag = presentie, niet uitgebrachte stemmen" blijft
-- ADR-0010 — Stemregistratie: niet/te laat gestemd = onthouding (geauditeerd), gelijk aan blanco stemformulier; blanco+onthouding niet-beslissend
-- ADR-0011 — In-app stemkeuze: alleen Voor/Tegen (twee knoppen); onthouding (afgeleid) en blanco (fysiek formulier) alleen als resultaat
-- ADR-0012 — Secrets-locatie: configbestand buiten de webroot (chmod 600) per omgeving, via niet-geheime `SECRETS_FILE`; nooit in Git/artefact/.htaccess
-- ADR-0013 — CD-automatisering: acceptatie via handmatige `workflow_dispatch`; productie achter GitHub Environment + verplichte approval (Bas); SSH via deploy-key in Secrets. Agent-autorun = aparte track
-- ADR-0014 — Basisdatamodel: object (woning/plek) = anker, 1:1 breukdeel (= GBO-aandeel) en 1:1 eigenaarstitel; eigenaar mag meerdere objecten houden, elk apart gestemd (nooit samenvoegen); PG↔TF/NB administratief gekoppeld (1:0..n, gewichtloos); bron = TwinQ (`owners.js`)
-- ADR-0015 — Pijplijn-guardrails: geen extra LLM-revisor; deterministische state-lint (CI-gate + hook), tail-context, idempotente infra-provisioning — prerequisites voor onbemande autorun
-- ADR-0016 — Auth-model: magic-link-als-QR (gebonden token) + toegangscode-fallback + optionele roteerbare PIN (opt-in, ingebakken); geen e-mail-OTP als live-drempel; welkomstbrief geeft codes+PIN uit
-- ADR-0017 — Autorun: watcher-act() start de rol-runner; vangrails (kill-switch, loop-cap, stop-on-error→BLOCKED, deploy blijft mens); één notifier (exception-based, gededupliceerd, e-mail+push); attended-first
-- ADR-0018 — Stemronde-scope per VvE + één stemactie per eigenaar: ronde-scope = deelnemende splitsingen; stemgerechtigd bij ≥1 in-scope recht; één Voor/Tegen-keuze gefan-out naar al zijn in-scope rechten (eigen breukdeel, per VvE geteld), niet splitsbaar; quorum/2⁄3 per betrokken VvE; geen acclamatie
-- ADR-0019 — Rol-runners voor autorun: contract (stdin-context → één beurt → volgende READY, commit+push, schoon/in-sync, exit 0, nooit deploy). Codex=`codex exec -`, Claude=Claude Code headless (validatiebeurt), Mistral=deterministisch Node-integrator-script (Ollama alleen voor bestaande naamstap); Gemini geen lokale runner
-- ADR-0020 — Login-identiteit: stemmer = eigenaar (niet bewoner); één eigenaarstitel = één credential = één magic-link naar één primaire e-mail (default eerst-genoemde bij 2; code-fallback bij 0); datakwaliteitspoort bij setup; sub-accounts/bewonerfuncties = fase-later platform
-- ADR-0021 — Presentie & quorum (supersedes ADR-0009): presentie = login, telt monotoon (vertrek verlaagt quorum niet, uitloggen gelogd); quorum per ronde bij admin-activatie; stemknop alleen voor wie op activatiemoment is ingelogd (laatkomer pas volgende ronde); present-niet-gestemd/vertrokken = onthouding
-- ADR-0023 — PR-gate auto-advance: GitHub Action merget een groene pipeline-PR (CI+Gemini groen) en zet de baton READY_FOR_TEST→READY_FOR_VALIDATION; kill-switch `PIPELINE_AUTOMERGE` default uit; fail-safe (bij twijfel niets); nooit deploy/productie. Sluit het enige handmatige gat in de onbemande keten
-- ADR-0022 — Machtiging & stemformulier: twee stromen op één genummerd formulier; gemachtigde krijgt eigen QR/magic-link (naam+e-mail, ≥1 dag vooraf), eigenaarslink blijft actief; eigenaar-login vernietigt machtiging óf stemformulier onherstelbaar (breidt ADR-0008 uit); digitale intake + gemachtigde-UX geparkeerd
-- ADR-0024 — Frontend-architectuur eigenaar-portaal: vanilla/no-build, door de Node-app geserveerd onder `/deelnemen/`, sessietoken alleen in geheugen (geen browseropslag), polling met ETag/jitter, in-app alleen Voor/Tegen (ADR-0011) met server-side één-actie-fan-out (ADR-0018); **visuele stijl = Honigfabriek-huisstijl op `Platform/platform-tokens.css` (norm: `Platform/Platform_Stijlgids_v1.0.0.md`), tokens vendoren in de app**; scopegrens v0.1: eigenaar-deelnemen-flow met code-login; admin-UI/magic-link/gemachtigde later
-- ADR-0025 — GitSteward als apart deterministisch proces: enige git-schrijver naar `main` + enige houder van `GH_TOKEN`/netwerk; LLM-runners committen lokaal maar pushen niet (offline-sandboxbaar); steward loopt tussen elke stap met retry/backoff + stale-lock-opruiming; **verplichte block-finalize** (BLOCKED-baton+progress altijd gecommit+gepusht → geen dangling tree); alleen coördinatie auto naar main, nooit half-af productcode; vervangt de git-uitvoeringsdelen van ADR-0017/0019
+Elke entry: korte kern + **`Raakt:`** (forward-links = look-ahead). Loop de keten af om de gevolgen van een wijziging vooraf te zien; korte keten = schone grens, lange keten = koppelings-smell.
+
+- **ADR-0000** — Kennis-/documentatiearchitectuur: bijbel = index + invarianten, `Raakt:`-regel per stuk, register = traverseerbare index, ketenlengte = smell, voorkeur-met-gevolg in taakdocs. **Raakt:** bijbel.md · AGENTS.md · handoff-template · alle ADR's/specs.
+- **ADR-0001** — Docker alleen dev/test/CI. **Raakt:** ADR-0003 · ADR-0004.
+- **ADR-0002** — Shared-hosting-architectuurregels (zes regels; de meetlat). **Raakt:** ADR-0003.
+- **ADR-0003** — Databasekeuze (MariaDB 11.8.8 bevestigd), strikte per-verbinding `sql_mode`. **Raakt:** ADR-0001 · ADR-0002.
+- **ADR-0004** — OTAP-topologie + testdatastrategie. **Raakt:** ADR-0001 · ADR-0005.
+- **ADR-0005** — PII buiten release + provisioning + blokkerende scan-gate. **Raakt:** ADR-0004 · ADR-0007 (PII-voorwacht) · ADR-0013.
+- **ADR-0006** — Bewaartermijnen + datamodel + stemvaststelling. **Raakt:** ADR-0008 · ADR-0010 · ADR-0021.
+- **ADR-0007** — Repo-scope (ALV_Digitaal = eigen repo) + coördinatie-topologie. **Raakt:** ADR-0005 · ADR-0023 · ADR-0025.
+- **ADR-0008** — Domeinregels: multi-VvE-stemrechten (PG + TF/NB, nooit samenvoegen), machtiging vervalt bij login, exacte rekenkunde. **Raakt:** ADR-0014 · ADR-0018 · ADR-0022.
+- **ADR-0009** — Quorummodel — **VERVANGEN door ADR-0021**; kernregel "grondslag = presentie, niet uitgebrachte stemmen" blijft. **Raakt:** ADR-0021.
+- **ADR-0010** — Stemregistratie: niet/te laat gestemd = onthouding (geauditeerd), gelijk aan blanco; blanco+onthouding niet-beslissend. **Raakt:** ADR-0011 · ADR-0021.
+- **ADR-0011** — In-app stemkeuze: alleen Voor/Tegen (twee knoppen); onthouding (afgeleid) en blanco (fysiek) alleen als resultaat. **Raakt:** ADR-0010 · ADR-0018 · ADR-0024.
+- **ADR-0012** — Secrets-locatie: configbestand buiten de webroot (chmod 600) per omgeving via niet-geheime `SECRETS_FILE`; nooit in Git/artefact/.htaccess. **Raakt:** ADR-0002 · ADR-0013.
+- **ADR-0013** — CD-automatisering: acceptatie via handmatige `workflow_dispatch`; productie achter GitHub Environment + verplichte approval (Bas); SSH via deploy-key. **Raakt:** ADR-0005 · ADR-0012 · ADR-0026.
+- **ADR-0014** — Basisdatamodel: object = anker, 1:1 breukdeel + 1:1 eigenaarstitel; meerdere objecten per eigenaar apart gestemd; PG↔TF/NB administratief gekoppeld (gewichtloos); bron = TwinQ. **Raakt:** ADR-0006 · ADR-0008 · ADR-0018.
+- **ADR-0015** — Pijplijn-guardrails: deterministische state-lint (CI-gate + hook), tail-context, idempotente provisioning; prerequisites voor onbemande autorun. **Raakt:** ADR-0017 · ADR-0023 · ADR-0025 · ADR-0026.
+- **ADR-0016** — Auth-model: magic-link-als-QR (gebonden token) + toegangscode-fallback + optionele roteerbare PIN; geen e-mail-OTP als live-drempel. **Raakt:** ADR-0020 · ADR-0022.
+- **ADR-0017** — Autorun: watcher-act() start de rol-runner; vangrails (kill-switch, loop-cap, stop-on-error→BLOCKED, deploy blijft mens); één gededupliceerde notifier; attended-first. **Raakt:** ADR-0015 · ADR-0019 · ADR-0025.
+- **ADR-0018** — Stemronde-scope per VvE + één stemactie per eigenaar (gefan-out naar in-scope rechten, niet splitsbaar); quorum/2⁄3 per betrokken VvE; geen acclamatie. **Raakt:** ADR-0008 · ADR-0011 · ADR-0021.
+- **ADR-0019** — Rol-runners voor autorun: contract (stdin-context → één beurt → volgende READY, commit+push, schoon/in-sync, exit 0, nooit deploy). **Raakt:** ADR-0017 · ADR-0025.
+- **ADR-0020** — Login-identiteit: stemmer = eigenaar; één eigenaarstitel = één credential = één magic-link naar één primaire e-mail; datakwaliteitspoort bij setup. **Raakt:** ADR-0016 · ADR-0022.
+- **ADR-0021** — Presentie & quorum (**supersedes ADR-0009**): presentie = login, telt monotoon; quorum per ronde bij admin-activatie; laatkomer pas volgende ronde; present-niet-gestemd/vertrokken = onthouding. **Raakt:** ADR-0009 · ADR-0010 · ADR-0018.
+- **ADR-0022** — Machtiging & stemformulier: twee stromen op één genummerd formulier; gemachtigde krijgt eigen QR/magic-link; eigenaar-login vernietigt machtiging óf formulier onherstelbaar (**breidt ADR-0008 uit**). **Raakt:** ADR-0008 · ADR-0016 · ADR-0020.
+- **ADR-0023** — PR-gate auto-advance: Action merget een groene pipeline-PR en zet de baton READY_FOR_TEST→READY_FOR_VALIDATION; kill-switch `PIPELINE_AUTOMERGE` default uit; fail-safe; nooit deploy. **Raakt:** ADR-0015 · ADR-0025 · ADR-0026.
+- **ADR-0024** — Frontend-architectuur eigenaar-portaal: vanilla/no-build onder `/deelnemen/`, sessietoken alleen in geheugen, polling met ETag/jitter, in-app alleen Voor/Tegen met server-side fan-out; Honigfabriek-huisstijl op `platform-tokens.css`. **Raakt:** ADR-0011 · ADR-0018 · `Platform/Platform_Stijlgids_v1.0.0.md`.
+- **ADR-0025** — GitSteward als apart deterministisch proces: enige git-schrijver naar `main` + enige houder van `GH_TOKEN`; LLM-runners committen lokaal maar pushen niet; verplichte block-finalize; **vervangt de git-uitvoeringsdelen van ADR-0017/0019**. **Raakt:** ADR-0007 · ADR-0017 · ADR-0019 · ADR-0023.
+- **ADR-0026** — CI/CD-herinrichting github-native (gefaseerd): 1 sprint = 1 PR (branch alleen als merge-source), guardrails vanuit vertrouwde `main`, native auto-merge pas ná bewezen gates, deploy blijft mens. **Raakt:** ADR-0013 · ADR-0015 · ADR-0023 · ADR-0025.
 
 ## 10. Sleuteldocumenten
 
-`docs/OTAP_opzet_v1.0.0.md` (OTAP-plan) · `docs/Architectuur_en_infravoorstel_v0.2.0.md` (architectuur) · `docs/Mistral_Lokaal_setup_runbook_v1.0.0.md` · `docs/gates/handoff-template.md` (6-delig overdrachtsformaat) · `docs/gates/Codex-taak-10.2_T-run-en-CI-gates.md` · `AGENTS.md` (pijplijnregels) · `../Platform_Stijlgids_v1.0.0.md` + `../platform-tokens.css` (platform-huisstijl, honigfabriek).
+`docs/ADR/ADR-0000-kennis-en-documentatiearchitectuur.md` (doc-conventie) · `docs/OTAP_opzet_v1.0.0.md` (OTAP-plan) · `docs/Architectuur_en_infravoorstel_v0.2.0.md` (architectuur) · `docs/Mistral_Lokaal_setup_runbook_v1.0.0.md` · `docs/gates/handoff-template.md` (6-delig overdrachtsformaat) · `docs/gates/Codex-taak-10.2_T-run-en-CI-gates.md` · `AGENTS.md` (pijplijnregels) · `../Platform_Stijlgids_v1.0.0.md` + `../platform-tokens.css` (platform-huisstijl, honigfabriek).
 
 ## 11. Openstaande beslispunten
 
