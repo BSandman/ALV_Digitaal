@@ -1,12 +1,12 @@
 ---
 sprint: 13
-state: READY_FOR_TEST
-owner: gemini
-since: 2026-08-23T15:42:10Z
-next: gemini
-action_required_by: none
-blocked: false
-note: "PR #23 staat exact op f6affead4ffd; test GitSteward-CAS, main-observatie, PR/SHA-resolve, 1-PR-invariant en noodpad, native auto-merge blijft uit."
+state: BLOCKED
+owner: bas
+since: 2026-08-23T15:44:04Z
+next: none
+action_required_by: bas
+blocked: true
+note: "PR #23 is onverwacht door github-actions[bot] gemerged terwijl P0a auto-merge uit vereiste; setup-lint behandelde een variabele-API-403 foutief als unset. Bas: pauzeer auto-merge en besluit herstel."
 ---
 
 # handoff.md — de estafettestok
