@@ -185,6 +185,63 @@ def run_git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+class MainObservation:
+    """Read remote ``main`` from a clean detached worktree, never the runner tree."""
+
+    def __init__(self, repo: Path, *, git_runner=run_git) -> None:
+        self.repo = repo.resolve()
+        self.git_runner = git_runner
+        self._temporary: tempfile.TemporaryDirectory[str] | None = None
+        self.path: Path | None = None
+
+    def _git(self, repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        result = self.git_runner(repo, *args)
+        if result.returncode:
+            raise AutorunError("schone main-observatie kon niet worden bijgewerkt")
+        return result
+
+    def open(self) -> "MainObservation":
+        if self.path is not None:
+            return self
+        self._temporary = tempfile.TemporaryDirectory(prefix="alv-main-observation-")
+        self.path = Path(self._temporary.name) / "main"
+        self._git(self.repo, "fetch", "--quiet", "origin", "main")
+        self._git(
+            self.repo, "worktree", "add", "--quiet", "--detach", "--force",
+            str(self.path), "origin/main",
+        )
+        self.refresh()
+        return self
+
+    def refresh(self) -> tuple[dict[str, str], str]:
+        if self.path is None:
+            raise AutorunError("main-observatie is niet geopend")
+        self._git(self.repo, "fetch", "--quiet", "origin", "main")
+        self._git(self.path, "reset", "--hard", "origin/main")
+        status = self._git(self.path, "status", "--porcelain").stdout.strip()
+        if status:
+            raise AutorunError("main-observatie is niet schoon")
+        sha = self._git(self.path, "rev-parse", "HEAD").stdout.strip()
+        if not re.fullmatch(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})", sha):
+            raise AutorunError("main-observatie heeft geen geldige SHA")
+        validate_file(self.path / "handoff.md")
+        return read_frontmatter(self.path / "handoff.md"), sha.lower()
+
+    def close(self) -> None:
+        if self.path is not None:
+            self.git_runner(self.repo, "worktree", "remove", "--force", str(self.path))
+        self.path = None
+        if self._temporary is not None:
+            self._temporary.cleanup()
+            self._temporary = None
+
+    def __enter__(self) -> "MainObservation":
+        return self.open()
+
+    def __exit__(self, exc_type, exc, traceback) -> None:
+        self.close()
+
+
 def read_frontmatter(path: Path = HANDOFF) -> dict[str, str]:
     try:
         return parse_frontmatter(path.read_text(encoding="utf-8-sig"))
@@ -250,12 +307,14 @@ def build_context(
     progress_tail: int = DEFAULT_PROGRESS_TAIL,
     repo: Path = REPO,
     bijbel_mode: str | None = None,
+    coordination_repo: Path | None = None,
 ) -> str:
     mode = bijbel_mode or default_bijbel_mode(role)
     if mode not in BIJBEL_MODES:
         raise ValueError(f"bijbel-mode moet een van {', '.join(BIJBEL_MODES)} zijn")
     sections: list[str] = []
-    handoff = (repo / "handoff.md").read_text(encoding="utf-8-sig").rstrip("\r\n")
+    coordination = coordination_repo or repo
+    handoff = (coordination / "handoff.md").read_text(encoding="utf-8-sig").rstrip("\r\n")
     sprint = (repo / "sprint.md").read_text(encoding="utf-8-sig").rstrip("\r\n")
     sections.append(f"===== handoff.md (volledig) =====\n{handoff}")
     sections.append(f"===== sprint.md (volledig) =====\n{sprint}")
@@ -273,7 +332,7 @@ def build_context(
         content = (repo / relative).read_text(encoding="utf-8-sig").rstrip("\r\n")
         sections.append(f"===== {relative} (rol-taakdoc) =====\n{content}")
 
-    progress = tail_text(repo / "progress.md", progress_tail)
+    progress = tail_text(coordination / "progress.md", progress_tail)
     sections.append(f"===== progress.md (laatste {progress_tail} regels) =====\n{progress}")
     return "\n\n".join(sections) + "\n"
 
@@ -283,16 +342,20 @@ def build_runner_input(
     progress_tail: int = DEFAULT_PROGRESS_TAIL,
     repo: Path = REPO,
     bijbel_mode: str | None = None,
+    coordination_repo: Path | None = None,
 ) -> str:
     instructions = (
         f"Voer exact één handoff-beurt uit als rol {role}. Volg README.md en AGENTS.md; "
         "de watcher heeft de race-guard al voltooid, dus claim een READY-beurt direct zonder "
         "een tweede wachttijd of hervat je eigen IN_PROGRESS-beurt. Voer alleen je opgedragen "
-        "werk uit en sluit af met een geldige handoff + progress-commit die je pusht. "
+        "werk uit en push alleen de productbranch-commit(s). Laat handoff.md en progress.md "
+        "oncommitted achter voor de GitSteward; commit of push coördinatie nooit op de PR-head. "
         "Voer nooit zelf een deploy uit; zet voor een menselijke deploy action_required_by: bas. "
         "Bij twijfel of afwijking: BLOCKED voor Bas.\n\n"
     )
-    return instructions + build_context(role, progress_tail, repo, bijbel_mode)
+    return instructions + build_context(
+        role, progress_tail, repo, bijbel_mode, coordination_repo=coordination_repo
+    )
 
 
 def load_runner_command(role: str, environ: Mapping[str, str] | None = None) -> list[str]:
@@ -401,13 +464,53 @@ def run_git_steward(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def sync_coordination(repo: Path = REPO, steward_runner=run_git_steward) -> None:
+def sync_coordination(
+    expected_from: str,
+    source_sha: str,
+    repo: Path = REPO,
+    steward_runner=run_git_steward,
+) -> None:
     try:
-        result = steward_runner(repo, "sync")
+        result = steward_runner(
+            repo, "sync", "--expected-from", expected_from, "--source-sha", source_sha
+        )
     except OSError as exc:
         raise AutorunError("GitSteward kon niet worden gestart") from exc
     if result.returncode != 0:
         raise AutorunError("GitSteward kon de coördinatie na retries niet synchroniseren")
+
+
+def claim_runner_turn(
+    role: str,
+    *,
+    observed_repo: Path,
+    source_sha: str,
+    repo: Path = REPO,
+    steward_runner=run_git_steward,
+    git_runner=run_git,
+) -> None:
+    ready, in_progress = ROLE_STATE[role]
+    original = (observed_repo / "handoff.md").read_text(encoding="utf-8-sig")
+    values = parse_frontmatter(original)
+    if not my_turn(values, role):
+        raise AutorunError("claim geweigerd: geobserveerde baton is niet meer READY voor deze rol")
+    claimed = _frontmatter_with_updates(
+        original,
+        {
+            "state": in_progress,
+            "owner": role,
+            "since": utc_now(),
+            "action_required_by": "none",
+            "blocked": "false",
+        },
+    )
+    _write_text_atomic(repo / "handoff.md", claimed)
+    _write_text_atomic(
+        repo / "progress.md",
+        (observed_repo / "progress.md").read_text(encoding="utf-8-sig"),
+    )
+    sync_coordination(ready, source_sha, repo, steward_runner)
+    verify_post_steward(repo, git_runner)
 
 
 def mark_blocked(
@@ -565,6 +668,7 @@ def verify_completed_turn(
     *,
     repo: Path = REPO,
     git_runner=run_git,
+    source_sha: str | None = None,
 ) -> dict[str, str]:
     handoff_path = repo / "handoff.md"
     try:
@@ -578,12 +682,37 @@ def verify_completed_turn(
         raise AutorunError("runner liet de beurt op IN_PROGRESS achter")
 
     dirty = git_runner(repo, "status", "--porcelain")
-    if dirty.returncode != 0 or dirty.stdout.strip():
-        raise AutorunError("runner liet ongecommitteerde wijzigingen achter")
+    if dirty.returncode != 0:
+        raise AutorunError("git-status na runner faalde")
+    dirty_paths = {
+        line[3:].strip().replace("\\", "/")
+        for line in dirty.stdout.splitlines()
+        if len(line) >= 4
+    }
+    unexpected = sorted(dirty_paths - {"handoff.md", "progress.md"})
+    if unexpected:
+        raise AutorunError(
+            f"runner liet ongecommitteerde productwijzigingen achter: {', '.join(unexpected)}"
+        )
+    if source_sha:
+        coordination_commit = git_runner(
+            repo, "diff", "--quiet", source_sha, "HEAD", "--", "handoff.md", "progress.md"
+        )
+        if coordination_commit.returncode != 0:
+            raise AutorunError("runner committe coördinatie op de PR-head")
     sync = git_runner(repo, "rev-list", "--left-right", "--count", "HEAD...@{u}")
     if sync.returncode != 0 or sync.stdout.replace("\t", " ").split() != ["0", "0"]:
         raise AutorunError("runner liet lokale en remote branch uit sync of zonder upstream achter")
     return final
+
+
+def verify_post_steward(repo: Path = REPO, git_runner=run_git) -> None:
+    dirty = git_runner(repo, "status", "--porcelain")
+    if dirty.returncode != 0 or dirty.stdout.strip():
+        raise AutorunError("GitSteward liet de runner-worktree niet schoon achter")
+    sync = git_runner(repo, "rev-list", "--left-right", "--count", "HEAD...@{u}")
+    if sync.returncode != 0 or sync.stdout.replace("\t", " ").split() != ["0", "0"]:
+        raise AutorunError("productbranch is na GitSteward niet in sync")
 
 
 def execute_autorun_turn(
@@ -594,15 +723,37 @@ def execute_autorun_turn(
     bijbel_mode: str | None = None,
     deadline: float,
     repo: Path = REPO,
+    coordination_repo: Path | None = None,
+    source_sha: str | None = None,
     git_runner=run_git,
     steward_runner=run_git_steward,
     notifier_runner=run_notifier,
     log_path: Path | None = None,
 ) -> str:
     handoff_path = repo / "handoff.md"
-    original_text = handoff_path.read_text(encoding="utf-8-sig")
-    initial = read_frontmatter(handoff_path)
+    observed_repo = coordination_repo or repo
+    original_text = (observed_repo / "handoff.md").read_text(encoding="utf-8-sig")
+    initial = read_frontmatter(observed_repo / "handoff.md")
     initial_state = initial.get("state", "ONBEKEND")
+    observed_sha = source_sha
+    if observed_sha is None:
+        observed_sha_result = git_runner(observed_repo, "rev-parse", "HEAD")
+        observed_sha = observed_sha_result.stdout.strip() if observed_sha_result.returncode == 0 else ""
+    if not re.fullmatch(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})", observed_sha or ""):
+        raise AutorunError("runnerstart mist de exacte geobserveerde main-SHA")
+    branch_head_result = git_runner(repo, "rev-parse", "HEAD")
+    branch_start_sha = (
+        branch_head_result.stdout.strip()
+        if branch_head_result is not None and branch_head_result.returncode == 0
+        else ""
+    )
+    if not re.fullmatch(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})", branch_start_sha):
+        branch_start_sha = observed_sha
+    _write_text_atomic(handoff_path, original_text)
+    _write_text_atomic(
+        repo / "progress.md",
+        (observed_repo / "progress.md").read_text(encoding="utf-8-sig"),
+    )
     remaining = deadline - time.monotonic()
     if remaining <= 0:
         mark_blocked(
@@ -619,15 +770,20 @@ def execute_autorun_turn(
     try:
         result = act(
             command,
-            build_runner_input(role, progress_tail, repo, bijbel_mode),
+            build_runner_input(
+                role, progress_tail, repo, bijbel_mode, coordination_repo=observed_repo
+            ),
             repo=repo,
             timeout=remaining,
             pause_path=repo / "autorun.paused",
         )
         if result.returncode != 0:
             raise AutorunError(f"runner eindigde met exitcode {result.returncode}")
-        final = verify_completed_turn(role, initial_state, repo=repo, git_runner=git_runner)
-        sync_coordination(repo, steward_runner)
+        final = verify_completed_turn(
+            role, initial_state, repo=repo, git_runner=git_runner, source_sha=branch_start_sha
+        )
+        sync_coordination(initial_state, observed_sha, repo, steward_runner)
+        verify_post_steward(repo, git_runner)
     except AutorunPaused as exc:
         current = read_frontmatter(handoff_path)
         append_activity(
@@ -667,6 +823,24 @@ def execute_autorun_turn(
     return "success"
 
 
+def run_pipeline_setup_guard(repo: Path = REPO) -> None:
+    metadata = repo / "config" / "pipeline-sprint.json"
+    if not metadata.is_file():
+        return
+    result = subprocess.run(
+        [
+            sys.executable, str(repo / "scripts" / "pipeline_guard.py"), "setup",
+            "--metadata", str(metadata), "--repository", "BSandman/ALV_Digitaal",
+        ],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode:
+        raise AutorunError("pipeline setup-lint blokkeerde de sprintstart")
+
+
 def run_session(
     role: str,
     *,
@@ -680,6 +854,7 @@ def run_session(
     once: bool = False,
     race_guard_seconds: int = RACE_GUARD_SECONDS,
     repo: Path = REPO,
+    observation_factory=MainObservation,
 ) -> int:
     started_monotonic = time.monotonic()
     started_at = utc_now()
@@ -689,12 +864,27 @@ def run_session(
     log_path = repo / "autorun.log"
     paused_logged = False
     fallback_handoff: str | None = None
+    if pause_path.exists() and once:
+        if autorun:
+            write_runtime_status(
+                status_path, running=False, paused=True, role=role, pid=os.getpid(),
+                turns=turns, max_turns=max_turns, max_wallclock=max_wallclock,
+                started_at=started_at, last_turn_at=None,
+            )
+        return 0
+    observation = observation_factory(repo)
     try:
-        candidate = (repo / "handoff.md").read_text(encoding="utf-8-sig")
+        observation.open()
+        assert observation.path is not None
+        candidate = (observation.path / "handoff.md").read_text(encoding="utf-8-sig")
         validate_values(parse_frontmatter(candidate))
         fallback_handoff = candidate
-    except (OSError, UnicodeError, HandoffValidationError):
-        pass
+    except (OSError, UnicodeError, HandoffValidationError, AutorunError) as exc:
+        mark_blocked(
+            role, str(exc), repo=repo, fallback_handoff=fallback_handoff, log_path=log_path
+        )
+        observation.close()
+        return 1
 
     if autorun:
         try:
@@ -754,19 +944,20 @@ def run_session(
                 append_activity(role, "PAUSED", "SESSIE", "kill-switch opgeheven", log_path=log_path)
                 paused_logged = False
 
-            pull = run_git(repo, "pull", "--quiet", "--ff-only")
-            if pull.returncode != 0:
-                print(f"[{role}] git pull faalde — watcher stopt.", file=sys.stderr)
+            try:
+                fm, observed_sha = observation.refresh()
+            except (AutorunError, HandoffValidationError) as exc:
+                print(f"[{role}] main-observatie faalde — watcher stopt.", file=sys.stderr)
                 mark_blocked(
                     role,
-                    "git pull faalde",
+                    str(exc),
                     repo=repo,
                     fallback_handoff=fallback_handoff,
                     log_path=log_path,
                 )
                 return 1
-            fm = read_frontmatter(repo / "handoff.md")
-            fallback_handoff = (repo / "handoff.md").read_text(encoding="utf-8-sig")
+            assert observation.path is not None
+            fallback_handoff = (observation.path / "handoff.md").read_text(encoding="utf-8-sig")
 
             if fm.get("state") == "BLOCKED":
                 print(f"[{role}] BLOCKED — wacht op Bas. note={fm.get('note')!r}")
@@ -776,24 +967,55 @@ def run_session(
                     print(f"[{role}] mijn beurt gedetecteerd — race-guard {race_guard_seconds}s...")
                     if not wait_for_race_guard(race_guard_seconds, pause_path):
                         continue
-                    pull = run_git(repo, "pull", "--quiet", "--ff-only")
-                    if pull.returncode != 0:
-                        print(f"[{role}] tweede git pull faalde — watcher stopt.", file=sys.stderr)
+                    try:
+                        fm, observed_sha = observation.refresh()
+                    except (AutorunError, HandoffValidationError) as exc:
+                        print(f"[{role}] tweede main-observatie faalde — watcher stopt.", file=sys.stderr)
                         mark_blocked(
                             role,
-                            "tweede git pull na race-guard faalde",
+                            str(exc),
                             repo=repo,
                             fallback_handoff=fallback_handoff,
                             log_path=log_path,
                         )
                         return 1
-                    fm = read_frontmatter(repo / "handoff.md")
-                    fallback_handoff = (repo / "handoff.md").read_text(encoding="utf-8-sig")
+                    assert observation.path is not None
+                    fallback_handoff = (observation.path / "handoff.md").read_text(encoding="utf-8-sig")
                 else:
                     print(f"[{role}] hervat eigen IN_PROGRESS-beurt zonder nieuwe race-guard.")
                 if my_turn(fm, role) or (autorun and role_in_progress(fm, role)):
                     if autorun:
                         assert command is not None
+                        if ready_turn and role == "codex":
+                            try:
+                                run_pipeline_setup_guard(repo)
+                            except AutorunError as exc:
+                                mark_blocked(
+                                    role, str(exc), repo=repo,
+                                    fallback_handoff=fallback_handoff, log_path=log_path,
+                                )
+                                return 1
+                        if ready_turn:
+                            try:
+                                assert observation.path is not None
+                                claim_runner_turn(
+                                    role,
+                                    observed_repo=observation.path,
+                                    source_sha=observed_sha,
+                                    repo=repo,
+                                )
+                                fm, observed_sha = observation.refresh()
+                                if not role_in_progress(fm, role):
+                                    raise AutorunError("GitSteward-claim werd niet zichtbaar op main")
+                                fallback_handoff = (
+                                    observation.path / "handoff.md"
+                                ).read_text(encoding="utf-8-sig")
+                            except (AutorunError, HandoffValidationError) as exc:
+                                mark_blocked(
+                                    role, str(exc), repo=repo,
+                                    fallback_handoff=fallback_handoff, log_path=log_path,
+                                )
+                                return 1
                         deadline = started_monotonic + max_wallclock
                         outcome = execute_autorun_turn(
                             role,
@@ -802,6 +1024,8 @@ def run_session(
                             bijbel_mode=bijbel_mode,
                             deadline=deadline,
                             repo=repo,
+                            coordination_repo=observation.path,
+                            source_sha=observed_sha,
                             log_path=log_path,
                         )
                         if outcome != "paused":
@@ -835,7 +1059,13 @@ def run_session(
                             return 0
                     else:
                         print(f"[{role}] AAN ZET — state={fm.get('state')} note={fm.get('note')!r}")
-                        print(build_context(role, progress_tail, repo, bijbel_mode), end="")
+                        print(
+                            build_context(
+                                role, progress_tail, repo, bijbel_mode,
+                                coordination_repo=observation.path,
+                            ),
+                            end="",
+                        )
                 else:
                     print(f"[{role}] beurt gewijzigd tijdens guard — afgebroken.")
             if once:
@@ -851,6 +1081,7 @@ def run_session(
         )
         return 1
     finally:
+        observation.close()
         if autorun:
             try:
                 write_runtime_status(

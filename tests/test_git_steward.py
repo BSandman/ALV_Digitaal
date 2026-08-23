@@ -85,6 +85,9 @@ class GitFixture:
     def remote_count(self) -> int:
         return int(git(self.remote, "rev-list", "--count", "main").stdout.strip())
 
+    def remote_sha(self) -> str:
+        return git(self.remote, "rev-parse", "main").stdout.strip()
+
     def steward(self, **kwargs):
         return steward_module.GitSteward(
             self.work,
@@ -96,19 +99,23 @@ class GitFixture:
 
 
 class RacingSteward(steward_module.GitSteward):
-    def __init__(self, *args, competing_clone: Path, **kwargs) -> None:
+    def __init__(self, *args, competing_clone: Path, race_action=None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.competing_clone = competing_clone
+        self.race_action = race_action
         self.push_attempts = 0
 
     def _push_once(self, checkout: Path) -> None:
         self.push_attempts += 1
         if self.push_attempts == 1:
-            product = self.competing_clone / "product.txt"
-            product.write_text("release-v2\n", encoding="utf-8")
-            git(self.competing_clone, "add", "product.txt")
-            git(self.competing_clone, "commit", "-m", "concurrent product commit")
-            git(self.competing_clone, "push", "origin", "main")
+            if self.race_action:
+                self.race_action(self.competing_clone)
+            else:
+                product = self.competing_clone / "product.txt"
+                product.write_text("release-v2\n", encoding="utf-8")
+                git(self.competing_clone, "add", "product.txt")
+                git(self.competing_clone, "commit", "-m", "concurrent product commit")
+                git(self.competing_clone, "push", "origin", "main")
         super()._push_once(checkout)
 
 
@@ -125,7 +132,9 @@ class GitStewardTests(unittest.TestCase):
             (fixture.work / "handoff.md").write_text(updated, encoding="utf-8")
             (fixture.work / "progress.md").write_text("# Progress\n- core gereed\n", encoding="utf-8")
 
-            changed = fixture.steward().sync()
+            changed = fixture.steward().sync(
+                expected_from="DEV_IN_PROGRESS", source_sha=fixture.remote_sha()
+            )
 
             self.assertTrue(changed)
             self.assertIn("READY_FOR_TEST", fixture.remote_text("handoff.md"))
@@ -197,7 +206,7 @@ class GitStewardTests(unittest.TestCase):
             )
             self.assertTrue(lock.exists())
 
-    def test_non_fast_forward_push_recovers_with_rebase_retry(self) -> None:
+    def test_non_fast_forward_reloads_fresh_main_without_rebasing_old_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as empty_home, tempfile.TemporaryDirectory() as directory, patch.dict(
             os.environ,
             {
@@ -223,7 +232,8 @@ class GitStewardTests(unittest.TestCase):
                 process_checker=lambda: False,
             )
 
-            self.assertTrue(steward.sync())
+            source_sha = fixture.remote_sha()
+            self.assertTrue(steward.sync(expected_from="DEV_IN_PROGRESS", source_sha=source_sha))
             self.assertEqual(steward.push_attempts, 2)
             self.assertEqual(fixture.remote_text("product.txt"), "release-v2\n")
             self.assertIn("coordination", fixture.remote_text("progress.md"))
@@ -236,12 +246,101 @@ class GitStewardTests(unittest.TestCase):
             self.assertEqual(environment["GIT_COMMITTER_NAME"], steward_module.STEWARD_NAME)
             self.assertEqual(environment["GIT_COMMITTER_EMAIL"], steward_module.STEWARD_EMAIL)
 
-            bad_snapshots = {
-                "handoff.md": (fixture.work / "handoff.md").read_bytes(),
-                "progress.md": b"# Progress\n- ontbreekt in HEAD\n",
-            }
-            with self.assertRaisesRegex(steward_module.GitStewardError, "fail-closed"):
-                steward._verify_coordination_head(fixture.work, bad_snapshots)
+            self.assertNotIn("rebase", git(fixture.remote, "log", "--format=%s", "main").stdout.lower())
+
+    def test_stale_source_state_and_invalid_jump_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = GitFixture(Path(directory))
+            source_sha = fixture.remote_sha()
+            invalid = HANDOFF.replace("DEV_IN_PROGRESS", "READY_FOR_VALIDATION").replace(
+                "owner: codex", "owner: claude"
+            )
+            (fixture.work / "handoff.md").write_text(invalid, encoding="utf-8")
+            with self.assertRaisesRegex(steward_module.GitStewardError, "ongeldige sprong"):
+                fixture.steward().sync(expected_from="DEV_IN_PROGRESS", source_sha=source_sha)
+
+            (fixture.work / "handoff.md").write_text(
+                HANDOFF.replace("DEV_IN_PROGRESS", "READY_FOR_TEST").replace(
+                    "owner: codex", "owner: gemini"
+                ), encoding="utf-8"
+            )
+            remote_handoff = fixture.seed / "handoff.md"
+            remote_handoff.write_text(
+                HANDOFF.replace("DEV_IN_PROGRESS", "BLOCKED")
+                .replace("owner: codex", "owner: bas")
+                .replace("next: gemini", "next: none")
+                .replace("action_required_by: none", "action_required_by: bas")
+                .replace("blocked: false", "blocked: true"),
+                encoding="utf-8",
+            )
+            git(fixture.seed, "add", "handoff.md")
+            git(fixture.seed, "commit", "-m", "concurrent state transition")
+            git(fixture.seed, "push", "origin", "main")
+            with self.assertRaisesRegex(steward_module.GitStewardError, "stale source-state"):
+                fixture.steward().sync(expected_from="DEV_IN_PROGRESS", source_sha=source_sha)
+
+    def test_target_already_reached_is_idempotent_noop(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = GitFixture(Path(directory))
+            source_sha = fixture.remote_sha()
+            target = HANDOFF.replace("DEV_IN_PROGRESS", "READY_FOR_TEST").replace(
+                "owner: codex", "owner: gemini"
+            )
+            progress = "# Progress\n- codex gereed\n"
+            (fixture.work / "handoff.md").write_text(target, encoding="utf-8")
+            (fixture.work / "progress.md").write_text(progress, encoding="utf-8")
+            (fixture.seed / "handoff.md").write_text(target, encoding="utf-8")
+            (fixture.seed / "progress.md").write_text(progress, encoding="utf-8")
+            git(fixture.seed, "add", "handoff.md", "progress.md")
+            git(fixture.seed, "commit", "-m", "target reached elsewhere")
+            git(fixture.seed, "push", "origin", "main")
+            before = fixture.remote_count()
+
+            changed = fixture.steward().sync(
+                expected_from="DEV_IN_PROGRESS", source_sha=source_sha
+            )
+
+            self.assertFalse(changed)
+            self.assertEqual(fixture.remote_count(), before)
+
+    def test_concurrent_progress_append_is_preserved_with_local_append(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = GitFixture(Path(directory))
+            competing = Path(directory) / "competing-progress"
+            git(Path(directory), "clone", "--quiet", str(fixture.remote), str(competing))
+            git(competing, "config", "user.name", "Competitor")
+            git(competing, "config", "user.email", "competitor@example.invalid")
+            source_sha = fixture.remote_sha()
+            (fixture.work / "handoff.md").write_text(
+                HANDOFF.replace("DEV_IN_PROGRESS", "READY_FOR_TEST").replace(
+                    "owner: codex", "owner: gemini"
+                ), encoding="utf-8"
+            )
+            (fixture.work / "progress.md").write_text(
+                "# Progress\n- lokale codex-regel\n", encoding="utf-8"
+            )
+
+            def append_competing_progress(repo: Path) -> None:
+                (repo / "progress.md").write_text(
+                    "# Progress\n- concurrerende regel\n", encoding="utf-8"
+                )
+                git(repo, "add", "progress.md")
+                git(repo, "commit", "-m", "concurrent progress append")
+                git(repo, "push", "origin", "main")
+
+            steward = RacingSteward(
+                fixture.work,
+                competing_clone=competing,
+                race_action=append_competing_progress,
+                attempts=3,
+                backoff_seconds=0,
+                sleeper=lambda _: None,
+                process_checker=lambda: False,
+            )
+            self.assertTrue(steward.sync(expected_from="DEV_IN_PROGRESS", source_sha=source_sha))
+            remote_progress = fixture.remote_text("progress.md")
+            self.assertIn("concurrerende regel", remote_progress)
+            self.assertIn("lokale codex-regel", remote_progress)
 
     def test_retry_uses_three_attempts_with_exponential_backoff(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
