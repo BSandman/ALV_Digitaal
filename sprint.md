@@ -1,31 +1,22 @@
-# sprint.md — Sprint 10: Eigenaar-frontend v0.1 (deelnemen-UI, mobiel-eerst)
+# sprint.md — Sprint 13: CI/CD-hardening P0a (liveness/correctheid)
 
-**Doel:** het eerste zichtbare Fase-2-product — een door de Node-app geserveerde **eigenaar-UI** (mobiel-eerst) waarmee een eigenaar kan **inloggen (code-fallback) → de open ronde zien → Voor/Tegen stemmen (wijzigbaar tot sluiting) → bevestiging zien**, met polling volgens ADR-0002. Architectuur/scopegrens: **ADR-0024**. Spec: **`docs/gates/Codex-taak-frontend-eigenaar.md`**. Visuele + interactie-referentie: **`Platform/_design-prestage/deelnemen/deelnemen-v0.1.html`** (klikbaar, Honigfabriek-huisstijl, gesimuleerde data — akkoord als v0.1-milestone; bewust buiten de repo).
+**Doel:** de pijplijn **correct en observeerbaar** maken — de eerste, plan-agnostische fase van de CI/CD-herinrichting (**ADR-0026**). Een betrouwbare `main`-observatie, echte compare-and-swap in de GitSteward, exacte PR/SHA-identiteit, de 1-sprint-1-PR-invariant hard afgedwongen, en een noodpad voor een bewegende `main`. **Native auto-merge gaat NIET aan** (merge-enabler off; attended exact-SHA-merge) — dat is P0b. Detail: `Platform/_design-prestage/cicd/CICD-herontwerp-DEFINITIEF.md` (P0a). Spec: `docs/gates/Codex-taak-cicd-p0a.md`.
 
-> **Attended, geen deploy.** Reguliere feature-sprint via de PR-route; productcode uitsluitend op de feature-branch, nooit rechtstreeks naar `main`. Deploy naar acceptatie is een aparte, latere menselijke poort (ADR-0013).
+> **Zelf-modificerend + attended.** Deze sprint wijzigt `git_steward.py`/`watch_handoff.py`/de setup-lint die de beurten zelf draaien. Draai `--max-turns 1` met Bas erbij; **watchers op `main`** (niet op de feature-branch — de Sprint-10-les); branch = **`agent/sprint-13-cicd-p0a`** (niet `feat/`); merge attended en exact op SHA. Een begeleide beurt moet schoon + in-sync eindigen voor je op de nieuwe steward leunt.
 
 ## Cadans — per blok
-
 | Blok | Rol | Watcher | Inhoud |
 |---|---|---|---|
-| 1 | **Codex** (dev) | `--role codex` | statische serving + `app/public/deelnemen/`-UI (login→ronde→stem→bevestig), één-actie-fan-out, gevendorde tokens; tests; PR op `feat/sprint-10-frontend-eigenaar` |
+| 1 | **Codex** (dev) | `--role codex` (op main) | GitSteward-CAS + testset, main-observatie, PR/SHA-verificatie, 1-PR-invariant, noodpad; PR op `agent/sprint-13-cicd-p0a` |
 | 2 | *auto* | — | CI-gates + Gemini-review op de PR |
-| 3 | **Claude** (validatie) | `--role claude` | Toets tegen ADR-0024/0011/0018/0021/0002 + huisstijl (gevendorde tokens, geen token-at-rest, row-level isolatie) |
-| 4 | **Mistral** (integratie) | `--role mistral` | Gates; **geen deploy** |
+| 3 | **Claude** (validatie) | Cowork | Toets tegen ADR-0026 + de P0a-acceptatiecriteria |
+| 4 | **Mistral** (integratie) | `--role mistral` (op main) | Gates; **attended exact-SHA-merge**; geen deploy |
 
-## Scope
+## Scope (in) — acceptatiecriteria in het taakdoc
+Main-observatie (aparte schone worktree), GitSteward echte CAS + idempotente transitie + concurrentie-/idempotentie-testset, exacte PR-nummer/SHA-verificatie (0/1/>1-gedrag), 1-sprint-1-PR setup-lint-invariant, noodpad voor een bewegende `main`. Merge-enabler op `off`.
 
-- **In:** door Node geserveerde eigenaar-UI (login code-fallback, wachtscherm/rondescherm met ETag+jitter-polling, Voor/Tegen-stem wijzigbaar tot sluiting, bevestiging), server-side één-actie-fan-out (ADR-0018), veilige statische serving, mobiel-eerst + basis-a11y, verplicht op de gevendorde Honigfabriek-tokens.
-- **Uit (latere sprints):** admin/voorzitter-frontend (ronde activeren/sluiten/vaststellen — aparte **tablet/pc-view**) · magic-link/QR + PIN · gemachtigde-UX · sessieherstel na herlaad · meerdere bezorg-e-mails · deploy.
+## Scope (uit) — P0b of later
+Privileged/unprivileged workflow-split, echte Gemini-verdict-check, PII context-aware gate, native auto-merge activeren, Environment/deploy-poort, dedup-notifier, lease, labels-migratie, validatie-voor-merge.
 
-## Definition of done
-
-- End-to-end happy path op T (verse MariaDB 11.8.8): code-login → open ronde → Voor → bevestiging; `GET vote` toont de keuze; keuze **wijzigbaar** zolang de ronde open is (nieuwe `POST vote` overschrijft atomair, geen dubbeltelling).
-- Fan-out klopt (één actie → elk in-scope recht, per VvE geteld, exact decimal); row-level isolatie bewezen; geen token-at-rest; polling stopt bij gesloten/vastgestelde ronde.
-- Veilige statische serving (geen `..`-traversal, gewhiteliste content-types); bestaande Node-tests groen.
-- UI draagt de Honigfabriek-look via de **gevendorde** `platform-tokens.css` (geen gehardcodeerde kleuren/fonts), domeincodering TF/NB/PG + Voor/Tegen, mobiel-eerst + basis-a11y.
-- `npm run check` + Python-tests + architectuur-, release-, handoff- en PII-gates + Gemini-review groen. **Geen deploy; geen productcode naar `main` buiten de PR-route.**
-
-## Buiten scope
-
-Admin/voorzitter-frontend (aparte tablet/pc-view, latere sprint) · magic-link/QR + PIN · gemachtigde-intake · sessieherstel · deploy/productie · onbemand draaien zonder aparte Bas-go.
+## Definition of done / go-no-go -> P0b
+CAS-testset groen (concurrerende schrijver, stale source, doelstaat-al-bereikt, ongeldige sprong, gelijktijdige `progress.md`); PR/SHA-resolve bewezen (nul -> bewezen MERGED/CLOSED-no-op, >1 -> fail-luid); 1-PR-invariant blokkeert een tweede open `agent/*`-PR aantoonbaar; noodpad-rebase in droogloop bewezen; **geen** actieve native auto-merge. `npm run check` + Python-tests + gates + Gemini groen. Geen deploy; geen productcode buiten de PR.
