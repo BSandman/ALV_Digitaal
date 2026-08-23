@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -64,6 +65,15 @@ class PipelineIdentityTests(unittest.TestCase):
         self.assertEqual(result.decision, "noop")
         self.assertIn("MERGED", result.reason)
 
+    def test_merged_without_completed_follow_up_fails_closed(self) -> None:
+        with self.assertRaisesRegex(pipeline_guard.PipelineGuardError, "vervolgactie"):
+            pipeline_guard.resolve_pr_identity(
+                pr(23, state="MERGED"), [], expected_number=23,
+                expected_repository="BSandman/ALV_Digitaal",
+                expected_branch="agent/sprint-13", expected_sha="a" * 40,
+                follow_up_done=False,
+            )
+
     def test_multiple_branch_results_fail_loudly(self) -> None:
         with self.assertRaisesRegex(pipeline_guard.PipelineGuardError, "meerdere"):
             pipeline_guard.resolve_pr_identity(
@@ -104,28 +114,81 @@ class PipelineSetupTests(unittest.TestCase):
             path = Path(directory) / "sprint.json"
             path.write_text(json.dumps({
                 "sprint": 13,
-                "branch": "agent/sprint-13-cicd-p0a",
-                "version": "0.2.0",
-                "release_tag": "v0.2.0",
+                "branch": "agent/sprint-13-cicd-p0a-fix1",
+                "release_namespace": "infra",
+                "version": "p0a-fix1",
+                "release_tag": "infra-p0a-fix1",
                 "release_sha": None,
                 "require_branches_up_to_date": False,
                 "native_automerge": "off",
             }), encoding="utf-8")
             metadata = pipeline_guard.load_sprint_metadata(path)
-        self.assertEqual(metadata.release_tag, "v0.2.0")
+        self.assertEqual(metadata.release_tag, "infra-p0a-fix1")
         self.assertEqual(pipeline_guard.verify_reserved_tag(metadata, None), "reserved")
         with self.assertRaisesRegex(pipeline_guard.PipelineGuardError, "incident"):
             pipeline_guard.verify_reserved_tag(metadata, "c" * 40)
 
     def test_existing_tag_must_equal_recorded_release_sha(self) -> None:
         metadata = pipeline_guard.SprintMetadata(
-            sprint=13, branch="agent/sprint-13-cicd-p0a", version="0.2.0",
-            release_tag="v0.2.0", release_sha="d" * 40,
+            sprint=13, branch="agent/sprint-13-cicd-p0a-fix1",
+            release_namespace="infra", version="p0a-fix1",
+            release_tag="infra-p0a-fix1", release_sha="d" * 40,
             require_branches_up_to_date=False, native_automerge="off",
         )
         self.assertEqual(pipeline_guard.verify_reserved_tag(metadata, "d" * 40), "exact")
         with self.assertRaisesRegex(pipeline_guard.PipelineGuardError, "incident"):
             pipeline_guard.verify_reserved_tag(metadata, "e" * 40)
+
+    def test_repository_variable_403_is_not_treated_as_off(self) -> None:
+        denied = pipeline_guard.subprocess.CompletedProcess(
+            ["gh", "variable", "get"], 1, stdout="", stderr="HTTP 403: Forbidden"
+        )
+        with mock.patch.object(pipeline_guard.subprocess, "run", return_value=denied):
+            with self.assertRaisesRegex(pipeline_guard.PipelineGuardError, "PIPELINE_AUTOMERGE"):
+                pipeline_guard._repository_variable(
+                    "BSandman/ALV_Digitaal", "PIPELINE_AUTOMERGE"
+                )
+
+    def test_setup_blocks_active_automerge_end_to_end(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sprint.json"
+            path.write_text(json.dumps({
+                "sprint": 13,
+                "branch": "agent/sprint-13-cicd-p0a-fix1",
+                "release_namespace": "infra",
+                "version": "p0a-fix1",
+                "release_tag": "infra-p0a-fix1",
+                "release_sha": None,
+                "require_branches_up_to_date": False,
+                "native_automerge": "off",
+            }), encoding="utf-8")
+            with (
+                mock.patch.object(pipeline_guard, "_run_json", return_value=[]),
+                mock.patch.object(pipeline_guard, "_existing_remote_tag", return_value=None),
+            ):
+                exit_code = pipeline_guard.main([
+                    "setup", "--metadata", str(path),
+                    "--repository", "BSandman/ALV_Digitaal",
+                    "--runtime-automerge", "on",
+                ])
+
+        self.assertEqual(exit_code, 2)
+
+    def test_live_repository_safety_requires_exact_off_disabled_and_not_strict(self) -> None:
+        result = pipeline_guard.validate_live_repository_safety(
+            repository_variable="off",
+            workflow_state="disabled_manually",
+            require_branches_up_to_date=False,
+        )
+        self.assertEqual(result["decision"], "ok")
+        for kwargs in (
+            {"repository_variable": "", "workflow_state": "disabled_manually", "require_branches_up_to_date": False},
+            {"repository_variable": "OFF", "workflow_state": "disabled_manually", "require_branches_up_to_date": False},
+            {"repository_variable": "off", "workflow_state": "active", "require_branches_up_to_date": False},
+            {"repository_variable": "off", "workflow_state": "disabled_manually", "require_branches_up_to_date": True},
+        ):
+            with self.subTest(**kwargs), self.assertRaises(pipeline_guard.PipelineGuardError):
+                pipeline_guard.validate_live_repository_safety(**kwargs)
 
 
 class EmergencyAndMergePlanTests(unittest.TestCase):

@@ -7,6 +7,8 @@ import sys
 import tempfile
 import time
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
@@ -341,6 +343,77 @@ class GitStewardTests(unittest.TestCase):
             remote_progress = fixture.remote_text("progress.md")
             self.assertIn("concurrerende regel", remote_progress)
             self.assertIn("lokale codex-regel", remote_progress)
+
+    def test_concurrent_same_state_descriptive_fields_are_preserved_fieldwise(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = GitFixture(Path(directory))
+            competing = Path(directory) / "competing-handoff"
+            git(Path(directory), "clone", "--quiet", str(fixture.remote), str(competing))
+            git(competing, "config", "user.name", "Competitor")
+            git(competing, "config", "user.email", "competitor@example.invalid")
+            source_sha = fixture.remote_sha()
+            target = (
+                HANDOFF.replace("DEV_IN_PROGRESS", "READY_FOR_TEST")
+                .replace("owner: codex", "owner: gemini")
+                .replace("since: 2026-08-20T20:41:04Z", "since: 2026-08-20T22:00:00Z")
+                .replace("next: gemini", "next: claude")
+                .replace('note: "Codex bouwt de GitSteward-kern."', 'note: "Codex is gereed."')
+            )
+            (fixture.work / "handoff.md").write_text(target, encoding="utf-8")
+
+            def update_same_state(repo: Path) -> None:
+                concurrent = (
+                    HANDOFF.replace("since: 2026-08-20T20:41:04Z", "since: 2026-08-20T21:30:00Z")
+                    .replace("next: gemini", "next: mistral")
+                    .replace(
+                        'note: "Codex bouwt de GitSteward-kern."',
+                        'note: "Concurrerende observatie blijft behouden."',
+                    )
+                )
+                (repo / "handoff.md").write_text(concurrent, encoding="utf-8")
+                git(repo, "add", "handoff.md")
+                git(repo, "commit", "-m", "concurrent same-state metadata")
+                git(repo, "push", "origin", "main")
+
+            steward = RacingSteward(
+                fixture.work,
+                competing_clone=competing,
+                race_action=update_same_state,
+                attempts=3,
+                backoff_seconds=0,
+                sleeper=lambda _: None,
+                process_checker=lambda: False,
+            )
+            self.assertTrue(steward.sync(expected_from="DEV_IN_PROGRESS", source_sha=source_sha))
+            values = lint_handoff.parse_frontmatter(fixture.remote_text("handoff.md"))
+            self.assertEqual(values["state"], "READY_FOR_TEST")
+            self.assertEqual(values["owner"], "gemini")
+            self.assertEqual(values["since"], "2026-08-20T21:30:00Z")
+            self.assertEqual(values["next"], "mistral")
+            self.assertEqual(values["note"], "Concurrerende observatie blijft behouden.")
+
+    def test_post_push_local_housekeeping_failure_is_only_a_warning(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = GitFixture(Path(directory))
+            (fixture.work / "handoff.md").write_text(
+                HANDOFF.replace("DEV_IN_PROGRESS", "READY_FOR_TEST").replace(
+                    "owner: codex", "owner: gemini"
+                ),
+                encoding="utf-8",
+            )
+            steward = fixture.steward()
+            steward._consume_local_coordination = lambda: (_ for _ in ()).throw(
+                steward_module.GitStewardError("lokale opruiming faalde")
+            )
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                changed = steward.sync(
+                    expected_from="DEV_IN_PROGRESS", source_sha=fixture.remote_sha()
+                )
+
+            self.assertTrue(changed)
+            self.assertIn("READY_FOR_TEST", fixture.remote_text("handoff.md"))
+            self.assertIn("WAARSCHUWING", stderr.getvalue())
 
     def test_retry_uses_three_attempts_with_exponential_backoff(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

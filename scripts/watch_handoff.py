@@ -826,11 +826,12 @@ def execute_autorun_turn(
 def run_pipeline_setup_guard(repo: Path = REPO) -> None:
     metadata = repo / "config" / "pipeline-sprint.json"
     if not metadata.is_file():
-        return
+        raise AutorunError("pipeline sprintmetadata ontbreekt; sprintstart fail-closed geblokkeerd")
     result = subprocess.run(
         [
             sys.executable, str(repo / "scripts" / "pipeline_guard.py"), "setup",
             "--metadata", str(metadata), "--repository", "BSandman/ALV_Digitaal",
+            "--defer-live-safety-to-ci",
         ],
         cwd=repo,
         capture_output=True,

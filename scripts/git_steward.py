@@ -414,8 +414,31 @@ class GitSteward:
         if progress_delta and progress_delta not in current_progress:
             separator = b"" if not current_progress or current_progress.endswith(b"\n") else b"\n"
             merged_progress = current_progress + separator + progress_delta.lstrip(b"\n")
+        merged_handoff = current_handoff
+        if not target_reached:
+            merged_values = dict(current_values)
+            descriptive_fields = {"since", "next", "note"}
+            for field, target_value in target_values.items():
+                source_value = source_values[field]
+                current_value = current_values[field]
+                if target_value == source_value:
+                    continue
+                if current_value == source_value or current_value == target_value:
+                    merged_values[field] = target_value
+                elif field in descriptive_fields:
+                    # A same-state observer may have refreshed these fields on fresh main.
+                    # Preserve that newer description while applying the control transition.
+                    continue
+                else:
+                    raise GitStewardError(
+                        f"concurrent conflict in handoff-veld {field}; transitie geweigerd"
+                    )
+            rendered = _render_handoff(
+                current_handoff.decode("utf-8-sig"), merged_values
+            )
+            merged_handoff = self._normalized(rendered.encode("utf-8"))
         return {
-            "handoff.md": current_handoff if target_reached else target["handoff.md"],
+            "handoff.md": merged_handoff,
             "progress.md": merged_progress,
         }
 
@@ -490,7 +513,14 @@ class GitSteward:
                         break
                     self.sleeper(self.backoff_seconds * (2 ** (attempt - 1)))
                     continue
-                self._consume_local_coordination()
+                try:
+                    self._consume_local_coordination()
+                except GitStewardError as exc:
+                    print(
+                        "GitSteward WAARSCHUWING: main-push is geslaagd; "
+                        f"lokale post-push-opruiming faalde: {exc}",
+                        file=sys.stderr,
+                    )
                 return True
             assert last_push_error is not None
             raise GitStewardError(

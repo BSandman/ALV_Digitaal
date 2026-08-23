@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 jobs:
   handoff-lint:
@@ -23,6 +25,28 @@ jobs:
 
       - name: Test Python-guardrails, begrensde context en notifier
         run: python -m unittest discover -s tests -p 'test_*.py'
+
+      - name: Verifieer live P0a-mergeveiligheid en sprintreservatie
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PIPELINE_AUTOMERGE: ${{ vars.PIPELINE_AUTOMERGE }}
+        run: |
+          set -euo pipefail
+          workflow_state="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/pipeline-autoadvance.yml" \
+            --jq '.state')"
+          require_up_to_date="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/branches/main/protection/required_status_checks" \
+            --jq '.strict')"
+          python scripts/pipeline_guard.py setup \
+            --metadata config/pipeline-sprint.json \
+            --repository "$GITHUB_REPOSITORY" \
+            --runtime-automerge "$PIPELINE_AUTOMERGE"
+          python scripts/pipeline_guard.py live-safety \
+            --repository-variable "$PIPELINE_AUTOMERGE" \
+            --workflow-state "$workflow_state" \
+            --require-branches-up-to-date "$require_up_to_date"
 
       - name: Valideer huidige handoff
         run: python scripts/lint_handoff.py handoff.md
