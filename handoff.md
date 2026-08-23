@@ -1,12 +1,12 @@
 ---
 sprint: 13
-state: READY_FOR_DEV
+state: DEV_IN_PROGRESS
 owner: codex
-since: 2026-08-22T23:54:56Z
+since: 2026-08-23T15:21:46Z
 next: gemini
 action_required_by: none
 blocked: false
-note: "Sprint 13 CI/CD-hardening P0a opgezet (ADR-0026); Codex: GitSteward-CAS + main-observatie + PR/SHA-verificatie + 1-PR-invariant + noodpad op agent/sprint-13-cicd-p0a, native auto-merge blijft off."
+note: "Codex bouwt Sprint 13 P0a attended op agent/sprint-13-cicd-p0a; native auto-merge blijft uit en er volgt geen deploy."
 ---
 
 # handoff.md — de estafettestok
