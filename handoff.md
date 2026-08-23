@@ -1,12 +1,12 @@
 ---
 sprint: 13
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-23T21:55:37Z
-next: gemini
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-23T22:05:06Z
+next: claude
 action_required_by: none
 blocked: false
-note: "Sprint 13 P0a fix-ronde 1 (2-subagent findings): guard fail-closed + missing-metadata-block + tag-namespace + rode tests + notifier-state; Codex op agent/sprint-13-cicd-p0a-fix1, auto-merge uit."
+note: "Sprint 13 P0a fix-ronde 1 staat op PR #24 exact SHA 9243eec; CI en Gemini zijn gestart, auto-merge blijft uit en er volgt geen deploy."
 ---
 
 # handoff.md — de estafettestok
