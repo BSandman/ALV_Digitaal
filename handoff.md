@@ -1,12 +1,12 @@
 ---
 sprint: 13
-state: BLOCKED
-owner: bas
-since: 2026-08-23T15:44:04Z
-next: none
-action_required_by: bas
-blocked: true
-note: "PR #23 is onverwacht door github-actions[bot] gemerged terwijl P0a auto-merge uit vereiste; setup-lint behandelde een variabele-API-403 foutief als unset. Bas: pauzeer auto-merge en besluit herstel."
+state: READY_FOR_DEV
+owner: codex
+since: 2026-08-23T21:07:56Z
+next: gemini
+action_required_by: none
+blocked: false
+note: "Sprint 13 P0a fix-ronde 1 (2-subagent findings): guard fail-closed + missing-metadata-block + tag-namespace + rode tests + notifier-state; Codex op agent/sprint-13-cicd-p0a-fix1, auto-merge uit."
 ---
 
 # handoff.md — de estafettestok
