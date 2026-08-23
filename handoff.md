@@ -1,12 +1,12 @@
 ---
 sprint: 13
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-23T15:21:46Z
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-23T15:42:10Z
 next: gemini
 action_required_by: none
 blocked: false
-note: "Codex bouwt Sprint 13 P0a attended op agent/sprint-13-cicd-p0a; native auto-merge blijft uit en er volgt geen deploy."
+note: "PR #23 staat exact op f6affead4ffd; test GitSteward-CAS, main-observatie, PR/SHA-resolve, 1-PR-invariant en noodpad, native auto-merge blijft uit."
 ---
 
 # handoff.md — de estafettestok
