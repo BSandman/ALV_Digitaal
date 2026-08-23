@@ -46,6 +46,25 @@ READY_FOR_TEST_HANDOFF = READY_HANDOFF.replace("READY_FOR_DEV", "READY_FOR_TEST"
 )
 
 
+class FakeMainObservation:
+    def __init__(self, repo: Path) -> None:
+        self.path = repo
+        self.refreshes = 0
+
+    def open(self):
+        return self
+
+    def refresh(self):
+        self.refreshes += 1
+        values = watch_handoff.read_frontmatter(self.path / "handoff.md")
+        if values["state"] == "READY_FOR_DEV" and self.refreshes >= 3:
+            values = {**values, "state": "DEV_IN_PROGRESS"}
+        return values, "a" * 40
+
+    def close(self) -> None:
+        pass
+
+
 class WatchHandoffContextTests(unittest.TestCase):
     def make_repo(self, directory: str) -> Path:
         repo = Path(directory)
@@ -256,13 +275,9 @@ class WatchHandoffAutorunTests(unittest.TestCase):
             runner = root / "runner.py"
             runner.write_text(
                 "from pathlib import Path\n"
-                "import subprocess\n"
                 f"Path('handoff.md').write_text({READY_FOR_TEST_HANDOFF!r}, encoding='utf-8')\n"
                 "with Path('progress.md').open('a', encoding='utf-8') as handle:\n"
-                "    handle.write('- attended watcher proof\\n')\n"
-                "subprocess.run(['git', 'add', '--', 'handoff.md', 'progress.md'], check=True)\n"
-                "subprocess.run(['git', 'commit', '-m', 'test: complete attended turn'], check=True)\n"
-                "subprocess.run(['git', 'push'], check=True)\n",
+                "    handle.write('- attended watcher proof\\n')\n",
                 encoding="utf-8",
             )
 
@@ -281,7 +296,9 @@ class WatchHandoffAutorunTests(unittest.TestCase):
 
             runtime = json.loads((work / "autorun-status.json").read_text(encoding="utf-8"))
             remote_handoff = self.fixture_git(remote, "show", "main:handoff.md").stdout
-            self.assertEqual(result, 0)
+            self.assertEqual(
+                result, 0, (work / "autorun.log").read_text(encoding="utf-8")
+            )
             self.assertIn("state: READY_FOR_TEST", remote_handoff)
             self.assertFalse(runtime["running"])
             self.assertEqual(self.fixture_git(work, "status", "--porcelain").stdout, "")
@@ -415,10 +432,14 @@ class WatchHandoffAutorunTests(unittest.TestCase):
                     steward_runner=fake_steward,
                     notifier_runner=lambda current_repo: notifications.append(current_repo) or 0,
                     log_path=repo / "autorun.log",
+                    source_sha="a" * 40,
                 )
 
             self.assertEqual(result, "success")
-            self.assertEqual(steward_calls, [("sync",)])
+            self.assertEqual(
+                steward_calls,
+                [("sync", "--expected-from", "READY_FOR_DEV", "--source-sha", "a" * 40)],
+            )
             self.assertEqual(notifications, [repo])
             log = (repo / "autorun.log").read_text(encoding="utf-8")
             self.assertIn("READY_FOR_DEV → READY_FOR_VALIDATION · OK", log)
@@ -465,6 +486,7 @@ class WatchHandoffAutorunTests(unittest.TestCase):
                     steward_runner=fake_steward,
                     notifier_runner=lambda current_repo: notifications.append(current_repo) or 0,
                     log_path=repo / "autorun.log",
+                    source_sha="a" * 40,
                 )
 
             self.assertEqual(result, "failed")
@@ -473,7 +495,7 @@ class WatchHandoffAutorunTests(unittest.TestCase):
             self.assertEqual(blocked["owner"], "bas")
             self.assertEqual(blocked["action_required_by"], "bas")
             self.assertEqual(blocked["blocked"], "true")
-            self.assertEqual(git_calls, [])
+            self.assertEqual(git_calls, [("rev-parse", "HEAD")])
             self.assertEqual(steward_calls[0][0], "block_finalize")
             self.assertIn("--role", steward_calls[0])
             self.assertEqual(notifications, [repo])
@@ -504,10 +526,14 @@ class WatchHandoffAutorunTests(unittest.TestCase):
                     steward_runner=fake_steward,
                     notifier_runner=lambda current_repo: 0,
                     log_path=repo / "autorun.log",
+                    source_sha="a" * 40,
                 )
 
         self.assertEqual(result, "failed")
-        self.assertEqual(steward_calls[0], ("sync",))
+        self.assertEqual(
+            steward_calls[0],
+            ("sync", "--expected-from", "READY_FOR_DEV", "--source-sha", "a" * 40),
+        )
         self.assertEqual(steward_calls[1][0], "block_finalize")
 
     def test_paused_runner_keeps_current_baton_resumable(self) -> None:
@@ -529,11 +555,12 @@ class WatchHandoffAutorunTests(unittest.TestCase):
                     git_runner=lambda current_repo, *args: git_calls.append(args),
                     notifier_runner=lambda current_repo: notifications.append(current_repo) or 0,
                     log_path=repo / "autorun.log",
+                    source_sha="a" * 40,
                 )
 
             self.assertEqual(outcome, "paused")
             self.assertEqual(watch_handoff.read_frontmatter(repo / "handoff.md")["state"], "READY_FOR_DEV")
-            self.assertEqual(git_calls, [])
+            self.assertEqual(git_calls, [("rev-parse", "HEAD")])
             self.assertEqual(notifications, [])
             self.assertIn("PAUSED", (repo / "autorun.log").read_text(encoding="utf-8"))
 
@@ -674,6 +701,7 @@ class WatchHandoffAutorunTests(unittest.TestCase):
                     once=True,
                     race_guard_seconds=60,
                     repo=repo,
+                    observation_factory=FakeMainObservation,
                 )
 
             self.assertEqual(result, 0)
@@ -688,6 +716,7 @@ class WatchHandoffAutorunTests(unittest.TestCase):
                 mock.patch.object(watch_handoff, "run_git", return_value=clean_pull),
                 mock.patch.object(watch_handoff, "execute_autorun_turn", return_value="success") as execute,
                 mock.patch.object(watch_handoff, "wait_for_race_guard", return_value=True),
+                mock.patch.object(watch_handoff, "claim_runner_turn", return_value=None),
                 mock.patch.object(watch_handoff, "mark_blocked", return_value=True) as blocked,
                 mock.patch.object(watch_handoff.time, "sleep", return_value=None),
             ):
@@ -702,6 +731,7 @@ class WatchHandoffAutorunTests(unittest.TestCase):
                     once=False,
                     race_guard_seconds=0,
                     repo=repo,
+                    observation_factory=FakeMainObservation,
                 )
 
             self.assertEqual(result, 0)

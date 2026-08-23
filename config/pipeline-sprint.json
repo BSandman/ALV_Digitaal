@@ -1,0 +1,9 @@
+{
+  "sprint": 13,
+  "branch": "agent/sprint-13-cicd-p0a",
+  "version": "0.2.0",
+  "release_tag": "v0.2.0",
+  "release_sha": null,
+  "require_branches_up_to_date": false,
+  "native_automerge": "off"
+}
