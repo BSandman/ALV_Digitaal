@@ -1,22 +1,25 @@
-# sprint.md — Sprint 13: CI/CD-hardening P0a (liveness/correctheid)
+# sprint.md — Sprint 14: P0a-herstel + coherentie-gate
 
-**Doel:** de pijplijn **correct en observeerbaar** maken — de eerste, plan-agnostische fase van de CI/CD-herinrichting (**ADR-0026**). Een betrouwbare `main`-observatie, echte compare-and-swap in de GitSteward, exacte PR/SHA-identiteit, de 1-sprint-1-PR-invariant hard afgedwongen, en een noodpad voor een bewegende `main`. **Native auto-merge gaat NIET aan** (merge-enabler off; attended exact-SHA-merge) — dat is P0b. Detail: `Platform/_design-prestage/cicd/CICD-herontwerp-DEFINITIEF.md` (P0a). Spec: `docs/gates/Codex-taak-cicd-p0a.md`.
+**Doel:** de P0a-herstelronde na Sprint 13 (PR #23 mergde vroegtijdig door een bug; de fix-ronde bleek niet mergeklaar). We fixen de **klasse, niet het geval**: de verificatie in de juiste lane (onbevoorrechte PR-CI + aparte vertrouwde admin-preflight), de CAS-baton als één atomair object, het nood-rebasepad met eenduidige SHA-rollen, en — de kern — een **coherentie-gate** die luid faalt zodra projectonderdelen elkaar tegenspreken. Ontwerp: **ADR-0026** (CI/CD) + **ADR-0000** (coherentie). **Native auto-merge blijft OFF** (P0b).
 
-> **Zelf-modificerend + attended.** Deze sprint wijzigt `git_steward.py`/`watch_handoff.py`/de setup-lint die de beurten zelf draaien. Draai `--max-turns 1` met Bas erbij; **watchers op `main`** (niet op de feature-branch — de Sprint-10-les); branch = **`agent/sprint-13-cicd-p0a`** (niet `feat/`); merge attended en exact op SHA. Een begeleide beurt moet schoon + in-sync eindigen voor je op de nieuwe steward leunt.
+> **Bron van waarheid:** `config/pipeline-sprint.json` is de autoriteit voor sprint/branch/versie/tag; dit bestand en `handoff.md` verwijzen daarnaar. Spec + acceptatiecriteria: `docs/gates/Codex-taak-sprint-14-p0a-herstel-coherentie.md`.
+
+> **Zelf-modificerend + attended.** Vertak van de tip van `agent/sprint-13-cicd-p0a-fix1` (`9243eec`) — het goede werk uit findings 1–8 blijft behouden. Branch = **`agent/sprint-14-p0a-herstel-coherentie`**; watchers op **`main`**; `--max-turns 1`; merge attended exact-op-SHA.
 
 ## Cadans — per blok
 | Blok | Rol | Watcher | Inhoud |
 |---|---|---|---|
-| 1 | **Codex** (dev) | `--role codex` (op main) | GitSteward-CAS + testset, main-observatie, PR/SHA-verificatie, 1-PR-invariant, noodpad; PR op `agent/sprint-13-cicd-p0a` |
-| 2 | *auto* | — | CI-gates + Gemini-review op de PR |
-| 3 | **Claude** (validatie) | Cowork | Toets tegen ADR-0026 + de P0a-acceptatiecriteria |
-| 4 | **Mistral** (integratie) | `--role mistral` (op main) | Gates; **attended exact-SHA-merge**; geen deploy |
+| 1 | **Codex** (dev) | `--role codex` (op main) | Lane A onbevoorrecht + `p0a-admin-preflight`, CAS full-swap, rebase-SHA-rollen, coherentie-gate, consistentie-herstel; PR op `agent/sprint-14-p0a-herstel-coherentie` |
+| 2 | *auto* | — | Lane A CI-gates + Gemini-review op de PR |
+| 3 | **Claude** (validatie) | Cowork | Toets tegen ADR-0026 + ADR-0000 + de acceptatiecriteria |
+| 4 | **Bas** (preflight) | handmatig | `p0a-admin-preflight` draaien (App-token, `Administration: read`) |
+| 5 | **Mistral** (integratie) | `--role mistral` (op main) | Gates; **attended exact-SHA-merge**; geen deploy |
 
 ## Scope (in) — acceptatiecriteria in het taakdoc
-Main-observatie (aparte schone worktree), GitSteward echte CAS + idempotente transitie + concurrentie-/idempotentie-testset, exacte PR-nummer/SHA-verificatie (0/1/>1-gedrag), 1-sprint-1-PR setup-lint-invariant, noodpad voor een bewegende `main`. Merge-enabler op `off`.
+Lane A onbevoorrechte PR-CI-verificatie (geen branch-protection-lees daar), aparte vertrouwde `p0a-admin-preflight` (App-token, fail-closed, handmatig), CAS-baton volledige swap (finding-7 terug), nood-rebase met drie expliciete SHA-rollen + ancestry-check, coherentie-gate + single source of truth, alles consistent Sprint 14.
 
 ## Scope (uit) — P0b of later
-Privileged/unprivileged workflow-split, echte Gemini-verdict-check, PII context-aware gate, native auto-merge activeren, Environment/deploy-poort, dedup-notifier, lease, labels-migratie, validatie-voor-merge.
+Native auto-merge activeren, echte Gemini-verdict-check, PII context-aware gate, Environment/deploy-poort, dedup-notifier, lease, labels-migratie, `p0a-admin-preflight` automatisch draaien.
 
-## Definition of done / go-no-go -> P0b
-CAS-testset groen (concurrerende schrijver, stale source, doelstaat-al-bereikt, ongeldige sprong, gelijktijdige `progress.md`); PR/SHA-resolve bewezen (nul -> bewezen MERGED/CLOSED-no-op, >1 -> fail-luid); 1-PR-invariant blokkeert een tweede open `agent/*`-PR aantoonbaar; noodpad-rebase in droogloop bewezen; **geen** actieve native auto-merge. `npm run check` + Python-tests + gates + Gemini groen. Geen deploy; geen productcode buiten de PR.
+## Definition of done / go-no-go → P0b
+Lane A groen zónder admin-lees; `p0a-admin-preflight` correct begrensd + fail-closed + inert-met-melding zonder secret; CAS full-swap bewezen (nieuwe re-read-test groen, oude veld-merge-test weg); nood-rebase drie-SHA-rollen + `--force-with-lease` dry-run bewezen; coherentie-gate faalt aantoonbaar bij tegenstrijdigheid en is groen bij consistente staat; alles consistent Sprint 14; **geen** actieve native auto-merge. `npm run check` + Python-tests + gates + Gemini groen. Geen deploy; geen productcode buiten de PR.
