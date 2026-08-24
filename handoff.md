@@ -1,12 +1,12 @@
 ---
 sprint: 14
-state: READY_FOR_DEV
-owner: codex
-since: 2026-08-23T22:32:26Z
-next: gemini
-action_required_by: none
-blocked: false
-note: "Sprint 14 P0a-herstel + coherentie-gate: Lane A onbevoorrecht, aparte p0a-admin-preflight (App), CAS full-swap, rebase-SHA-rollen, coherentie-gate; vertak van fix1-tip 9243eec naar agent/sprint-14-p0a-herstel-coherentie; auto-merge off."
+state: BLOCKED
+owner: bas
+since: 2026-08-24T08:31:58Z
+next: none
+action_required_by: bas
+blocked: true
+note: "Autorun codex gestopt: pipeline setup-lint blokkeerde de sprintstart; zie autorun.log."
 ---
 
 # handoff.md — de estafettestok
