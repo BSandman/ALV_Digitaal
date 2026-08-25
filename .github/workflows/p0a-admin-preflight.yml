@@ -1,6 +1,6 @@
 name: P0a trusted admin preflight
 
-# Raakt: ADR-0026, ADR-0025 en config/pipeline-sprint.json (vertrouwde Lane B).
+# Raakt: ADR-0026 · ADR-0025 · config/pipeline-sprint.json (vertrouwde Lane B).
 
 on:
   workflow_dispatch:
