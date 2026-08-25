@@ -62,6 +62,17 @@ class NotifyResult:
 Sender = Callable[[Mapping[str, str], Notification], None]
 
 
+def path_from_environment(
+    name: str,
+    default: Path,
+    environ: Mapping[str, str] | None = None,
+) -> Path:
+    """Treat an absent or blank local path setting as the safe ignored default."""
+    source = os.environ if environ is None else environ
+    value = source.get(name, "").strip()
+    return Path(value) if value else default
+
+
 def append_notifier_activity(state: str, outcome: str, path: Path = DEFAULT_ACTIVITY_LOG) -> None:
     try:
         safe_state = state or "ONBEKEND"
@@ -407,13 +418,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path(os.environ.get("ALV_NOTIFIER_CONFIG", DEFAULT_CONFIG)),
+        default=path_from_environment("ALV_NOTIFIER_CONFIG", DEFAULT_CONFIG),
         help="lokaal notifier.env-pad (of ALV_NOTIFIER_CONFIG)",
     )
     parser.add_argument(
         "--state-file",
         type=Path,
-        default=Path(os.environ.get("ALV_NOTIFIER_STATE", DEFAULT_STATE)),
+        default=path_from_environment("ALV_NOTIFIER_STATE", DEFAULT_STATE),
         help="lokaal deduplicatiestate-pad (of ALV_NOTIFIER_STATE)",
     )
     parser.add_argument("--dry-run", action="store_true", help="toon bericht zonder verzending of statewijziging")

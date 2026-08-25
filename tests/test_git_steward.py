@@ -7,6 +7,8 @@ import sys
 import tempfile
 import time
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
@@ -69,6 +71,10 @@ class GitFixture:
         git(self.seed, "config", "user.email", "fixture@example.invalid")
         (self.seed / "handoff.md").write_text(HANDOFF, encoding="utf-8")
         (self.seed / "progress.md").write_text("# Progress\n", encoding="utf-8")
+        (self.seed / "config").mkdir()
+        (self.seed / "config/pipeline-sprint.json").write_text(
+            '{"sprint": 11}\n', encoding="utf-8"
+        )
         (self.seed / "product.txt").write_text("release-v1\n", encoding="utf-8")
         git(self.seed, "add", ".")
         git(self.seed, "commit", "-m", "seed")
@@ -341,6 +347,170 @@ class GitStewardTests(unittest.TestCase):
             remote_progress = fixture.remote_text("progress.md")
             self.assertIn("concurrerende regel", remote_progress)
             self.assertIn("lokale codex-regel", remote_progress)
+
+    def test_concurrent_frontmatter_divergence_requires_reread_and_recompute(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = GitFixture(Path(directory))
+            competing = Path(directory) / "competing-handoff"
+            git(Path(directory), "clone", "--quiet", str(fixture.remote), str(competing))
+            git(competing, "config", "user.name", "Competitor")
+            git(competing, "config", "user.email", "competitor@example.invalid")
+            source_sha = fixture.remote_sha()
+            target = (
+                HANDOFF.replace("DEV_IN_PROGRESS", "READY_FOR_TEST")
+                .replace("owner: codex", "owner: gemini")
+                .replace("since: 2026-08-20T20:41:04Z", "since: 2026-08-20T22:00:00Z")
+                .replace("next: gemini", "next: claude")
+                .replace('note: "Codex bouwt de GitSteward-kern."', 'note: "Codex is gereed."')
+            )
+            (fixture.work / "handoff.md").write_text(target, encoding="utf-8")
+
+            def update_same_state(repo: Path) -> None:
+                concurrent = (
+                    HANDOFF.replace("since: 2026-08-20T20:41:04Z", "since: 2026-08-20T21:30:00Z")
+                    .replace("next: gemini", "next: mistral")
+                    .replace(
+                        'note: "Codex bouwt de GitSteward-kern."',
+                        'note: "Concurrerende observatie blijft behouden."',
+                    )
+                )
+                (repo / "handoff.md").write_text(concurrent, encoding="utf-8")
+                git(repo, "add", "handoff.md")
+                git(repo, "commit", "-m", "concurrent same-state metadata")
+                git(repo, "push", "origin", "main")
+
+            steward = RacingSteward(
+                fixture.work,
+                competing_clone=competing,
+                race_action=update_same_state,
+                attempts=3,
+                backoff_seconds=0,
+                sleeper=lambda _: None,
+                process_checker=lambda: False,
+            )
+            with self.assertRaisesRegex(steward_module.GitStewardError, "herlees.*herbereken"):
+                steward.sync(expected_from="DEV_IN_PROGRESS", source_sha=source_sha)
+            self.assertEqual(steward.push_attempts, 1)
+            values = lint_handoff.parse_frontmatter(fixture.remote_text("handoff.md"))
+            self.assertEqual(values["state"], "DEV_IN_PROGRESS")
+            self.assertEqual(values["owner"], "codex")
+            self.assertEqual(values["since"], "2026-08-20T21:30:00Z")
+            self.assertEqual(values["next"], "mistral")
+            self.assertEqual(values["note"], "Concurrerende observatie blijft behouden.")
+
+    def test_activate_sprint_aggregates_errors_and_publishes_nothing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = GitFixture(Path(directory))
+            candidate = Path(directory) / "candidate"
+            candidate.mkdir()
+            base_sha = fixture.remote_sha()
+            (candidate / "activation.json").write_text(
+                '{"previous_sprint": 11, "resolution": "completed"}\n', encoding="utf-8"
+            )
+            (candidate / "pipeline-sprint.json").write_text(
+                '{"sprint": 12, "branch": "agent/sprint-12", "base_sha": "' + "f" * 40
+                + '", "release_namespace": "infra", "version": "sprint-12", '
+                '"release_tag": "infra-sprint-12", "release_sha": null, '
+                '"require_branches_up_to_date": false, "native_automerge": "off"}\n',
+                encoding="utf-8",
+            )
+            (candidate / "sprint.md").write_text(
+                "# sprint 12\nbranch: agent/sprint-12\n", encoding="utf-8"
+            )
+            (candidate / "handoff.md").write_text(
+                HANDOFF.replace("sprint: 11", "sprint: 13")
+                .replace("state: DEV_IN_PROGRESS", "state: ARCHITECTUUR")
+                .replace("owner: codex", "owner: claude"),
+                encoding="utf-8",
+            )
+            (candidate / "progress.md").write_text("# Progress\n- sprint 12 voorbereid\n", encoding="utf-8")
+            before = fixture.remote_count()
+
+            with self.assertRaises(steward_module.GitStewardError) as caught:
+                fixture.steward().activate_sprint(
+                    candidate,
+                    repository="BSandman/ALV_Digitaal",
+                    pull_requests=[{"number": 24, "state": "OPEN", "baseRefName": "main", "headRefName": "agent/old"}],
+                )
+
+            message = str(caught.exception)
+            self.assertIn("basis-SHA", message)
+            self.assertIn("baton-sprint", message)
+            self.assertIn("open pipeline-PR #24", message)
+            self.assertEqual(fixture.remote_count(), before)
+
+    def test_activate_sprint_atomically_publishes_four_files_and_ready_for_dev(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = GitFixture(Path(directory))
+            finished = HANDOFF.replace("state: DEV_IN_PROGRESS", "state: SPRINT_DONE").replace(
+                "owner: codex", "owner: claude"
+            )
+            (fixture.seed / "handoff.md").write_text(finished, encoding="utf-8")
+            git(fixture.seed, "add", "handoff.md")
+            git(fixture.seed, "commit", "-m", "finish prior sprint")
+            git(fixture.seed, "push", "origin", "main")
+            base_sha = fixture.remote_sha()
+            candidate = Path(directory) / "candidate"
+            candidate.mkdir()
+            (candidate / "activation.json").write_text(
+                '{"previous_sprint": 11, "resolution": "completed"}\n', encoding="utf-8"
+            )
+            (candidate / "pipeline-sprint.json").write_text(
+                '{"sprint": 12, "branch": "agent/sprint-12", "base_sha": "' + base_sha
+                + '", "release_namespace": "infra", "version": "sprint-12", '
+                '"release_tag": "infra-sprint-12", "release_sha": null, '
+                '"require_branches_up_to_date": false, "native_automerge": "off"}\n',
+                encoding="utf-8",
+            )
+            (candidate / "sprint.md").write_text(
+                "# sprint 12\nbranch: agent/sprint-12\n", encoding="utf-8"
+            )
+            (candidate / "handoff.md").write_text(
+                HANDOFF.replace("sprint: 11", "sprint: 12")
+                .replace("state: DEV_IN_PROGRESS", "state: ARCHITECTUUR")
+                .replace("owner: codex", "owner: claude"),
+                encoding="utf-8",
+            )
+            (candidate / "progress.md").write_text("# Progress\n- sprint 12 voorbereid\n", encoding="utf-8")
+
+            self.assertTrue(
+                fixture.steward().activate_sprint(
+                    candidate, repository="BSandman/ALV_Digitaal", pull_requests=[]
+                )
+            )
+            values = lint_handoff.parse_frontmatter(fixture.remote_text("handoff.md"))
+            self.assertEqual(values["state"], "READY_FOR_DEV")
+            self.assertEqual(values["owner"], "codex")
+            self.assertIn("sprint 12", fixture.remote_text("sprint.md"))
+            self.assertIn('"release_namespace": "infra"', fixture.remote_text("config/pipeline-sprint.json"))
+            changed = git(fixture.remote, "diff-tree", "--no-commit-id", "--name-only", "-r", "main").stdout.splitlines()
+            self.assertEqual(
+                sorted(changed),
+                ["config/pipeline-sprint.json", "handoff.md", "progress.md", "sprint.md"],
+            )
+
+    def test_post_push_local_housekeeping_failure_is_only_a_warning(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = GitFixture(Path(directory))
+            (fixture.work / "handoff.md").write_text(
+                HANDOFF.replace("DEV_IN_PROGRESS", "READY_FOR_TEST").replace(
+                    "owner: codex", "owner: gemini"
+                ),
+                encoding="utf-8",
+            )
+            steward = fixture.steward()
+            steward._consume_local_coordination = lambda: (_ for _ in ()).throw(
+                steward_module.GitStewardError("lokale opruiming faalde")
+            )
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                changed = steward.sync(
+                    expected_from="DEV_IN_PROGRESS", source_sha=fixture.remote_sha()
+                )
+
+            self.assertTrue(changed)
+            self.assertIn("READY_FOR_TEST", fixture.remote_text("handoff.md"))
+            self.assertIn("WAARSCHUWING", stderr.getvalue())
 
     def test_retry_uses_three_attempts_with_exponential_backoff(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

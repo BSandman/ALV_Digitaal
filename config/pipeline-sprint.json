@@ -1,8 +1,10 @@
 {
   "sprint": 14,
   "branch": "agent/sprint-14-veilige-activatie",
-  "version": "0.0.14",
-  "release_tag": "v0.0.14",
+  "base_sha": "b937ce2074306fd144062a87558dfdbe073f6f5e",
+  "release_namespace": "infra",
+  "version": "sprint-14-p0a-herstel",
+  "release_tag": "infra-sprint-14-p0a-herstel",
   "release_sha": null,
   "require_branches_up_to_date": false,
   "native_automerge": "off"

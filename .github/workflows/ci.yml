@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 jobs:
   handoff-lint:
@@ -15,6 +17,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Python 3
         uses: actions/setup-python@v5
@@ -23,6 +27,35 @@ jobs:
 
       - name: Test Python-guardrails, begrensde context en notifier
         run: python -m unittest discover -s tests -p 'test_*.py'
+
+      - name: Verifieer live P0a-mergeveiligheid en sprintreservatie
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PIPELINE_AUTOMERGE: ${{ vars.PIPELINE_AUTOMERGE }}
+        run: |
+          set -euo pipefail
+          workflow_state="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/pipeline-autoadvance.yml" \
+            --jq '.state')"
+          python scripts/pipeline_guard.py setup \
+            --metadata config/pipeline-sprint.json \
+            --repository "$GITHUB_REPOSITORY" \
+            --runtime-automerge "$PIPELINE_AUTOMERGE"
+          python scripts/pipeline_guard.py live-safety \
+            --repository-variable "$PIPELINE_AUTOMERGE" \
+            --workflow-state "$workflow_state"
+
+      - name: Verifieer PR-head, branch en checkout-SHA
+        if: github.event_name == 'pull_request'
+        env:
+          PR_HEAD: ${{ github.head_ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python scripts/check_coherence.py pr-ci \
+            --metadata config/pipeline-sprint.json \
+            --pr-head "$PR_HEAD" \
+            --pr-head-sha "$PR_HEAD_SHA"
 
       - name: Valideer huidige handoff
         run: python scripts/lint_handoff.py handoff.md

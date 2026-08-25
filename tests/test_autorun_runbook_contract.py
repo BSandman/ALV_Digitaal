@@ -34,6 +34,7 @@ class AutorunRunbookContractTests(unittest.TestCase):
             "ALV_AUTORUN_MAX_TURNS",
             "ALV_AUTORUN_MAX_WALLCLOCK_SECONDS",
             "ALV_NOTIFIER_CONFIG",
+            "ALV_NOTIFIER_STATE",
         ):
             self.assertIn(required, example)
         self.assertNotIn("ALV_AUTORUN_GEMINI_ARGV", example)
