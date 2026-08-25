@@ -1,25 +1,25 @@
-# sprint.md — Sprint 14: P0a-herstel + coherentie-gate
+# sprint.md — Sprint 14: veilige sprintactivatie + P0a-herstel
 
-**Doel:** de P0a-herstelronde na Sprint 13 (PR #23 mergde vroegtijdig door een bug; de fix-ronde bleek niet mergeklaar). We fixen de **klasse, niet het geval**: de verificatie in de juiste lane (onbevoorrechte PR-CI + aparte vertrouwde admin-preflight), de CAS-baton als één atomair object, het nood-rebasepad met eenduidige SHA-rollen, en — de kern — een **coherentie-gate** die luid faalt zodra projectonderdelen elkaar tegenspreken. Ontwerp: **ADR-0026** (CI/CD) + **ADR-0000** (coherentie). **Native auto-merge blijft OFF** (P0b).
+**Doel:** de control-plane vertrouwbaar maken. De Codex-review (24-08) legde een structurele **bootstrap-cirkel** bloot: de baton werd rechtstreeks op `main` gewijzigd (buiten de GitSteward om), config-herstel toegewezen aan Codex terwijl zijn watcher die config vóór de start valideert, en overgedragen met een open PR (#24). De kern is niet nóg een regel maar één machine-afgedwongen, atomische **`git_steward activate-sprint`**: Claude levert een kandidaat-manifest, de steward bewíjst op verse `main` dat de overgang haalbaar is vóór Codex de baton krijgt. Daarnaast: context-afhankelijke coherentie, concrete fouten doorgeven, Lane A onbevoorrecht, CAS-baton volledige swap. Ontwerp: **ADR-0026** + **ADR-0000**. **Native auto-merge blijft OFF.**
 
-> **Bron van waarheid:** `config/pipeline-sprint.json` is de autoriteit voor sprint/branch/versie/tag; dit bestand en `handoff.md` verwijzen daarnaar. Spec + acceptatiecriteria: `docs/gates/Codex-taak-sprint-14-p0a-herstel-coherentie.md`.
+> **Bron van waarheid:** `config/pipeline-sprint.json` (sprint/branch/versie/tag); `sprint.md` en `handoff.md` verwijzen. Spec + acceptatiecriteria: `docs/gates/Codex-taak-sprint-14-p0a-herstel-coherentie.md`.
 
-> **Zelf-modificerend + attended.** Vertak van de tip van `agent/sprint-13-cicd-p0a-fix1` (`9243eec`) — het goede werk uit findings 1–8 blijft behouden. Branch = **`agent/sprint-14-p0a-herstel-coherentie`**; watchers op **`main`**; `--max-turns 1`; merge attended exact-op-SHA.
+> **Eenmalige begeleide bridge.** `activate-sprint` bestaat nog niet, dus deze sprint wordt één keer attended geactiveerd (oud-schema config, guard groen geverifieerd) — daarna bouwt Codex de geautomatiseerde versie en is elke volgende sprint verplicht via de command. Branch = **`agent/sprint-14-veilige-activatie`**, vanaf de actuele `main`; watchers op `main`; `--max-turns 1`; merge attended exact-op-SHA. Bruikbare broncode uit `9243eec` wordt selectief gecherry-pickt (geen oude control-plane).
 
 ## Cadans — per blok
 | Blok | Rol | Watcher | Inhoud |
 |---|---|---|---|
-| 1 | **Codex** (dev) | `--role codex` (op main) | Lane A onbevoorrecht + `p0a-admin-preflight`, CAS full-swap, rebase-SHA-rollen, coherentie-gate, consistentie-herstel; PR op `agent/sprint-14-p0a-herstel-coherentie` |
+| 1 | **Codex** (dev) | `--role codex` (op main) | `activate-sprint`, context-coherentie, concrete fouten, Lane A, CAS full-swap; PR op `agent/sprint-14-veilige-activatie` |
 | 2 | *auto* | — | Lane A CI-gates + Gemini-review op de PR |
-| 3 | **Claude** (validatie) | Cowork | Toets tegen ADR-0026 + ADR-0000 + de acceptatiecriteria |
-| 4 | **Bas** (preflight) | handmatig | `p0a-admin-preflight` draaien (App-token, `Administration: read`) |
+| 3 | **Claude** (validatie) | Cowork | Toets tegen ADR-0026 + ADR-0000 + acceptatiecriteria |
+| 4 | **Bas** (preflight) | handmatig | `p0a-admin-preflight` (indien in scope) |
 | 5 | **Mistral** (integratie) | `--role mistral` (op main) | Gates; **attended exact-SHA-merge**; geen deploy |
 
-## Scope (in) — acceptatiecriteria in het taakdoc
-Lane A onbevoorrechte PR-CI-verificatie (geen branch-protection-lees daar), aparte vertrouwde `p0a-admin-preflight` (App-token, fail-closed, handmatig), CAS-baton volledige swap (finding-7 terug), nood-rebase met drie expliciete SHA-rollen + ancestry-check, coherentie-gate + single source of truth, alles consistent Sprint 14.
+## Scope (in) — kern
+`git_steward activate-sprint` (atomische, bewezen sprintstart), context-afhankelijke coherentie (activatie/feature/PR-CI), concrete guard-/activatiefouten doorgeven, Lane A onbevoorrechte PR-CI, CAS-baton volledige swap. **Verplicht vóór integratie:** `p0a-admin-preflight` (App-token, per-run gemint). **Mag naar Sprint 15:** nood-rebase-SHA-rollen.
 
 ## Scope (uit) — P0b of later
-Native auto-merge activeren, echte Gemini-verdict-check, PII context-aware gate, Environment/deploy-poort, dedup-notifier, lease, labels-migratie, `p0a-admin-preflight` automatisch draaien.
+Native auto-merge activeren, echte Gemini-verdict-check, PII context-aware gate, Environment/deploy-poort, dedup-notifier, lease, labels-migratie.
 
-## Definition of done / go-no-go → P0b
-Lane A groen zónder admin-lees; `p0a-admin-preflight` correct begrensd + fail-closed + inert-met-melding zonder secret; CAS full-swap bewezen (nieuwe re-read-test groen, oude veld-merge-test weg); nood-rebase drie-SHA-rollen + `--force-with-lease` dry-run bewezen; coherentie-gate faalt aantoonbaar bij tegenstrijdigheid en is groen bij consistente staat; alles consistent Sprint 14; **geen** actieve native auto-merge. `npm run check` + Python-tests + gates + Gemini groen. Geen deploy; geen productcode buiten de PR.
+## Definition of done (P0a-afronding; P0b-go pas geldig mét admin-preflight)
+`activate-sprint` bewezen (inconsistente kandidaat faalt met álle concrete redenen tegelijk, publiceert niets; groene kandidaat publiceert config/sprint/progress/handoff atomair + `READY_FOR_DEV`; Claude kan `READY_FOR_DEV` niet buiten de command zetten); context-coherentie in drie modi groen; concrete fout in `note`+`autorun.log`; Lane A groen zónder admin-lees; CAS full-swap bewezen; alles consistent Sprint 14; **geen** actieve native auto-merge. `npm run check` + Python-tests + gates + Gemini groen. Geen deploy; geen productcode buiten de PR.

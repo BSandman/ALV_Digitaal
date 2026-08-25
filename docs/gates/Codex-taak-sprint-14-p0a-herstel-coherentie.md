@@ -1,85 +1,74 @@
-# Codex-taak — Sprint 14: P0a-herstel + coherentie-gate
+# Codex-taak — Sprint 14: veilige sprintactivatie + P0a-herstel
 
-**Ontwerp:** ADR-0026 (CI/CD-herinrichting) + ADR-0000 (kennis-/coherentie). **Zelf-modificerend, attended.** Herstelronde na Sprint 13: PR #23 mergde vroegtijdig (bug) en de fix-ronde bleek mergeklaar maar was het niet (Codex + Claude review, 24-08). Deze sprint fixt de **klasse**, niet het geval. **Native auto-merge blijft OFF.**
+**Ontwerp:** ADR-0026 (CI/CD) + ADR-0000 (coherentie) + Codex-review 24-08. **Zelf-modificerend, attended.** Herstelronde na Sprint 13. De review legde een **structurele bootstrap-cirkel** bloot: de gewenste eindtoestand werd beschreven, maar de overgang vanaf de actuele toestand niet bewezen — Claude wijzigde de baton rechtstreeks op `main` (buiten de GitSteward om), gaf config-herstel aan Codex terwijl Codex' watcher die config vóór de start valideert, en droeg over met een open PR (#24). **De kern van deze sprint is dat niet nóg een regel oplost, maar een machine-afgedwongen atomische sprintactivatie.** **Native auto-merge blijft OFF.**
 
-**Raakt:** ADR-0026 · ADR-0023 (PR-gate) · ADR-0025 (GitSteward) · ADR-0015 (guardrails) · ADR-0000 (coherentie) · `.github/workflows/ci.yml` · nieuw `.github/workflows/p0a-admin-preflight.yml` · `scripts/pipeline_guard.py` · `scripts/git_steward.py` · `scripts/watch_handoff.py` · nieuw `scripts/check_coherence.py` · `config/pipeline-sprint.json` · `sprint.md` · `handoff.md`. Loop deze keten af vóór je iets wijzigt: een verandering in de baton-transitie (`git_steward`), de verificatie-lane (`ci.yml`/preflight) of de bron-van-waarheid (`config`) raakt de rest — afwijken van één stuk breekt de andere.
+**Raakt:** ADR-0026 · ADR-0025 (GitSteward) · ADR-0023 (PR-gate) · ADR-0015 (guardrails) · ADR-0000 (coherentie) · `scripts/git_steward.py` (nieuw: `activate-sprint`) · `scripts/pipeline_guard.py` · `scripts/watch_handoff.py` · nieuw `scripts/check_coherence.py` · `.github/workflows/ci.yml` · `config/pipeline-sprint.json` · `sprint.md` · `handoff.md` · `progress.md`. Loop deze keten af: de sprintactivatie, de baton-transitie en de bron-van-waarheid (`config`) grijpen in elkaar — afwijken van één stuk breekt de start.
 
-## Werkwijze
-- **Basisbranch:** vertak Sprint 14 van de tip van `agent/sprint-13-cicd-p0a-fix1` (`9243eec`) — **voorkeur**, want findings 1–8 zijn daar grotendeels goed; **gevolg van vanaf `main` starten:** je herbouwt al dat werk = verspilling. Nieuwe branch: **`agent/sprint-14-p0a-herstel-coherentie`**.
-- **Geen open PR laten staan** vanuit de fix1-branch (anders tript de 1-PR-invariant); Sprint 14 krijgt één verse PR naar `main`.
-- Watchers op **`main`**, attended, `--max-turns 1`; **merge attended exact-op-SHA** (`PIPELINE_AUTOMERGE` blijft `off`). Schoon + in-sync eindigen.
+## Werkwijze — veilige herstelroute (Codex-review)
+Niet rechtstreeks vanaf `9243eec` vertakken (dat sleept de verouderde control-plane mee). Route:
+1. **PR #24 sluiten als *superseded*** — menselijke randvoorwaarde (Bas), vóór activatie.
+2. **Eenmalige begeleide bridge (expliciete uitzondering).** Er zijn twee bootstrap-cirkels: (a) Codex moet config repareren maar de watcher valideert config vóór de start; (b) de nieuwe infra-config vereist de nieuwe guard die Codex pas bouwt. Doorbreken zonder productcode buiten een PR: zet op de actuele `main` (`bfd9e95`) een **oud-schema-consistente** Sprint 14-kandidaat (config `sprint:14` + doelbranch + `0.2.0`/`v0.2.0`, plus `sprint.md`/`handoff.md`) in één commit, **verifieer de oude guard groen** (handmatig, met Bas erbij) en zet dán pas `READY_FOR_DEV`. Codex' **eerste** deliverable is `activate-sprint` (nieuw-schema-bewust) + migratie van config naar `infra`-schema op de branch; vanaf Sprint 15 verplicht via de command.
+3. **Nieuwe Sprint 14-branch** `agent/sprint-14-veilige-activatie` vanaf de geactiveerde `main`.
+4. **Alleen de bruikbare broncodewijzigingen van `9243eec` cherry-picken** (`pipeline_guard.py`, `git_steward.py`, `watch_handoff.py`, `notify_bas.py`, `ci.yml`, tests) — **niet** de oude `handoff.md`/`progress.md`/`sprint.md`/`config` uit de fixbranch.
+5. Watchers op **`main`**, attended, `--max-turns 1`; merge attended exact-op-SHA (`PIPELINE_AUTOMERGE` off).
 
-## Scope (in) — met voorkeur + gevolg per keuze
+## Scope (in) — kern: control-plane veilig maken
 
-### 1. Lane A — onbevoorrechte PR-CI-verificatie
-De PR-workflow (`ci.yml`, draait PR-code) verifieert **alleen wat `GITHUB_TOKEN` veilig kan lezen**:
-- `PIPELINE_AUTOMERGE == off` (via `vars`, geen API);
-- de oude `pipeline-autoadvance`-workflow is `disabled_manually` (via `actions: read`);
-- sprintmetadata + `config/pipeline-sprint.json` kloppen (`pipeline_guard setup`, lokaal `--defer-live-safety-to-ci`-equivalent voor de admin-as);
-- PR-nummer, branch en gecontroleerde commit-SHA komen overeen.
+### 1. `git_steward activate-sprint` — atomische, bewezen sprintstart (de kern)
+Claude levert alleen een **kandidaat-sprintmanifest** aan; Claude zet daarna **nooit meer zelf** `READY_FOR_DEV`. De command draait op een **verse `main`-snapshot** en voert alle controles uit:
+1. vorige sprint formeel beëindigd of als incident afgesloten;
+2. oude pipeline-PR's gesloten of expliciet afgehandeld;
+3. sprintnummer, doelbranch, basis-SHA en infra-tag geldig;
+4. `config`, sprintdocument en baton vormen één consistente kandidaat;
+5. de basiscommit bestaat en is bereikbaar;
+6. **alle fouten worden tegelijk en concreet gerapporteerd** (geen faal-op-de-eerste);
+7. **alleen bij volledig groen** worden `config`, `sprint.md`, `progress.md` en `handoff.md` **atomair gepubliceerd** en `READY_FOR_DEV` gezet.
 
-**Verwijder de branch-protection-lees uit deze lane** (`gh api .../branches/main/protection/...` uit `ci.yml`). **Reden/voorkeur:** dat endpoint vereist `Administration: read`, en dat recht bestáát niet binnen de instelbare `GITHUB_TOKEN`-permissies. **Gevolg van het tóch daar laten:** 403 → fail-closed → CI permanent rood om een omgevingsreden (de fout die deze hele ronde veroorzaakte). Workflow-`permissions` in Lane A blijven minimaal: `contents: read`, `actions: read`, `pull-requests: read`. **Nooit** een admin-/App-token in deze PR-be­ïnvloede workflow.
+De activatie beoordeelt de **kandidaat-sprint én de nog-actieve toestand van de vorige sprint**: een oude **open** PR blokkeert, een correct-gesloten oude PR of een oud, anders-genaamd tag niet (de 1-PR-invariant blijft fail-closed). De command **ondersteunt het nieuwe manifestformaat** (`infra`-namespace-schema) — dat doorbreekt de tweede bootstrap-cirkel (nieuwe config vereist nieuwe guard). Bij een fout blijft Claude eigenaar van de voorbereiding. Alleen wanneer een **externe handeling** nodig is (zoals PR #24 sluiten) gaat de baton met een **concrete actie** naar Bas — niet een generieke melding. **Voorkeur:** dit ís de stop tegen de bootstrap-cirkel — de statemachine wordt machine-afgedwongen i.p.v. adviserend. **Machinegarantie vereist een GitHub-laag (named follow-up, Sprint 15/P0b):** een command voorkomt geen directe omzeiling zolang een agent nog rechtstreeks naar `main` kan pushen. De harde afdwinging vraagt: `main` beschermd tegen directe agent-pushes; alleen een herkenbare **GitSteward-identiteit** (aparte GitHub App, beperkte `Contents: write`) mag de activatie publiceren; andere agent-identiteiten uitsluitend via PR. Sprint 14 levert de command + conventie en bedraadt wat lokaal kan; de GitHub-afdwinging is de expliciete vervolgstap.  **Gevolg van weglaten:** agents blijven zelf `handoff.md` op `main` kunnen zetten en de regels blijven adviserend → dezelfde klasse fouten keert terug.
 
-### 2. `p0a-admin-preflight` — aparte, vertrouwde beheercontrole
-Nieuwe workflow `.github/workflows/p0a-admin-preflight.yml` die:
-- **uitsluitend de workflowversie van `main`** gebruikt (geen `checkout` van PR-code, geen PR-artifacts/caches);
-- alleen GitHub-API-aanroepen doet (geen build/test van repo-code);
-- **per run een kortlevend installation-token mint** met `actions/create-github-app-token@v3` en dáármee branch-protection van `main` leest met `Administration: read`;
-- verifieert: strict/up-to-date **uit**, required checks aanwezig zoals bedoeld;
-- **fail-closed** eindigt (exit ≠ 0 bij twijfel/onleesbaar);
-- start via **`workflow_dispatch`** (aanvankelijk handmatig door Bas).
+### 2. Context-afhankelijke coherentie (vervangt de universele gelijkheid)
+De coherentiecontrole is **niet** één universele `branch == overal`-check (die deadlockt: bij activatie draait de watcher bewust op `main` terwijl `config` naar een featurebranch wijst). Drie modi:
+- **Sprintactivatie:** actuele branch = `main`; manifest bevat de *toekomstige* featurebranch; basis-SHA bestaat.
+- **Codex-featurewerk:** actuele branch == de manifestbranch.
+- **PR-CI:** de PR-head == de manifestbranch.
 
-**Identiteit — GitHub App, géén opgeslagen token, géén PAT.** Een App-installatietoken is kortlevend en wordt elke run opnieuw gemint; sla het dus nooit als secret op. GitHub schrijft dit patroon voor: Client ID als **repository variable**, private key als **repository secret**, token per run genereren.
+`scripts/check_coherence.py` implementeert deze modi en wordt door `activate-sprint` én door Lane A CI gebruikt. **Gevolg van één universele check:** blokkeert opnieuw alles bij de start.
+
+### 3. Concrete guard-/activatiefouten doorgeven
+`watch_handoff.py` vangt nu stdout/stderr van de setup-guard maar rapporteert alleen "pipeline setup-lint blokkeerde de sprintstart" → onbruikbaar. **De concrete fout** (bv. "enige open pipeline-PR hoort niet bij de gereserveerde sprintbranch") moet in de `BLOCKED`-`note` en in `autorun.log` terechtkomen. **Gevolg van weggooien:** Claude/Bas moeten achteraf raden — precies wat nu gebeurde.
+
+### 4. Lane A — onbevoorrechte PR-CI-verificatie
+`ci.yml` (draait PR-code) verifieert alleen wat `GITHUB_TOKEN` veilig kan lezen: `PIPELINE_AUTOMERGE == off` (via `vars`), oude `pipeline-autoadvance` = `disabled_manually` (via `actions: read`), metadata/config kloppen, PR/branch/SHA komen overeen. **Verwijder de branch-protection-lees hier** (vereist `Administration: read`, bestaat niet in `GITHUB_TOKEN` → 403 → CI rood). Permissions minimaal (`contents/actions/pull-requests: read`); **nooit** een admin-/App-token in deze PR-be­ïnvloede workflow.
+
+### 5. CAS-baton — volledige swap (draait finding-7 terug)
+Frontmatter = **volledige CAS**: elke onverwachte frontmatter-afwijking t.o.v. de geobserveerde parent = **verloren race → herlezen + herberekenen** op verse `main`; alleen `progress.md` (append-only) mergen; idempotente "doel-al-bereikt"-tak toetst de **volledige** bedoelde staat + invarianten. Verwijder `test_concurrent_same_state_descriptive_fields_are_preserved_fieldwise`; vervang door een test die bewijst dat een onverwachte divergentie tot re-read/recompute leidt. **Gevolg van veldsgewijs houden:** semantisch tegenstrijdige baton kan doorlopen.
+
+## Scope (in) — `p0a-admin-preflight` verplicht vóór integratie; alleen rebase-SHA mag naar Sprint 15
+
+### 6. `p0a-admin-preflight` — aparte, vertrouwde beheercontrole (VERPLICHT vóór integratie)
+Nieuwe workflow die alleen de `main`-workflowversie gebruikt (geen PR-code/checkout/artifacts), puur API, **per run een kortlevend token mint** met `actions/create-github-app-token@v3` en daarmee branch-protection leest met `Administration: read`, fail-closed, `workflow_dispatch` (handmatig Bas).
 - Repository variable: `ADMIN_PREFLIGHT_APP_CLIENT_ID`
 - Repository secret: `ADMIN_PREFLIGHT_APP_PRIVATE_KEY`
 - Tijdelijke stap-output (nooit opgeslagen): `ADMIN_PREFLIGHT_APP_TOKEN`
 
-App-instellingen: installatie **alleen `ALV_Digitaal`**, `Administration: read-only`, overige rechten **none**, webhooks **uit**. **Gevolg van afwijken (PAT of opgeslagen token):** breder/langlevender geheim, grotere blast-radius bij lek — GitHub raadt Apps expliciet boven PAT's aan.
+App: installatie alleen `ALV_Digitaal`, `Administration: read-only`, overige rechten none, webhooks uit. **Gevolg van afwijken (PAT/opgeslagen token):** breder/langlevender geheim. Inert zolang variable/private-key ontbreekt: buiten de PR-gates, handmatige preflight stopt met duidelijke melding, Lane A werkt door, Codex niet geblokkeerd.
 
-Referentiepatroon in de workflow:
-
-```yaml
-- name: Maak tijdelijk beheer-token
-  id: admin-token
-  uses: actions/create-github-app-token@v3
-  with:
-    client-id: ${{ vars.ADMIN_PREFLIGHT_APP_CLIENT_ID }}
-    private-key: ${{ secrets.ADMIN_PREFLIGHT_APP_PRIVATE_KEY }}
-- name: Controleer branch protection
-  env:
-    GH_TOKEN: ${{ steps.admin-token.outputs.token }}
-  run: gh api repos/${{ github.repository }}/branches/main/protection/required_status_checks
-```
-
-**Inert-gedrag zolang de variable óf de private key ontbreekt** (geen stille fail-open, maar ook geen blokkade): `p0a-admin-preflight` blijft **buiten** de verplichte PR-gates; een handmatig gestarte preflight **stopt met een duidelijke melding**; **Lane A** blijft zonder adminrechten werken; **Codex wordt niet geblokkeerd**.
-
-### 3. CAS-baton — volledige swap (draait finding-7 terug)
-De veldsgewijze handoff-merge kan een nieuwe `state`/`owner` combineren met beschrijvende velden van de vórige toestand → semantisch tegenstrijdige baton. **Voorkeur:** frontmatter = **volledige CAS** — elke onverwachte frontmatter-afwijking t.o.v. de geobserveerde parent = **verloren race → herlezen + overgang opnieuw berekenen** op verse `main`; alleen `progress.md` (append-only) mergen; op de idempotente "doel-al-bereikt"-tak de **volledige** bedoelde staat + invarianten toetsen (niet enkel `state`/`owner`/`sprint`). **Gevolg van veldsgewijs houden:** technisch-geldige maar inhoudelijk tegenstrijdige baton kan doorlopen. **Test:** verwijder `test_concurrent_same_state_descriptive_fields_are_preserved_fieldwise`; vervang door een test die bewijst dat een onverwachte frontmatter-divergentie tot re-read/recompute leidt (geen veld-merge).
-
-### 4. Nood-rebaseplan — eenduidige SHA-rollen
-Vervang de ambigue `old_sha` door drie expliciete rollen: `old_main_base_sha`, `new_main_sha`, `expected_old_branch_head_sha`. Controleer vóór uitvoering merge-base + voorouderrelaties; vul een exacte `--force-with-lease=<branch>:<expected_old_branch_head_sha>` in. **Voorkeur:** dit nu hardmaken, ook al is het pad dry-run-only. **Gevolg van uitstellen:** een uitvoerder kan bij een echte noodrebase de verkeerde commits herschrijven (data-verlies op een safety-pad). Blijft dry-run-advies tot de ancestry-checks bewezen zijn.
-
-### 5. Coherentie-gate + single source of truth (de "stop")
-**`config/pipeline-sprint.json` = de autoriteit** voor sprint/branch/versie/tag. `sprint.md` en `handoff.md` **verwijzen** ernaar en dupliceren de waarden niet. Nieuw `scripts/check_coherence.py` dat **luid faalt** (exit ≠ 0) zodra onderdelen elkaar tegenspreken:
-- branch in `config` == `handoff.md` == `sprint.md` == de actuele git-branch (waar van toepassing);
-- versie/tag-namespace botst niet met de app-versie in `package.json` (infra-namespace ≠ `vX.y.z`);
-- de gedeclareerde `Raakt:`-verwijzingen in het taakdoc bestaan als bestand/ADR (bestands-existentie, geen semantiek).
-
-Draai de gate in **Lane A CI** én als **lokale pre-flight** in de watcher-setup-guard. **Voorkeur:** dit is de kern van deze sprint — het hándhaaft de ADR-0000-index (de index declareert koppelingen, de gate bewijst dat ze kloppen). **Gevolg van weglaten:** de tegenspraak-klasse (sprint.md ≠ handoff ≠ config, versiebotsingen) blijft terugkomen.
-
-### 6. Consistentie-herstel (in één klap)
-Trek `sprint.md`, `handoff.md`, `config/pipeline-sprint.json`, de branchnaam en de tests **allemaal** naar Sprint 14. De `0.2.0`-botsing is al opgelost via de infra-namespace; houd dat. Geen enkel bestand mag na deze sprint nog naar `agent/sprint-13-*` of een app-`vX.y.z`-tag voor deze infra-sprint verwijzen.
+### 7. Nood-rebaseplan — eenduidige SHA-rollen (mag naar Sprint 15)
+`old_main_base_sha` / `new_main_sha` / `expected_old_branch_head_sha` + merge-base/ancestry-check + `--force-with-lease=<branch>:<expected_old_branch_head_sha>`; dry-run-only tot bewezen.
 
 ## Scope (uit — P0b of later)
-Native auto-merge activeren · echte Gemini-verdict-check · PII context-aware gate · Environment/deploy-poort · dedup-notifier (indien nog niet gedaan) · lease · labels-migratie · validatie-voor-merge. De `p0a-admin-preflight` blijft **handmatig**; automatisch draaien = P0b.
+Native auto-merge activeren · echte Gemini-verdict-check · PII context-aware gate · Environment/deploy-poort · dedup-notifier · lease · labels-migratie · `p0a-admin-preflight` automatisch draaien.
 
-## Acceptatiecriteria / go-no-go → P0b
-1. **Lane A groen zónder admin-lees:** `ci.yml` verifieert automerge-off + workflow-disabled + metadata/config + PR/SHA; geen `branch/protection`-call meer in de PR-lane; permissions minimaal.
-2. **`p0a-admin-preflight` bestaat en is correct begrensd:** alleen `main`-workflow, geen PR-code/checkout/artifacts, puur API, `Administration: read` via een **per-run gemint App-token** (`actions/create-github-app-token@v3`; Client ID = variable, private key = secret, nooit een opgeslagen token), fail-closed, `workflow_dispatch`. Aantoonbaar inert-met-duidelijke-melding zolang variable/private-key ontbreekt (buiten PR-gates, Lane A werkt door, Codex niet geblokkeerd).
-3. **CAS full-swap bewezen:** onverwachte frontmatter-divergentie → re-read/recompute (nieuwe test groen); de oude veld-merge-test is weg; idempotente tak toetst volledige staat + invarianten.
-4. **Nood-rebase:** drie expliciete SHA-rollen + merge-base/ancestry-check + `--force-with-lease`; dry-run bewezen.
-5. **Coherentie-gate:** faalt aantoonbaar bij een geïntroduceerde tegenstrijdigheid (branch-mismatch of versiebotsing) en is groen bij consistente staat; draait in CI én lokale pre-flight.
-6. **Alles consistent Sprint 14**; **geen** actieve native auto-merge; `npm run check` + Python-tests + architectuur-/release-/handoff-/PII-gates + Gemini groen. Geen deploy; geen productcode naar `main` buiten de PR.
+## Acceptatiecriteria (P0a-afronding)
+
+> **P0b-go/no-go is pas geldig als criterium 6 (`p0a-admin-preflight`) groen is.** Zonder admin-preflight is dit control-plane-herstel, geen volledige P0a-afronding.
+1. **`activate-sprint` bewezen:** een inconsistente kandidaat (open vreemde PR, niet-bestaande basis-SHA, config/baton-mismatch) faalt met **alle** concrete redenen tegelijk en publiceert niets; een volledig groene kandidaat publiceert config/sprint/progress/handoff **atomair** + `READY_FOR_DEV`. Claude kan `READY_FOR_DEV` niet buiten deze command zetten.
+2. **Context-coherentie:** de drie modi (activatie/feature/PR-CI) elk groen op de juiste branch-verwachting; de universele-gelijkheids-deadlock is aantoonbaar weg.
+3. **Concrete fout doorgegeven:** een geblokkeerde activatie toont de exacte guard-reden in `note` + `autorun.log`.
+4. **Lane A groen zónder admin-lees;** geen `branch/protection`-call in de PR-lane; permissions minimaal.
+5. **CAS full-swap bewezen:** onverwachte divergentie → re-read/recompute (nieuwe test groen; oude veld-merge-test weg).
+6. **`p0a-admin-preflight` verplicht bewezen vóór integratie:** correct begrensd (alleen `main`-workflow, per-run App-token, `Administration: read`, fail-closed, inert-met-melding zonder credential). Rebase-SHA-rollen + `--force-with-lease` dry-run **mogen** naar Sprint 15.
+7. **Alles consistent Sprint 14**; geen verwijzing meer naar `agent/sprint-13-*` of een app-`vX.y.z`-tag voor deze infra-sprint; **geen** actieve native auto-merge; `npm run check` + Python-tests + gates + Gemini groen. Geen deploy; geen productcode naar `main` buiten de PR.
 
 ## Overdracht
-`handoff.md` → PR bij `READY_FOR_TEST` (Gemini + Lane A-gates), daarna `READY_FOR_VALIDATION` (Claude tegen ADR-0026 + ADR-0000 + deze criteria), dan `READY_FOR_INTEGRATION` (Mistral, **attended exact-SHA-merge**). De `p0a-admin-preflight` draait Bas handmatig vóór integratie. **Deploy nooit.** Bij twijfel/afwijking van een ADR: `BLOCKED` + `action_required_by: bas`.
+`handoff.md` → PR bij `READY_FOR_TEST` (Gemini + Lane A-gates) → `READY_FOR_VALIDATION` (Claude tegen ADR-0026 + ADR-0000 + deze criteria) → `READY_FOR_INTEGRATION` (Mistral, **attended exact-SHA-merge**). Vanaf nu wordt élke volgende sprint via `git_steward activate-sprint` geopend. **Deploy nooit.** Bij twijfel/afwijking: `BLOCKED` + `action_required_by: bas` met een **concrete** actie.
