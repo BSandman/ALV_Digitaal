@@ -1,12 +1,12 @@
 ---
 sprint: 14
-state: DEV_IN_PROGRESS
-owner: codex
-since: 2026-08-25T20:40:11Z
-next: gemini
+state: READY_FOR_TEST
+owner: gemini
+since: 2026-08-25T20:56:13Z
+next: claude
 action_required_by: none
 blocked: false
-note: "Sprint 14 (veilige activatie + P0a-herstel) na begeleide bridge: PR #24 gesloten, config/sprint/baton oud-schema-consistent op main; branch agent/sprint-14-veilige-activatie vanaf main; source uit 9243eec cherry-picken; auto-merge off."
+note: "Sprint 14 P0a-herstel staat op PR #25 (exact SHA a3e9a13); CI/Gemini volgen, auto-merge blijft off en admin-preflight is vóór integratie verplicht."
 ---
 
 # handoff.md — de estafettestok
