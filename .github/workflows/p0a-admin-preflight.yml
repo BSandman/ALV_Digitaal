@@ -1,0 +1,60 @@
+name: P0a trusted admin preflight
+
+# Raakt: ADR-0026 · ADR-0025 · config/pipeline-sprint.json (vertrouwde Lane B).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  branch-protection:
+    name: Read bounded main branch protection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the trusted main workflow version and App credentials
+        env:
+          APP_CLIENT_ID: ${{ vars.ADMIN_PREFLIGHT_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.ADMIN_PREFLIGHT_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "ADMIN_PREFLIGHT_BLOCKED: start deze workflow uitsluitend vanaf main" >&2
+            exit 2
+          fi
+          if [[ -z "$APP_CLIENT_ID" || -z "$APP_PRIVATE_KEY" ]]; then
+            echo "ADMIN_PREFLIGHT_BLOCKED: ADMIN_PREFLIGHT_APP_CLIENT_ID/private key ontbreken; Lane A blijft bruikbaar" >&2
+            exit 2
+          fi
+
+      - name: Mint per-run read-only administration token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.ADMIN_PREFLIGHT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ADMIN_PREFLIGHT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-administration: read
+
+      - name: Read main protection fail-closed without checkout or artifacts
+        env:
+          ADMIN_PREFLIGHT_APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          protection="$(GH_TOKEN="$ADMIN_PREFLIGHT_APP_TOKEN" gh api \
+            "repos/${GITHUB_REPOSITORY}/branches/main/protection")"
+          if [[ -z "$protection" ]]; then
+            echo "ADMIN_PREFLIGHT_BLOCKED: branch protection kon niet worden gelezen" >&2
+            exit 2
+          fi
+          if ! strict="$(jq -er '.required_status_checks.strict | if type == "boolean" then tostring else error("strict ontbreekt") end' <<<"$protection")"; then
+            echo "ADMIN_PREFLIGHT_BLOCKED: required_status_checks.strict ontbreekt of is ongeldig" >&2
+            exit 2
+          fi
+          if [[ "$strict" != "false" ]]; then
+            echo "ADMIN_PREFLIGHT_BLOCKED: required_status_checks.strict moet in P0a false zijn" >&2
+            exit 2
+          fi
+          echo "ADMIN_PREFLIGHT_OK: main branch protection is leesbaar met een per-run App-token (strict=$strict)"

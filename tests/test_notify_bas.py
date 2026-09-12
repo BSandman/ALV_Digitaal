@@ -126,6 +126,16 @@ class NotifyBasTests(unittest.TestCase):
             self.assertFalse(result.triggered)
             self.assertFalse(state_file.exists())
 
+    def test_missing_or_empty_notifier_state_environment_uses_safe_default(self) -> None:
+        for environ in ({}, {"ALV_NOTIFIER_STATE": ""}, {"ALV_NOTIFIER_STATE": "   "}):
+            with self.subTest(environ=environ):
+                self.assertEqual(
+                    notify_bas.path_from_environment(
+                        "ALV_NOTIFIER_STATE", notify_bas.DEFAULT_STATE, environ
+                    ),
+                    notify_bas.DEFAULT_STATE,
+                )
+
     def test_successful_channel_is_not_repeated_if_later_channel_fails(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             handoff, state_file = self.paths(

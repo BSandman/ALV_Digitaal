@@ -19,6 +19,7 @@ from typing import Any, Mapping, Sequence
 
 SHA_RE = re.compile(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})\Z")
 VERSION_RE = re.compile(r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\Z")
+INFRA_VERSION_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 
 
 class PipelineGuardError(RuntimeError):
@@ -37,6 +38,8 @@ class PrResolution:
 class SprintMetadata:
     sprint: int
     branch: str
+    base_sha: str
+    release_namespace: str
     version: str
     release_tag: str
     release_sha: str | None
@@ -173,7 +176,7 @@ def load_sprint_metadata(path: Path) -> SprintMetadata:
     if not isinstance(payload, Mapping):
         raise PipelineGuardError("sprintmetadata moet een JSON-object zijn")
     expected_keys = {
-        "sprint", "branch", "version", "release_tag", "release_sha",
+        "sprint", "branch", "base_sha", "release_namespace", "version", "release_tag", "release_sha",
         "require_branches_up_to_date", "native_automerge",
     }
     if set(payload) != expected_keys:
@@ -181,6 +184,8 @@ def load_sprint_metadata(path: Path) -> SprintMetadata:
     try:
         sprint = int(payload["sprint"])
         branch = str(payload["branch"])
+        base_sha = str(payload["base_sha"]).lower()
+        release_namespace = str(payload["release_namespace"])
         version = str(payload["version"])
         release_tag = str(payload["release_tag"])
         release_sha_raw = payload["release_sha"]
@@ -189,10 +194,19 @@ def load_sprint_metadata(path: Path) -> SprintMetadata:
     except (TypeError, ValueError) as exc:
         raise PipelineGuardError("sprintmetadata bevat ongeldige veldtypen") from exc
     release_sha = None if release_sha_raw is None else str(release_sha_raw).lower()
-    if sprint < 1 or not branch.startswith("agent/"):
+    if sprint < 1 or not branch.startswith("agent/") or not SHA_RE.fullmatch(base_sha):
         raise PipelineGuardError("sprintnummer of sprintbranch is ongeldig")
-    if not VERSION_RE.fullmatch(version) or release_tag != f"v{version}":
-        raise PipelineGuardError("versie en gereserveerde release-tag zijn niet canoniek")
+    if release_namespace == "app":
+        canonical_release = VERSION_RE.fullmatch(version) and release_tag == f"v{version}"
+    elif release_namespace == "infra":
+        canonical_release = (
+            INFRA_VERSION_RE.fullmatch(version) is not None
+            and release_tag == f"infra-{version}"
+        )
+    else:
+        canonical_release = False
+    if not canonical_release:
+        raise PipelineGuardError("release-namespace, versie en gereserveerde tag zijn niet canoniek")
     if release_sha is not None and not SHA_RE.fullmatch(release_sha):
         raise PipelineGuardError("geregistreerde release-SHA is ongeldig")
     if require_up_to_date is not False:
@@ -200,7 +214,7 @@ def load_sprint_metadata(path: Path) -> SprintMetadata:
     if native_automerge != "off":
         raise PipelineGuardError("native auto-merge moet in P0a uit staan")
     return SprintMetadata(
-        sprint, branch, version, release_tag, release_sha,
+        sprint, branch, base_sha, release_namespace, version, release_tag, release_sha,
         require_up_to_date, native_automerge,
     )
 
@@ -282,9 +296,37 @@ def _repository_variable(repository: str, name: str) -> str | None:
         capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     if result.returncode:
-        return None
+        detail = " ".join((result.stderr or result.stdout or "onleesbaar").splitlines())[:160]
+        raise PipelineGuardError(f"repositoryvariabele {name} kon niet fail-closed worden gelezen: {detail}")
     value = result.stdout.strip()
-    return value or None
+    if not value:
+        raise PipelineGuardError(f"repositoryvariabele {name} is leeg of ontbreekt")
+    return value
+
+
+def validate_live_repository_safety(
+    *,
+    repository_variable: str,
+    workflow_state: str,
+) -> dict[str, object]:
+    """Validate only state readable by Lane A's unprivileged PR token."""
+    if repository_variable != "off":
+        raise PipelineGuardError("PIPELINE_AUTOMERGE moet live leesbaar en exact 'off' zijn")
+    if workflow_state != "disabled_manually":
+        raise PipelineGuardError("pipeline-autoadvance workflow moet live disabled_manually zijn")
+    return {
+        "decision": "ok",
+        "pipeline_automerge": repository_variable,
+        "autoadvance_workflow": workflow_state,
+    }
+
+
+def _strict_boolean(value: str, *, label: str) -> bool:
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    raise PipelineGuardError(f"{label} moet exact true of false zijn")
 
 
 def _jsonable(value: object) -> object:
@@ -300,6 +342,16 @@ def _parser() -> argparse.ArgumentParser:
     setup.add_argument("--metadata", type=Path, required=True)
     setup.add_argument("--repository", required=True)
     setup.add_argument("--remote", default="origin")
+    live_source = setup.add_mutually_exclusive_group()
+    live_source.add_argument(
+        "--runtime-automerge",
+        help="live waarde uit GitHub Actions vars; zonder deze optie leest gh de repovariabele",
+    )
+    live_source.add_argument(
+        "--defer-live-safety-to-ci",
+        action="store_true",
+        help="lokale watcher: CI moet de live repo-status daarna fail-closed verifiëren",
+    )
     resolve = commands.add_parser("resolve")
     resolve.add_argument("--pr-number", required=True, type=int)
     resolve.add_argument("--repository", required=True)
@@ -315,6 +367,9 @@ def _parser() -> argparse.ArgumentParser:
     emergency.add_argument("--branch", required=True)
     emergency.add_argument("--old-sha", required=True)
     emergency.add_argument("--new-main-sha", required=True)
+    live = commands.add_parser("live-safety")
+    live.add_argument("--repository-variable", required=True)
+    live.add_argument("--workflow-state", required=True)
     return parser
 
 
@@ -336,13 +391,25 @@ def main(argv: list[str] | None = None) -> int:
             tag_status = verify_reserved_tag(
                 metadata, _existing_remote_tag(args.remote, metadata.release_tag)
             )
-            runtime_automerge = _repository_variable(args.repository, "PIPELINE_AUTOMERGE")
-            if runtime_automerge and runtime_automerge.casefold() == "on":
-                raise PipelineGuardError("PIPELINE_AUTOMERGE staat actief op on; P0a blokkeert")
+            if args.defer_live_safety_to_ci:
+                runtime_automerge = None
+                live_status = "deferred-to-ci"
+            else:
+                runtime_automerge = (
+                    args.runtime_automerge
+                    if args.runtime_automerge is not None
+                    else _repository_variable(args.repository, "PIPELINE_AUTOMERGE")
+                )
+                if runtime_automerge != "off":
+                    raise PipelineGuardError(
+                        "PIPELINE_AUTOMERGE moet live leesbaar en exact 'off' zijn"
+                    )
+                live_status = "verified-off"
             result: object = {
                 "decision": "ok", "active_pr": active.get("number") if active else None,
                 "release_tag": metadata.release_tag, "tag_status": tag_status,
-                "native_automerge": runtime_automerge or "unset/off",
+                "metadata_native_automerge_expectation": metadata.native_automerge,
+                "live_safety": live_status,
             }
         elif args.command == "resolve":
             fields = "number,state,baseRefName,headRefName,headRefOid,headRepository,labels"
@@ -360,10 +427,15 @@ def main(argv: list[str] | None = None) -> int:
             )
         elif args.command == "merge-plan":
             result = exact_sha_merge_plan(args.setting, args.pr_number, args.head_sha)
-        else:
+        elif args.command == "emergency-rebase-plan":
             result = emergency_rebase_plan(
                 paused=args.pause_file.is_file(), branch=args.branch,
                 old_sha=args.old_sha, new_main_sha=args.new_main_sha,
+            )
+        else:
+            result = validate_live_repository_safety(
+                repository_variable=args.repository_variable,
+                workflow_state=args.workflow_state,
             )
     except PipelineGuardError as exc:
         print(f"PIPELINE_GUARD_BLOCKED: {exc}", file=sys.stderr)

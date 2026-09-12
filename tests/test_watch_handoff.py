@@ -228,7 +228,14 @@ class WatchHandoffAutorunTests(unittest.TestCase):
             self.fixture_git(seed, "config", "user.email", "fixture@example.invalid")
             (seed / "scripts").mkdir()
             (seed / "docs" / "gates").mkdir(parents=True)
-            for name in ("git_steward.py", "lint_handoff.py", "notify_bas.py", "autorun_io.py"):
+            for name in (
+                "git_steward.py",
+                "lint_handoff.py",
+                "notify_bas.py",
+                "autorun_io.py",
+                "pipeline_guard.py",
+                "check_coherence.py",
+            ):
                 shutil.copy2(REPO / "scripts" / name, seed / "scripts" / name)
             (seed / ".gitignore").write_text(
                 "autorun-status.json\nautorun.log\nautorun.paused\n__pycache__/\n*.pyc\n",
@@ -281,18 +288,19 @@ class WatchHandoffAutorunTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = watch_handoff.run_session(
-                "codex",
-                autorun=True,
-                command=[sys.executable, str(runner)],
-                interval=1,
-                progress_tail=15,
-                max_turns=1,
-                max_wallclock=30,
-                once=False,
-                race_guard_seconds=0,
-                repo=work,
-            )
+            with mock.patch.object(watch_handoff, "run_pipeline_setup_guard"):
+                result = watch_handoff.run_session(
+                    "codex",
+                    autorun=True,
+                    command=[sys.executable, str(runner)],
+                    interval=1,
+                    progress_tail=15,
+                    max_turns=1,
+                    max_wallclock=30,
+                    once=False,
+                    race_guard_seconds=0,
+                    repo=work,
+                )
 
             runtime = json.loads((work / "autorun-status.json").read_text(encoding="utf-8"))
             remote_handoff = self.fixture_git(remote, "show", "main:handoff.md").stdout
@@ -495,10 +503,15 @@ class WatchHandoffAutorunTests(unittest.TestCase):
             self.assertEqual(blocked["owner"], "bas")
             self.assertEqual(blocked["action_required_by"], "bas")
             self.assertEqual(blocked["blocked"], "true")
+            self.assertIn("runner eindigde met exitcode 9", blocked["note"])
             self.assertEqual(git_calls, [("rev-parse", "HEAD")])
             self.assertEqual(steward_calls[0][0], "block_finalize")
             self.assertIn("--role", steward_calls[0])
             self.assertEqual(notifications, [repo])
+            self.assertIn(
+                "runner eindigde met exitcode 9",
+                (repo / "autorun.log").read_text(encoding="utf-8"),
+            )
 
     def test_failed_coordination_sync_is_block_finalized_via_steward(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -708,6 +721,40 @@ class WatchHandoffAutorunTests(unittest.TestCase):
             execute.assert_called_once()
             guard.assert_not_called()
 
+    def test_missing_pipeline_metadata_blocks_sprint_start(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = self.make_repo(directory)
+            with self.assertRaisesRegex(watch_handoff.AutorunError, "sprintmetadata"):
+                watch_handoff.run_pipeline_setup_guard(repo)
+
+    def test_local_pipeline_setup_explicitly_defers_live_safety_to_ci(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = self.make_repo(directory)
+            metadata = repo / "config" / "pipeline-sprint.json"
+            metadata.parent.mkdir()
+            metadata.write_text("{}\n", encoding="utf-8")
+            completed = subprocess.CompletedProcess(["pipeline_guard"], 0, stdout="{}", stderr="")
+            with mock.patch.object(
+                watch_handoff.subprocess, "run", return_value=completed
+            ) as runner:
+                watch_handoff.run_pipeline_setup_guard(repo)
+
+            command = runner.call_args.args[0]
+            self.assertIn("--defer-live-safety-to-ci", command)
+
+    def test_pipeline_setup_guard_passes_through_concrete_error(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = self.make_repo(directory)
+            metadata = repo / "config" / "pipeline-sprint.json"
+            metadata.parent.mkdir()
+            metadata.write_text("{}\n", encoding="utf-8")
+            completed = subprocess.CompletedProcess(
+                ["pipeline_guard"], 2, stdout="", stderr="PIPELINE_GUARD_BLOCKED: open PR #24 moet eerst sluiten\n"
+            )
+            with mock.patch.object(watch_handoff.subprocess, "run", return_value=completed):
+                with self.assertRaisesRegex(watch_handoff.AutorunError, "open PR #24"):
+                    watch_handoff.run_pipeline_setup_guard(repo)
+
     def test_max_turns_exits_cleanly_without_after_idle_or_block(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo = self.make_repo(directory)
@@ -717,6 +764,7 @@ class WatchHandoffAutorunTests(unittest.TestCase):
                 mock.patch.object(watch_handoff, "execute_autorun_turn", return_value="success") as execute,
                 mock.patch.object(watch_handoff, "wait_for_race_guard", return_value=True),
                 mock.patch.object(watch_handoff, "claim_runner_turn", return_value=None),
+                mock.patch.object(watch_handoff, "run_pipeline_setup_guard", return_value=None),
                 mock.patch.object(watch_handoff, "mark_blocked", return_value=True) as blocked,
                 mock.patch.object(watch_handoff.time, "sleep", return_value=None),
             ):

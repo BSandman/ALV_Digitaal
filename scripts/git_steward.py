@@ -10,6 +10,7 @@ therefore never staged, committed or pushed by this script.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -22,9 +23,17 @@ from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
 from lint_handoff import HandoffValidationError, parse_frontmatter, validate_file, validate_values
+from check_coherence import CoherenceError, validate_coherence
+from pipeline_guard import PipelineGuardError, load_sprint_metadata, verify_reserved_tag
 
 
 COORDINATION_PATHS = ("handoff.md", "progress.md")
+ACTIVATION_PATHS = (
+    "config/pipeline-sprint.json",
+    "sprint.md",
+    "progress.md",
+    "handoff.md",
+)
 DEFAULT_TOKEN_PATH = Path("mistral-lokaal/secure/git-steward.env")
 ROLE_NAMES = {"codex": "Codex", "claude": "Claude", "gemini": "Gemini", "mistral": "Mistral"}
 STEWARD_NAME = "ALV GitSteward"
@@ -399,11 +408,7 @@ class GitSteward:
         if target_values["sprint"] != source_values["sprint"]:
             raise GitStewardError("coördinatietransitie mag het sprintnummer niet wijzigen")
 
-        target_reached = (
-            current_values["state"] == target_state
-            and current_values["owner"] == target_values["owner"]
-            and current_values["sprint"] == target_values["sprint"]
-        )
+        target_reached = current_values == target_values
         if current_values["state"] != expected_from and not target_reached:
             raise GitStewardError(
                 f"stale source-state: main staat op {current_values['state']}, verwacht {expected_from}"
@@ -414,8 +419,18 @@ class GitSteward:
         if progress_delta and progress_delta not in current_progress:
             separator = b"" if not current_progress or current_progress.endswith(b"\n") else b"\n"
             merged_progress = current_progress + separator + progress_delta.lstrip(b"\n")
+        merged_handoff = current_handoff
+        if not target_reached:
+            if current_values != source_values:
+                raise GitStewardError(
+                    "CAS-baton verloor de race door gewijzigde frontmatter; "
+                    "herlees verse main en herbereken de volledige transitie"
+                )
+            # The frontmatter is one semantic CAS value: swap the complete target,
+            # never combine fields from different observations.
+            merged_handoff = target["handoff.md"]
         return {
-            "handoff.md": current_handoff if target_reached else target["handoff.md"],
+            "handoff.md": merged_handoff,
             "progress.md": merged_progress,
         }
 
@@ -490,7 +505,14 @@ class GitSteward:
                         break
                     self.sleeper(self.backoff_seconds * (2 ** (attempt - 1)))
                     continue
-                self._consume_local_coordination()
+                try:
+                    self._consume_local_coordination()
+                except GitStewardError as exc:
+                    print(
+                        "GitSteward WAARSCHUWING: main-push is geslaagd; "
+                        f"lokale post-push-opruiming faalde: {exc}",
+                        file=sys.stderr,
+                    )
                 return True
             assert last_push_error is not None
             raise GitStewardError(
@@ -508,6 +530,234 @@ class GitSteward:
                 for relative in COORDINATION_PATHS
             }
         return sha, snapshots
+
+    def _open_pull_requests(self, repository: str) -> list[Mapping[str, object]]:
+        result = subprocess.run(
+            [
+                "gh", "pr", "list", "--repo", repository, "--state", "open",
+                "--base", "main", "--limit", "100", "--json", "number,state,baseRefName,headRefName,labels",
+            ],
+            cwd=self.repo,
+            env=self._environment(),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        if result.returncode:
+            detail = " ".join((result.stderr or result.stdout or "onbekende GitHub-fout").splitlines())[:200]
+            raise GitStewardError(f"open PR's konden niet fail-closed worden gelezen: {self._redact(detail)}")
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise GitStewardError("open PR-observatie gaf geen geldige JSON") from exc
+        if not isinstance(payload, list):
+            raise GitStewardError("open PR-observatie is geen lijst")
+        return payload
+
+    @staticmethod
+    def _candidate_bytes(candidate: Path, relative: str) -> bytes:
+        path = candidate / relative
+        if path.is_symlink() or not path.is_file():
+            raise GitStewardError(f"kandidaatbestand ontbreekt of is onveilig: {relative}")
+        try:
+            return path.read_bytes()
+        except OSError as exc:
+            raise GitStewardError(f"kandidaatbestand onleesbaar: {relative}") from exc
+
+    def activate_sprint(
+        self,
+        candidate: Path,
+        *,
+        repository: str,
+        pull_requests: Sequence[Mapping[str, object]] | None = None,
+        now: str | None = None,
+    ) -> bool:
+        """Validate and atomically publish a candidate sprint from fresh main."""
+        candidate = candidate.resolve()
+        remote_url = self._remote_url()
+        observed_prs = list(pull_requests) if pull_requests is not None else self._open_pull_requests(repository)
+        with tempfile.TemporaryDirectory(prefix="alv-git-steward-activate-") as temporary:
+            checkout = Path(temporary) / "main"
+            self._retry("main-observatie", lambda: self._clone_once(remote_url, checkout))
+            head_sha = self._run_git(["rev-parse", "HEAD"], cwd=checkout).stdout.strip().lower()
+            errors: list[str] = []
+
+            try:
+                activation = json.loads(self._candidate_bytes(candidate, "activation.json").decode("utf-8"))
+                if not isinstance(activation, Mapping):
+                    raise ValueError("geen object")
+                previous_sprint = int(activation["previous_sprint"])
+                resolution = str(activation["resolution"])
+                if set(activation) != {"previous_sprint", "resolution"}:
+                    errors.append("activation.json heeft ontbrekende of onverwachte velden")
+            except (GitStewardError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+                activation = {}
+                previous_sprint = -1
+                resolution = ""
+                errors.append(f"activation.json is ongeldig: {exc}")
+
+            config_path = candidate / "pipeline-sprint.json"
+            try:
+                metadata = load_sprint_metadata(config_path)
+            except PipelineGuardError as exc:
+                metadata = None
+                errors.append(str(exc))
+
+            try:
+                current_handoff_text = (checkout / "handoff.md").read_text(encoding="utf-8-sig")
+                current_values = parse_frontmatter(current_handoff_text)
+                validate_values(current_values)
+            except (OSError, UnicodeError, HandoffValidationError) as exc:
+                current_values = {}
+                errors.append(f"actieve baton is ongeldig: {exc}")
+
+            try:
+                current_config = json.loads(
+                    (checkout / "config/pipeline-sprint.json").read_text(encoding="utf-8")
+                )
+                current_config_sprint = int(current_config["sprint"])
+            except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+                current_config_sprint = -1
+                errors.append(f"actieve config is ongeldig: {exc}")
+
+            try:
+                candidate_handoff_text = self._candidate_bytes(candidate, "handoff.md").decode("utf-8-sig")
+                candidate_values = parse_frontmatter(candidate_handoff_text)
+                validate_values(candidate_values)
+            except (GitStewardError, UnicodeError, HandoffValidationError) as exc:
+                candidate_handoff_text = ""
+                candidate_values = {}
+                errors.append(f"kandidaat-baton is ongeldig: {exc}")
+
+            try:
+                sprint_text = self._candidate_bytes(candidate, "sprint.md").decode("utf-8-sig")
+                progress = self._candidate_bytes(candidate, "progress.md")
+            except (GitStewardError, UnicodeError) as exc:
+                sprint_text = ""
+                progress = b""
+                errors.append(str(exc))
+
+            if current_values:
+                current_sprint = int(current_values["sprint"])
+                if current_config_sprint != current_sprint:
+                    errors.append("actieve config en baton verschillen van sprintnummer")
+                if previous_sprint != current_sprint:
+                    errors.append("previous_sprint wijkt af van de nog actieve baton")
+                completed = resolution == "completed" and current_values["state"] == "SPRINT_DONE"
+                incident = (
+                    resolution == "incident"
+                    and current_values["state"] == "BLOCKED"
+                    and current_values["owner"] == "bas"
+                )
+                if not (completed or incident):
+                    errors.append("vorige sprint is niet formeel beëindigd of als incident afgesloten")
+                if metadata is not None and metadata.sprint != current_sprint + 1:
+                    errors.append("kandidaat-sprintnummer is niet exact de opvolger")
+            if metadata is not None:
+                try:
+                    validate_coherence(
+                        metadata,
+                        mode="activation",
+                        current_branch="main",
+                        head_sha=head_sha,
+                    )
+                except CoherenceError as exc:
+                    errors.append(str(exc))
+                exists = self._run_git(["cat-file", "-e", f"{metadata.base_sha}^{{commit}}"], cwd=checkout, check=False)
+                if exists.returncode:
+                    errors.append("basis-SHA bestaat niet als bereikbare commit")
+                branch_exists = self._run_git(
+                    ["ls-remote", "--heads", remote_url, f"refs/heads/{metadata.branch}"],
+                    cwd=checkout,
+                    check=False,
+                )
+                if branch_exists.returncode:
+                    errors.append("doelbranch kon niet fail-closed worden geobserveerd")
+                elif branch_exists.stdout.strip():
+                    errors.append("doelbranch bestaat al; kies een verse sprintbranch")
+                tag_result = self._run_git(
+                    ["ls-remote", "--tags", remote_url, f"refs/tags/{metadata.release_tag}"],
+                    cwd=checkout,
+                    check=False,
+                )
+                if tag_result.returncode:
+                    errors.append("infra-tag kon niet fail-closed worden geobserveerd")
+                else:
+                    tag_sha = tag_result.stdout.split()[0] if tag_result.stdout.split() else None
+                    try:
+                        verify_reserved_tag(metadata, tag_sha)
+                    except PipelineGuardError as exc:
+                        errors.append(str(exc))
+                if f"sprint {metadata.sprint}" not in sprint_text.casefold():
+                    errors.append("sprintdocument noemt het kandidaat-sprintnummer niet")
+                if metadata.branch not in sprint_text:
+                    errors.append("sprintdocument noemt de kandidaat-branch niet")
+                if candidate_values and candidate_values.get("sprint") != str(metadata.sprint):
+                    errors.append("baton-sprint wijkt af van config")
+            if candidate_values and (
+                candidate_values.get("state") != "ARCHITECTUUR"
+                or candidate_values.get("owner") != "claude"
+            ):
+                errors.append("Claude-kandidaat moet ARCHITECTUUR blijven; alleen activate-sprint zet READY_FOR_DEV")
+            if candidate_handoff_text and len(candidate_handoff_text.splitlines()) > 20:
+                errors.append("kandidaat-handoff overschrijdt de limiet van 20 regels")
+            current_progress = self._normalized((checkout / "progress.md").read_bytes())
+            if progress and not self._normalized(progress).startswith(current_progress):
+                errors.append("kandidaat-progress moet de actuele append-only historie behouden")
+            for pr in observed_prs:
+                branch = str(pr.get("headRefName", ""))
+                labels = pr.get("labels", [])
+                label_names = {
+                    str(label.get("name", "")).casefold()
+                    for label in labels if isinstance(label, Mapping)
+                } if isinstance(labels, list) else set()
+                if str(pr.get("state")) == "OPEN" and str(pr.get("baseRefName")) == "main" and (
+                    branch.startswith("agent/") or "pipeline" in label_names
+                ):
+                    errors.append(
+                        f"open pipeline-PR #{pr.get('number')} ({branch}) moet vóór activatie worden gesloten"
+                    )
+            if errors:
+                raise GitStewardError("activatie geweigerd: " + "; ".join(errors))
+
+            assert metadata is not None and candidate_values
+            activated_values = {
+                **candidate_values,
+                "state": "READY_FOR_DEV",
+                "owner": "codex",
+                "since": now or _utc_now(),
+                "next": "gemini",
+                "action_required_by": "none",
+                "blocked": "false",
+            }
+            validate_values(activated_values)
+            activated_handoff = _render_handoff(candidate_handoff_text, activated_values).encode("utf-8")
+            snapshots = {
+                "config/pipeline-sprint.json": self._candidate_bytes(candidate, "pipeline-sprint.json"),
+                "sprint.md": self._candidate_bytes(candidate, "sprint.md"),
+                "progress.md": progress,
+                "handoff.md": activated_handoff,
+            }
+            for relative, content in snapshots.items():
+                destination = checkout / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(content)
+            self._run_git(["add", "--", *ACTIVATION_PATHS], cwd=checkout)
+            names = self._run_git(["diff", "--cached", "--name-only", "--"], cwd=checkout).stdout.splitlines()
+            if set(names) != set(ACTIVATION_PATHS):
+                raise GitStewardError("atomische activatie moet exact config/sprint/progress/handoff wijzigen")
+            self._run_git(
+                [
+                    "-c", f"user.name={STEWARD_NAME}", "-c", f"user.email={STEWARD_EMAIL}",
+                    "commit", "--quiet", "-m", f"chore(sprint-{metadata.sprint}): activate sprint atomically",
+                    "--", *ACTIVATION_PATHS,
+                ],
+                cwd=checkout,
+            )
+            self._push_once(checkout)
+            return True
 
     def block_finalize(self, role: str, note: str, *, now: str | None = None) -> bool:
         """Write an idempotent BLOCKED baton/progress entry and synchronize it."""
@@ -579,6 +829,9 @@ def _parser() -> argparse.ArgumentParser:
     blocked = commands.add_parser("block_finalize")
     blocked.add_argument("--role", required=True, choices=sorted(ROLE_NAMES))
     blocked.add_argument("--note", required=True)
+    activate = commands.add_parser("activate-sprint")
+    activate.add_argument("--candidate", type=Path, required=True)
+    activate.add_argument("--repository", required=True)
     return parser
 
 
@@ -596,8 +849,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         if args.command == "sync":
             changed = steward.sync(expected_from=args.expected_from, source_sha=args.source_sha)
-        else:
+        elif args.command == "block_finalize":
             changed = steward.block_finalize(args.role, args.note)
+        else:
+            changed = steward.activate_sprint(args.candidate, repository=args.repository)
     except GitStewardError as exc:
         print(f"GIT_STEWARD_BLOCKED: {exc}", file=sys.stderr)
         return 1

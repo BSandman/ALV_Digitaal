@@ -564,9 +564,9 @@ def mark_blocked(
     except OSError:
         notify_ok = False
     outcome = (
-        "BLOCKED via GitSteward + notify"
+        f"FOUT: {safe_reason}; BLOCKED via GitSteward + notify"
         if steward_ok and notify_ok
-        else "BLOCKED; GitSteward/notifier aandacht nodig"
+        else f"FOUT: {safe_reason}; BLOCKED; GitSteward/notifier aandacht nodig"
     )
     append_activity(role, previous, "BLOCKED", outcome, log_path=log_path or repo / "autorun.log")
     return steward_ok and notify_ok
@@ -826,11 +826,12 @@ def execute_autorun_turn(
 def run_pipeline_setup_guard(repo: Path = REPO) -> None:
     metadata = repo / "config" / "pipeline-sprint.json"
     if not metadata.is_file():
-        return
+        raise AutorunError("pipeline sprintmetadata ontbreekt; sprintstart fail-closed geblokkeerd")
     result = subprocess.run(
         [
             sys.executable, str(repo / "scripts" / "pipeline_guard.py"), "setup",
             "--metadata", str(metadata), "--repository", "BSandman/ALV_Digitaal",
+            "--defer-live-safety-to-ci",
         ],
         cwd=repo,
         capture_output=True,
@@ -838,7 +839,8 @@ def run_pipeline_setup_guard(repo: Path = REPO) -> None:
         check=False,
     )
     if result.returncode:
-        raise AutorunError("pipeline setup-lint blokkeerde de sprintstart")
+        detail = " ".join((result.stderr or result.stdout or "onbekende setup-fout").splitlines())[:180]
+        raise AutorunError(f"pipeline setup-lint blokkeerde de sprintstart: {detail}")
 
 
 def run_session(

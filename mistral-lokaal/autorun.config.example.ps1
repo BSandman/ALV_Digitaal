@@ -23,3 +23,4 @@ $env:ALV_AUTORUN_PROGRESS_TAIL = '15'
 
 # De notifier leest kanaal en geheimen uit het bestaande lokale notifier.env-bestand.
 $env:ALV_NOTIFIER_CONFIG = (Join-Path $PSScriptRoot 'notifier.env')
+$env:ALV_NOTIFIER_STATE = (Join-Path $PSScriptRoot 'notifier-state.json')
